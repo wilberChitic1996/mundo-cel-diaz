@@ -1,0 +1,46 @@
+# Dependencias
+node_modules/
+vendor/
+
+# Variables de entorno (NUNCA subir al repo)
+.env
+.env.local
+.env.production
+.env.*
+
+# Builds y distribución
+dist/
+build/
+*.exe
+*.dmg
+*.AppImage
+
+# Editor
+.vscode/
+.idea/
+*.swp
+*.swo
+*.DS_Store
+Thumbs.db
+
+# Logs
+*.log
+logs/
+npm-debug.log*
+
+# Cache
+.cache/
+.parcel-cache/
+
+# Electron
+out/
+release/
+
+# Base de datos local (no subir datos reales)
+*.db
+*.sqlite
+*.sqlite3
+
+# Backups (contienen datos de clientes)
+*_backup_*.json
+*_backup_*.xlsx
