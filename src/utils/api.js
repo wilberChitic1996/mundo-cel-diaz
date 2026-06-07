@@ -1,7 +1,7 @@
 // src/utils/api.js
 import axios from 'axios';
 
-const API_URL = 'http://localhost:4000/api';
+const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:4000/api';
 
 const api = axios.create({
   baseURL: API_URL,
@@ -80,8 +80,7 @@ export const usersAPI = {
 // ── Health check ──────────────────────────────────────
 export const checkAPI = async function() {
   try {
-    const res = await fetch('http://localhost:4000/health', {
-      signal: AbortSignal.timeout(3000)
+    const res = await fetch((import.meta.env.VITE_API_URL || 'http://localhost:4000/api').replace('/api', '/health'), {      signal: AbortSignal.timeout(3000)
     });
     return res.ok;
   } catch { return false; }
