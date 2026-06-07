@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import * as XLSX from 'xlsx';
 import { db } from './utils/db.js';
-import { authAPI, productsAPI, salesAPI, accountsAPI, usersAPI, checkAPI } from './utils/api.js';
+import { authAPI, productsAPI, salesAPI, accountsAPI, returnsAPI, defectivesAPI, usersAPI, checkAPI } from './utils/api.js';
 
 const TEAL = "#1D9E75";
 const NAVY = "#1a2535";
@@ -1346,20 +1346,23 @@ function App(props) {
       if(online && hasApiToken){
         // Modo online: cargar datos desde el API
         try {
-          var [prods, sls, accs] = await Promise.all([
+          var [prods, sls, accs, rets, defs] = await Promise.all([
             productsAPI.getAll(),
             salesAPI.getAll(),
             accountsAPI.getAll(),
+            returnsAPI.getAll(),
+            defectivesAPI.getAll(),
           ]);
-          // Normalizar formato del API al formato del sistema
-          var normalProds = (prods||[]).map(function(p){return Object.assign({},p,{id:p.id,code:p.code,name:p.name,category:p.category,shelf:p.shelf,price:Number(p.price),cost:Number(p.cost),stock:p.stock,unit:p.unit});});
+          var normalProds = (prods||[]).map(function(p){return Object.assign({},p,{id:p.id,code:p.code,name:p.name,category:p.category||'',shelf:p.shelf||'',price:Number(p.price),cost:Number(p.cost),stock:Number(p.stock),unit:p.unit||'uni'});});
           var normalSales = (sls||[]).map(function(s){return Object.assign({},s,{items:s.sale_items||[],total:Number(s.total),date:s.created_at});});
           var normalAccs  = (accs||[]).map(function(a){return Object.assign({},a,{items:a.account_items||[],payments:a.account_payments||[],total:Number(a.total),paid:Number(a.paid),balance:Number(a.balance),date:a.created_at});});
+          var normalRets  = (rets||[]).map(function(r){return Object.assign({},r,{items:r.return_items||[],refundAmount:Number(r.refund_amount),itemCondition:r.item_condition,refundMethod:r.refund_method,date:r.created_at});});
+          var normalDefs  = (defs||[]).map(function(d){return Object.assign({},d,{price:Number(d.price||0)});});
           setProducts(normalProds.length>0?normalProds:DEMO);
           setSales(normalSales);
           setAccounts(normalAccs);
-          setReturns([]);
-          setDefectives([]);
+          setReturns(normalRets);
+          setDefectives(normalDefs);
         } catch(e) {
           console.warn("Error cargando del API, usando local:", e);
           setIsOnline(false);
@@ -1457,70 +1460,159 @@ function App(props) {
       var balance=cartTotal-paid;
       var status=balance<=0?"pagado":paid>0?"parcial":"pendiente";
       var pmts=paid>0?[{id:gid(),date:new Date().toISOString(),amount:paid,method:payMethod,note:"Abono inicial"}]:[];
-      setAccounts(function(p){return [Object.assign({},base,{paid:paid,balance:balance,status:status,payments:pmts})].concat(p);});
+      if(isOnline){
+        try{
+          await salesAPI.create({client:client,total:cartTotal,method:payMethod,items:cart,payType:payType,initialPay:paid});
+          var freshAccs = await accountsAPI.getAll();
+          var na=(freshAccs||[]).map(function(a){return Object.assign({},a,{items:a.account_items||[],payments:a.account_payments||[],total:Number(a.total),paid:Number(a.paid),balance:Number(a.balance),date:a.created_at});});
+          setAccounts(na);
+        }catch(e){
+          console.warn("Error API cuenta:",e);
+          setAccounts(function(p){return [Object.assign({},base,{paid:paid,balance:balance,status:status,payments:pmts})].concat(p);});
+        }
+      } else {
+        setAccounts(function(p){return [Object.assign({},base,{paid:paid,balance:balance,status:status,payments:pmts})].concat(p);});
+      }
       deduct();
       showFlash(payType==="pendiente"?"⏳ Pendiente — "+Q(cartTotal)+" por cobrar":"💰 Abono "+Q(paid)+" — Saldo: "+Q(balance),"warn");
     }
     resetPOS();
   }
 
-  function addPayment(accountId,amount,method,note){
-    var pmt={id:gid(),date:new Date().toISOString(),amount:amount,method:method,note:note};
-    setAccounts(function(prev){return prev.map(function(acc){
-      if(acc.id!==accountId)return acc;
-      var pmts=(acc.payments||[]).concat([pmt]);
-      var paid=pmts.reduce(function(s,p){return s+p.amount;},0);
-      var balance=Math.max(0,acc.total-paid);
-      var status=balance<=0?"pagado":paid>0?"parcial":"pendiente";
-      return Object.assign({},acc,{payments:pmts,paid:paid,balance:balance,status:status});
-    });});
+  async function addPayment(accountId,amount,method,note){
+    if(isOnline){
+      try{
+        await accountsAPI.addPayment(accountId,{amount:amount,method:method||'Efectivo',note:note||''});
+        var freshAccs2 = await accountsAPI.getAll();
+        var na2=(freshAccs2||[]).map(function(a){return Object.assign({},a,{items:a.account_items||[],payments:a.account_payments||[],total:Number(a.total),paid:Number(a.paid),balance:Number(a.balance),date:a.created_at});});
+        setAccounts(na2);
+      }catch(e){
+        console.warn("Error API addPayment:",e);
+        var pmt2={id:gid(),date:new Date().toISOString(),amount:amount,method:method,note:note};
+        setAccounts(function(prev){return prev.map(function(acc){
+          if(acc.id!==accountId)return acc;
+          var pmts=(acc.payments||[]).concat([pmt2]);
+          var paid=pmts.reduce(function(s,p){return s+p.amount;},0);
+          var balance=Math.max(0,acc.total-paid);
+          var status=balance<=0?"pagado":paid>0?"parcial":"pendiente";
+          return Object.assign({},acc,{payments:pmts,paid:paid,balance:balance,status:status});
+        });});
+      }
+    } else {
+      var pmtOff={id:gid(),date:new Date().toISOString(),amount:amount,method:method,note:note};
+      setAccounts(function(prev){return prev.map(function(acc){
+        if(acc.id!==accountId)return acc;
+        var pmts=(acc.payments||[]).concat([pmtOff]);
+        var paid=pmts.reduce(function(s,p){return s+p.amount;},0);
+        var balance=Math.max(0,acc.total-paid);
+        var status=balance<=0?"pagado":paid>0?"parcial":"pendiente";
+        return Object.assign({},acc,{payments:pmts,paid:paid,balance:balance,status:status});
+      });});
+    }
+    showFlash("✓ Pago registrado","ok");
   }
 
-  function processReturn(data){
+  async function processReturn(data){
     var total=data.items.reduce(function(s,i){return s+i.price*i.qty;},0);
     var newId=gid();
     var ret=Object.assign({},data,{id:newId,date:new Date().toISOString(),total:total});
-    setReturns(function(p){return [ret].concat(p);});
 
-    if(data.itemCondition==="bueno"){
-      // Artículo en buen estado: vuelve al inventario
-      setProducts(function(p){return p.map(function(x){
-        var ri=data.items.find(function(i){return i.code===x.code;});
-        return ri&&x.unit!=="serv"?Object.assign({},x,{stock:x.stock+ri.qty}):x;
-      });});
+    if(isOnline){
+      try{
+        await returnsAPI.create({
+          client:data.client,
+          reason:data.reason,
+          refundMethod:data.refundMethod,
+          refundAmount:data.refundAmount,
+          itemCondition:data.itemCondition,
+          items:data.items
+        });
+        // Recargar returns, defectives y productos desde API
+        var [freshRets, freshDefs, freshProds] = await Promise.all([
+          returnsAPI.getAll(),
+          defectivesAPI.getAll(),
+          productsAPI.getAll(),
+        ]);
+        setReturns((freshRets||[]).map(function(r){return Object.assign({},r,{items:r.return_items||[],refundAmount:Number(r.refund_amount),itemCondition:r.item_condition,refundMethod:r.refund_method,date:r.created_at});}));
+        setDefectives((freshDefs||[]).map(function(d){return Object.assign({},d,{price:Number(d.price||0)});}));
+        setProducts((freshProds||[]).map(function(p){return Object.assign({},p,{price:Number(p.price),cost:Number(p.cost),stock:Number(p.stock)});}));
+      }catch(e){
+        console.warn("Error API return:",e);
+        setReturns(function(p){return [ret].concat(p);});
+        if(data.itemCondition==="bueno"){
+          setProducts(function(p){return p.map(function(x){var ri=data.items.find(function(i){return i.code===x.code;});return ri&&x.unit!=="serv"?Object.assign({},x,{stock:x.stock+ri.qty}):x;});});
+        } else {
+          setDefectives(function(p){return data.items.map(function(item){return {id:gid(),date:new Date().toISOString(),returnId:newId,code:item.code,name:item.name,qty:item.qty,price:item.price,reason:data.reason,status:"defectuoso"};}).concat(p);});
+        }
+      }
     } else {
-      // Artículo defectuoso: va a piezas defectuosas, NO al inventario
-      var newDefs=data.items.map(function(item){
-        return {id:gid(),date:new Date().toISOString(),returnId:newId,code:item.code,name:item.name,qty:item.qty,price:item.price,reason:data.reason,status:"defectuoso"};
-      });
-      setDefectives(function(p){return newDefs.concat(p);});
+      setReturns(function(p){return [ret].concat(p);});
+      if(data.itemCondition==="bueno"){
+        setProducts(function(p){return p.map(function(x){var ri=data.items.find(function(i){return i.code===x.code;});return ri&&x.unit!=="serv"?Object.assign({},x,{stock:x.stock+ri.qty}):x;});});
+      } else {
+        setDefectives(function(p){return data.items.map(function(item){return {id:gid(),date:new Date().toISOString(),returnId:newId,code:item.code,name:item.name,qty:item.qty,price:item.price,reason:data.reason,status:"defectuoso"};}).concat(p);});
+      }
     }
-
     var msg=data.itemCondition==="bueno"
       ?"🔄 Devolución registrada — artículo reintegrado al stock"
       :"🔄 Devolución registrada — artículo enviado a Piezas Defectuosas";
     showFlash(msg,"ok");
   }
 
-  function updateDefectiveStatus(id,status){
-    setDefectives(function(p){return p.map(function(d){return d.id===id?Object.assign({},d,{status:status}):d;});});
+  async function updateDefectiveStatus(id,status){
+    if(isOnline){
+      try{
+        await defectivesAPI.update(id,status);
+        var freshDefs = await defectivesAPI.getAll();
+        setDefectives((freshDefs||[]).map(function(d){return Object.assign({},d,{price:Number(d.price||0)});}));
+        if(status==="reingresado"){
+          var freshProds2 = await productsAPI.getAll();
+          setProducts((freshProds2||[]).map(function(p){return Object.assign({},p,{price:Number(p.price),cost:Number(p.cost),stock:Number(p.stock)});}));
+        }
+      }catch(e){
+        console.warn("Error API defective:",e);
+        setDefectives(function(p){return p.map(function(d){return d.id===id?Object.assign({},d,{status:status}):d;});});
+      }
+    } else {
+      setDefectives(function(p){return p.map(function(d){return d.id===id?Object.assign({},d,{status:status}):d;});});
+    }
   }
 
-  function reingresarDefective(id){
-    var def=defectives.find(function(d){return d.id===id;});
-    if(!def)return;
-    setProducts(function(p){return p.map(function(x){
-      return x.code===def.code&&x.unit!=="serv"?Object.assign({},x,{stock:x.stock+def.qty}):x;
-    });});
-    setDefectives(function(p){return p.map(function(d){return d.id===id?Object.assign({},d,{status:"reingresado"}):d;});});
+  async function reingresarDefective(id){
+    await updateDefectiveStatus(id,'reingresado');
     showFlash("✅ Pieza reingresada al inventario","ok");
   }
-
-  function saveProduct(prod){
-    if(prod.id) setProducts(function(p){return p.map(function(x){return x.id===prod.id?prod:x;});});
-    else setProducts(function(p){return p.concat([Object.assign({},prod,{id:gid()})]);});
+  async function saveProduct(prod){
+    var isNew=!prod.id;
+    if(!isNew&&isOnline){
+      try{
+        await productsAPI.update(prod.id,{code:prod.code,name:prod.name,category:prod.category||'',shelf:prod.shelf||'',price:prod.price,cost:prod.cost||0,stock:prod.stock||0,unit:prod.unit||'uni'});
+        setProducts(function(p){return p.map(function(x){return x.id===prod.id?prod:x;});});
+      }catch(e){
+        console.warn("Error API updateProduct:",e);
+        setProducts(function(p){return p.map(function(x){return x.id===prod.id?prod:x;});});
+      }
+    } else if(isNew&&isOnline){
+      try{
+        var saved=await productsAPI.create({code:prod.code,name:prod.name,category:prod.category||'',shelf:prod.shelf||'',price:prod.price,cost:prod.cost||0,stock:prod.stock||0,unit:prod.unit||'uni'});
+        setProducts(function(p){return p.concat([Object.assign({},prod,{id:saved.id})]);});
+      }catch(e){
+        console.warn("Error API createProduct:",e);
+        setProducts(function(p){return p.concat([Object.assign({},prod,{id:gid()})]);});
+      }
+    } else {
+      if(prod.id) setProducts(function(p){return p.map(function(x){return x.id===prod.id?prod:x;});});
+      else setProducts(function(p){return p.concat([Object.assign({},prod,{id:gid()})]);});
+    }
   }
-  function deleteProduct(id){ setProducts(function(p){return p.filter(function(x){return x.id!==id;});}); }
+  async function deleteProduct(id){
+    if(isOnline){
+      try{ await productsAPI.remove(id); }
+      catch(e){ console.warn("Error API deleteProduct:",e); }
+    }
+    setProducts(function(p){return p.filter(function(x){return x.id!==id;});});
+    showFlash("Producto eliminado","ok");
+  }
 
   function exportJSON(){
     var data={version:"2.1",exportDate:new Date().toISOString(),negocio:"MUNDO CEL DIAZ",products:products,sales:sales,accounts:accounts,returns:returns,defectives:defectives};
