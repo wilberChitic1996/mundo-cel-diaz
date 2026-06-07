@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
 import * as XLSX from 'xlsx';
+import { db } from './utils/db.js';
 
 const TEAL = "#1D9E75";
 const NAVY = "#1a2535";
@@ -14,10 +15,7 @@ const Q    = function(n){ return "Q " + Number(n).toFixed(2); };
 const fmtD = function(d){ return new Date(d).toLocaleDateString("es-GT",{day:"2-digit",month:"short",year:"numeric"}); };
 const fmtT = function(d){ return new Date(d).toLocaleTimeString("es-GT",{hour:"2-digit",minute:"2-digit"}); };
 
-const db = {
-  load: function(k,fb){ try{ var r=localStorage.getItem(k); return r?JSON.parse(r):fb; }catch(e){ return fb; } },
-  save: function(k,v) { try{ localStorage.setItem(k,JSON.stringify(v)); }catch(e){} }
-};
+// db importado desde src/utils/db.js
 
 var DEMO = [
   {id:"p01",code:"A001",name:"Pantalla iPhone 11",    category:"Pantallas",  price:450,cost:280,stock:8,  shelf:"A-01",unit:"uni"},
@@ -114,8 +112,8 @@ function LoginScreen(props) {
     if(blocked){setErr("Cuenta bloqueada 5 minutos por seguridad.");return;}
     if(!email.trim()||!pass){setErr("Ingresá tu email y contraseña");return;}
     setLoading(true);setErr("");
-    var users=db.load(UK,[]);
-    var user=users.find(function(u){return u.email.toLowerCase()===email.trim().toLowerCase()&&u.active;});
+    var users=await db.load(UK,[]);
+    var user=(users||[]).find(function(u){return u.email.toLowerCase()===email.trim().toLowerCase()&&u.active;});
     if(!user){setAttempts(function(a){return a+1;});setErr("Email o contraseña incorrectos");setLoading(false);return;}
     var hash=await hashPass(pass);
     if(hash!==user.passwordHash){
@@ -129,8 +127,8 @@ function LoginScreen(props) {
       }
       setLoading(false);return;
     }
-    var updated=users.map(function(u){return u.id===user.id?Object.assign({},u,{lastLogin:new Date().toISOString()}):u;});
-    db.save(UK,updated);
+    var updated=(users||[]).map(function(u){return u.id===user.id?Object.assign({},u,{lastLogin:new Date().toISOString()}):u;});
+    await db.save(UK,updated);
     setLoading(false);
     onLogin(createSession(user));
   }
@@ -182,7 +180,8 @@ function LoginScreen(props) {
 /* ── UsersScreen ── */
 function UsersScreen(props) {
   var session=props.session; var showFlash=props.showFlash;
-  var _u=useState(function(){return db.load(UK,[]);}); var users=_u[0]; var setUsers=_u[1];
+  var _u=useState([]); var users=_u[0]; var setUsers=_u[1];
+  var _uld=useState(false); var usersLoaded=_uld[0]; var setUsersLoaded=_uld[1];
   var _sf=useState(false); var showForm=_sf[0]; var setShowForm=_sf[1];
   var _eu=useState(null); var editUser=_eu[0]; var setEditUser=_eu[1];
   var _fn=useState(""); var fName=_fn[0]; var setFName=_fn[1];
@@ -191,7 +190,8 @@ function UsersScreen(props) {
   var _fr=useState("cajero"); var fRole=_fr[0]; var setFRole=_fr[1];
   var _fer=useState(""); var fErr=_fer[0]; var setFErr=_fer[1];
 
-  useEffect(function(){db.save(UK,users);},[users]);
+  useEffect(function(){async function load(){var u=await db.load(UK,[]);setUsers(u||[]);setUsersLoaded(true);}load();},[]);
+  useEffect(function(){if(usersLoaded)db.save(UK,users);},[users,usersLoaded]);
 
   function resetForm(){setFName("");setFEmail("");setFPass("");setFRole("cajero");setFErr("");setEditUser(null);setShowForm(false);}
 
@@ -292,10 +292,11 @@ function AppWrapper() {
 
   useEffect(function(){
     async function initAdmin(){
-      var users=db.load(UK,[]);
-      if(users.length===0){
+      var users=await db.load(UK,[]);
+      if(!users||users.length===0){
         var hash=await hashPass("Admin2026#");
-        db.save(UK,[{id:gid(),name:"Administrador",email:"admin@mundoceldiaz.com",passwordHash:hash,role:"admin",active:true,createdAt:new Date().toISOString()}]);
+        await db.save(UK,[{id:gid(),name:"Administrador",email:"admin@mundoceldiaz.com",passwordHash:hash,role:"admin",active:true,createdAt:new Date().toISOString()}]);
+        console.log("Admin creado exitosamente");
       }
     }
     initAdmin();
@@ -1265,7 +1266,7 @@ function BackupScreen(props) {
   var onExportJSON=props.onExportJSON; var onExportExcel=props.onExportExcel; var onImport=props.onImport;
   var _m=useState(""); var msg=_m[0]; var setMsg=_m[1];
   var _i=useState(false); var importing=_i[0]; var setImporting=_i[1];
-  var lastBackup=db.load("mnpos-last-backup",null);
+  var lastBackup=null; try{ lastBackup=JSON.parse(localStorage.getItem("mnpos-last-backup")); }catch(e){}
   var sizeKB=Math.round(JSON.stringify({products:products,sales:sales,accounts:accounts,returns:returns,defectives:defectives}).length/1024);
   var bm={ok:{bg:"#EAF3DE",border:"#97C459",color:"#27500A",text:"✓ Descargado correctamente"},imported:{bg:"#EAF3DE",border:"#97C459",color:"#27500A",text:"✓ Datos restaurados"},error:{bg:"#FCEBEB",border:"#F09595",color:"#791F1F",text:"✗ Archivo inválido"}}[msg];
   function doImport(file){
@@ -1318,17 +1319,31 @@ function BackupScreen(props) {
 /* ══ APP ══════════════════════════════════════════════════════════════ */
 function App(props) {
   var session=props.session||{}; var onLogout=props.onLogout||function(){};
-  var _p=useState(function(){return db.load(PK,DEMO);}); var products=_p[0]; var setProducts=_p[1];
-  var _s=useState(function(){return db.load(SK,[]);}); var sales=_s[0]; var setSales=_s[1];
-  var _a=useState(function(){return db.load(AK,[]);}); var accounts=_a[0]; var setAccounts=_a[1];
-  var _r=useState(function(){return db.load(RK,[]);}); var returns=_r[0]; var setReturns=_r[1];
-  var _d=useState(function(){return db.load(DFK,[]);}); var defectives=_d[0]; var setDefectives=_d[1];
+  var _p=useState([]); var products=_p[0]; var setProducts=_p[1];
+  var _s=useState([]); var sales=_s[0]; var setSales=_s[1];
+  var _a=useState([]); var accounts=_a[0]; var setAccounts=_a[1];
+  var _r=useState([]); var returns=_r[0]; var setReturns=_r[1];
+  var _d=useState([]); var defectives=_d[0]; var setDefectives=_d[1];
+  var _ld=useState(false); var loaded=_ld[0]; var setLoaded=_ld[1];
 
-  useEffect(function(){db.save(PK,products);},[products]);
-  useEffect(function(){db.save(SK,sales);},[sales]);
-  useEffect(function(){db.save(AK,accounts);},[accounts]);
-  useEffect(function(){db.save(RK,returns);},[returns]);
-  useEffect(function(){db.save(DFK,defectives);},[defectives]);
+  useEffect(function(){
+    async function loadAll(){
+      var p = await db.load(PK, DEMO);
+      var s = await db.load(SK, []);
+      var a = await db.load(AK, []);
+      var r = await db.load(RK, []);
+      var d = await db.load(DFK, []);
+      setProducts(p); setSales(s); setAccounts(a); setReturns(r); setDefectives(d);
+      setLoaded(true);
+    }
+    loadAll();
+  },[]);
+
+  useEffect(function(){ if(loaded) db.save(PK,products);    },[products,loaded]);
+  useEffect(function(){ if(loaded) db.save(SK,sales);       },[sales,loaded]);
+  useEffect(function(){ if(loaded) db.save(AK,accounts);    },[accounts,loaded]);
+  useEffect(function(){ if(loaded) db.save(RK,returns);     },[returns,loaded]);
+  useEffect(function(){ if(loaded) db.save(DFK,defectives); },[defectives,loaded]);
 
   var _v=useState("pos"); var view=_v[0]; var setView=_v[1];
   var _fl=useState({msg:"",type:"ok"}); var flash=_fl[0]; var setFlash=_fl[1];

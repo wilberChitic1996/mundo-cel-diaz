@@ -1,22 +1,51 @@
 {
   "name": "mundo-cel-diaz",
-  "version": "2.0.0",
-  "description": "Sistema de Gestión — MUNDO CEL DIAZ",
-  "type": "module",
+  "version": "2.1.0",
+  "description": "Sistema de Gestión POS — MUNDO CEL DIAZ",
+  "main": "electron/main.js",
   "scripts": {
-    "dev":     "vite",
-    "build":   "vite build",
-    "preview": "vite preview"
+    "dev": "vite",
+    "build": "vite build",
+    "preview": "vite preview",
+    "electron:dev": "cross-env NODE_ENV=development electron .",
+    "electron": "electron .",
+    "package": "vite build && electron-builder"
+  },
+  "build": {
+    "appId": "com.mundoceldiaz.pos",
+    "productName": "MUNDO CEL DIAZ",
+    "win": {
+      "target": "nsis"
+    },
+    "nsis": {
+      "oneClick": false,
+      "allowToChangeInstallationDirectory": true,
+      "createDesktopShortcut": true,
+      "createStartMenuShortcut": true,
+      "shortcutName": "MUNDO CEL DIAZ"
+    },
+    "files": [
+      "dist/**/*",
+      "electron/**/*",
+      "node_modules/**/*"
+    ],
+    "directories": {
+      "output": "release"
+    }
   },
   "dependencies": {
-    "react":     "^18.3.1",
+    "electron-store": "^8.1.0",
+    "react": "^18.3.1",
     "react-dom": "^18.3.1",
-    "xlsx":      "^0.18.5"
+    "xlsx": "^0.18.5"
   },
   "devDependencies": {
-    "@types/react":        "^18.3.1",
-    "@types/react-dom":    "^18.3.1",
+    "@types/react": "^18.3.1",
+    "@types/react-dom": "^18.3.1",
     "@vitejs/plugin-react": "^4.3.1",
-    "vite":                "^5.4.1"
+    "cross-env": "^7.0.3",
+    "electron": "^28.3.3",
+    "electron-builder": "^24.13.3",
+    "vite": "^5.4.1"
   }
 }

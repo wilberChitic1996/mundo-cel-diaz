@@ -1,51 +1,38 @@
-/**
- * Capa de abstracción de base de datos.
- *
- * AHORA:    usa localStorage del navegador.
- * FUTURO:   reemplazar load/save con llamadas a una API REST
- *           (Node.js + PostgreSQL / Supabase) sin tocar el resto del código.
- *
- * Ejemplo de migración futura:
- *   export const load = async (key) => {
- *     const res = await fetch(`/api/${key}`)
- *     return res.json()
- *   }
- *   export const save = async (key, data) => {
- *     await fetch(`/api/${key}`, { method:'PUT', body:JSON.stringify(data) })
- *   }
- */
+// src/utils/db.js
+// Capa de acceso a datos — funciona en AMBOS entornos:
+//   Electron (SQLite via IPC)  →  datos persistentes en archivo .db
+//   Navegador (localStorage)   →  para desarrollo con npm run dev
 
-// ── Claves de almacenamiento ─────────────────────────────
-export const KEYS = {
-  PRODUCTS:    'mnpos-prods-v5',
-  SALES:       'mnpos-sales-v5',
-  ACCOUNTS:    'mnpos-accounts-v2',
-  RETURNS:     'mnpos-returns-v2',
-  LAST_BACKUP: 'mnpos-last-backup',
-}
+const IS_ELECTRON =
+  typeof window !== 'undefined' &&
+  window.electronAPI?.isElectron === true;
 
-// ── Cargar datos ─────────────────────────────────────────
-export function load(key, fallback) {
-  try {
-    const raw = localStorage.getItem(key)
-    return raw ? JSON.parse(raw) : fallback
-  } catch {
-    return fallback
-  }
-}
+export const db = {
+  // ── Leer datos ────────────────────────────────────────────────────
+  load: async (key, fallback) => {
+    if (IS_ELECTRON) {
+      return window.electronAPI.getValue(key, fallback);
+    }
+    // Fallback: localStorage para desarrollo en navegador
+    try {
+      const raw = localStorage.getItem(key);
+      return raw ? JSON.parse(raw) : fallback;
+    } catch {
+      return fallback;
+    }
+  },
 
-// ── Guardar datos ────────────────────────────────────────
-export function save(key, value) {
-  try {
-    localStorage.setItem(key, JSON.stringify(value))
-  } catch (e) {
-    console.error('Error al guardar:', key, e)
-  }
-}
-
-// ── Eliminar clave ───────────────────────────────────────
-export function remove(key) {
-  try {
-    localStorage.removeItem(key)
-  } catch { /* silencioso */ }
-}
+  // ── Guardar datos ─────────────────────────────────────────────────
+  save: async (key, value) => {
+    if (IS_ELECTRON) {
+      return window.electronAPI.setValue(key, value);
+    }
+    // Fallback: localStorage para desarrollo en navegador
+    try {
+      localStorage.setItem(key, JSON.stringify(value));
+      return true;
+    } catch {
+      return false;
+    }
+  },
+};
