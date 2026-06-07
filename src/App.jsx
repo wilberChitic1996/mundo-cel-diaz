@@ -1388,8 +1388,8 @@ function App(props) {
 
   function checkout(){
     if(!cart.length)return;
-    var client=clientName.trim()||"Cliente general";
-    var items=cart.map(function(i){return {id:i.id,code:i.code,name:i.name,price:i.price,qty:i.qty,shelf:i.shelf};});
+    if(!clientName.trim()){showFlash("⚠ El nombre del cliente es obligatorio","err");return;}
+    var client=clientName.trim();    var items=cart.map(function(i){return {id:i.id,code:i.code,name:i.name,price:i.price,qty:i.qty,shelf:i.shelf};});
     var base={id:gid(),date:new Date().toISOString(),client:client,items:items,total:cartTotal,method:payMethod};
     function deduct(){ setProducts(function(p){return p.map(function(x){var ci=cart.find(function(i){return i.id===x.id;});return ci&&x.unit!=="serv"?Object.assign({},x,{stock:x.stock-ci.qty}):x;}); }); }
     if(payType==="completo"){
