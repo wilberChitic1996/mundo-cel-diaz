@@ -1,6 +1,7 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import * as XLSX from 'xlsx';
 import { db } from './utils/db.js';
+import { authAPI, productsAPI, salesAPI, accountsAPI, usersAPI, checkAPI } from './utils/api.js';
 
 const TEAL = "#1D9E75";
 const NAVY = "#1a2535";
@@ -129,6 +130,13 @@ function LoginScreen(props) {
     }
     var updated=(users||[]).map(function(u){return u.id===user.id?Object.assign({},u,{lastLogin:new Date().toISOString()}):u;});
     await db.save(UK,updated);
+    // Intentar login en el backend para sincronizacion en la nube
+    try {
+      await authAPI.login(email.trim(), pass);
+      console.log("Backend conectado — modo nube activo");
+    } catch(e) {
+      console.log("Backend no disponible — modo local activo");
+    }
     setLoading(false);
     onLogin(createSession(user));
   }
@@ -364,7 +372,7 @@ function Sidebar(props) {
   var view=props.view; var setView=props.setView;
   var cartLen=props.cartLen; var pendingLen=props.pendingLen;
   var products=props.products; var sales=props.sales;
-  var session=props.session||{}; var onLogout=props.onLogout||function(){};
+  var session=props.session||{}; var onLogout=props.onLogout||function(){}; var isOnline=props.isOnline||false;
   var NAV = [
     {id:"dashboard", ic:"📊", lb:"Dashboard"},
     {id:"pos",       ic:"🛒", lb:"Nueva Venta"},
@@ -434,6 +442,7 @@ function Sidebar(props) {
         )}
         <div style={{padding:"8px 16px"}}>
           <div style={{fontSize:10,color:"rgba(255,255,255,0.2)",lineHeight:1.9}}>{products.length} prod · {sales.length} ventas</div>
+          <div style={{fontSize:9,marginTop:2,color:isOnline?"#1D9E75":"rgba(255,255,255,0.15)"}}>● {isOnline?"Conectado a la nube":"Modo local"}</div>
         </div>
       </div>
     </div>
@@ -1318,32 +1327,69 @@ function BackupScreen(props) {
 
 /* ══ APP ══════════════════════════════════════════════════════════════ */
 function App(props) {
-  var session=props.session||{}; var onLogout=props.onLogout||function(){};
+  var session=props.session||{}; var onLogout=props.onLogout||function(){}; var isOnline=props.isOnline||false;
   var _p=useState([]); var products=_p[0]; var setProducts=_p[1];
   var _s=useState([]); var sales=_s[0]; var setSales=_s[1];
   var _a=useState([]); var accounts=_a[0]; var setAccounts=_a[1];
   var _r=useState([]); var returns=_r[0]; var setReturns=_r[1];
   var _d=useState([]); var defectives=_d[0]; var setDefectives=_d[1];
   var _ld=useState(false); var loaded=_ld[0]; var setLoaded=_ld[1];
+  var _on=useState(false); var isOnline=_on[0]; var setIsOnline=_on[1];
 
   useEffect(function(){
     async function loadAll(){
-      var p = await db.load(PK, DEMO);
-      var s = await db.load(SK, []);
-      var a = await db.load(AK, []);
-      var r = await db.load(RK, []);
-      var d = await db.load(DFK, []);
-      setProducts(p); setSales(s); setAccounts(a); setReturns(r); setDefectives(d);
+      // Verificar si el backend esta disponible
+      var online = await checkAPI();
+      setIsOnline(online);
+
+      var hasApiToken = !!sessionStorage.getItem('mnpos-api-session');
+      if(online && hasApiToken){
+        // Modo online: cargar datos desde el API
+        try {
+          var [prods, sls, accs] = await Promise.all([
+            productsAPI.getAll(),
+            salesAPI.getAll(),
+            accountsAPI.getAll(),
+          ]);
+          // Normalizar formato del API al formato del sistema
+          var normalProds = (prods||[]).map(function(p){return Object.assign({},p,{id:p.id,code:p.code,name:p.name,category:p.category,shelf:p.shelf,price:Number(p.price),cost:Number(p.cost),stock:p.stock,unit:p.unit});});
+          var normalSales = (sls||[]).map(function(s){return Object.assign({},s,{items:s.sale_items||[],total:Number(s.total),date:s.created_at});});
+          var normalAccs  = (accs||[]).map(function(a){return Object.assign({},a,{items:a.account_items||[],payments:a.account_payments||[],total:Number(a.total),paid:Number(a.paid),balance:Number(a.balance),date:a.created_at});});
+          setProducts(normalProds.length>0?normalProds:DEMO);
+          setSales(normalSales);
+          setAccounts(normalAccs);
+          setReturns([]);
+          setDefectives([]);
+        } catch(e) {
+          console.warn("Error cargando del API, usando local:", e);
+          setIsOnline(false);
+          var p2 = await db.load(PK, DEMO);
+          var s2 = await db.load(SK, []);
+          var a2 = await db.load(AK, []);
+          var r2 = await db.load(RK, []);
+          var d2 = await db.load(DFK, []);
+          setProducts(p2); setSales(s2); setAccounts(a2); setReturns(r2); setDefectives(d2);
+        }
+      } else {
+        // Modo offline: cargar desde almacenamiento local
+        var p = await db.load(PK, DEMO);
+        var s = await db.load(SK, []);
+        var a = await db.load(AK, []);
+        var r = await db.load(RK, []);
+        var d = await db.load(DFK, []);
+        setProducts(p); setSales(s); setAccounts(a); setReturns(r); setDefectives(d);
+      }
       setLoaded(true);
     }
     loadAll();
   },[]);
 
-  useEffect(function(){ if(loaded) db.save(PK,products);    },[products,loaded]);
-  useEffect(function(){ if(loaded) db.save(SK,sales);       },[sales,loaded]);
-  useEffect(function(){ if(loaded) db.save(AK,accounts);    },[accounts,loaded]);
-  useEffect(function(){ if(loaded) db.save(RK,returns);     },[returns,loaded]);
-  useEffect(function(){ if(loaded) db.save(DFK,defectives); },[defectives,loaded]);
+  // Guardar local solo en modo offline
+  useEffect(function(){ if(loaded&&!isOnline) db.save(PK,products);    },[products,loaded,isOnline]);
+  useEffect(function(){ if(loaded&&!isOnline) db.save(SK,sales);       },[sales,loaded,isOnline]);
+  useEffect(function(){ if(loaded&&!isOnline) db.save(AK,accounts);    },[accounts,loaded,isOnline]);
+  useEffect(function(){ if(loaded&&!isOnline) db.save(RK,returns);     },[returns,loaded,isOnline]);
+  useEffect(function(){ if(loaded&&!isOnline) db.save(DFK,defectives); },[defectives,loaded,isOnline]);
 
   var _v=useState("pos"); var view=_v[0]; var setView=_v[1];
   var _fl=useState({msg:"",type:"ok"}); var flash=_fl[0]; var setFlash=_fl[1];
@@ -1386,14 +1432,24 @@ function App(props) {
 
   function resetPOS(){ setCart([]);setCashIn("");setClientName("");setInitialPay("");setPayType("completo");setPayMethod("Efectivo"); }
 
-  function checkout(){
+  async function checkout(){
     if(!cart.length)return;
-    if(!clientName.trim()){showFlash("⚠ El nombre del cliente es obligatorio","err");return;}
-    var client=clientName.trim();    var items=cart.map(function(i){return {id:i.id,code:i.code,name:i.name,price:i.price,qty:i.qty,shelf:i.shelf};});
+    if(!clientName.trim()){showFlash("El nombre del cliente es obligatorio","err");return;}
+    var client=clientName.trim();
+    var items=cart.map(function(i){return {id:i.id,code:i.code,name:i.name,price:i.price,qty:i.qty,shelf:i.shelf};});
     var base={id:gid(),date:new Date().toISOString(),client:client,items:items,total:cartTotal,method:payMethod};
     function deduct(){ setProducts(function(p){return p.map(function(x){var ci=cart.find(function(i){return i.id===x.id;});return ci&&x.unit!=="serv"?Object.assign({},x,{stock:x.stock-ci.qty}):x;}); }); }
     if(payType==="completo"){
-      setSales(function(p){return [Object.assign({},base)].concat(p);});
+      if(isOnline){
+        try {
+          await salesAPI.create({client:client,total:cartTotal,method:payMethod,items:cart});
+          var freshSales = await salesAPI.getAll();
+          var ns = (freshSales||[]).map(function(s){return Object.assign({},s,{items:s.sale_items||[],total:Number(s.total),date:s.created_at});});
+          setSales(ns);
+        } catch(e){ console.warn("Error API venta:",e); setSales(function(p){return [Object.assign({},base)].concat(p);}); }
+      } else {
+        setSales(function(p){return [Object.assign({},base)].concat(p);});
+      }
       deduct();
       showFlash("✓ Venta cobrada — "+Q(cartTotal),"ok");
     } else {
@@ -1516,7 +1572,7 @@ function App(props) {
 
   return (
     <div style={{display:"flex",minHeight:"100vh",background:"#eceae4"}}>
-      <Sidebar view={view} setView={setView} cartLen={cart.length} pendingLen={pendingAccs.length} products={products} sales={sales} session={session} onLogout={onLogout}/>
+      <Sidebar view={view} setView={setView} cartLen={cart.length} pendingLen={pendingAccs.length} products={products} sales={sales} session={session} onLogout={onLogout} isOnline={isOnline}/>
       <div style={{flex:1,padding:"24px 28px",overflowY:"auto",minWidth:0}}>
         {view==="dashboard"&&<DashboardScreen sales={sales} todaySales={todaySales} pendingAccs={pendingAccs} totalPend={totalPend} products={products} top5={top5} setSelectedSale={setSelSale} setView={setView} accounts={accounts} returns={returns}/>}
         {view==="pos"      &&<POSScreen products={products} filteredPOS={filteredPOS} cart={cart} posQ={posQ} setPosQ={setPosQ} payMethod={payMethod} setPayMethod={setPayMethod} payType={payType} setPayType={setPayType} cashIn={cashIn} setCashIn={setCashIn} initialPay={initialPay} setInitialPay={setInitialPay} clientName={clientName} setClientName={setClientName} cartTotal={cartTotal} vuelto={vuelto} initPaidVal={initPaidVal} addToCart={addToCart} changeQty={changeQty} removeFromCart={removeFromCart} checkout={checkout} resetPOS={resetPOS} flash={flash}/>}

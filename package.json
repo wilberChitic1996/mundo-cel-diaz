@@ -15,7 +15,8 @@
     "appId": "com.mundoceldiaz.pos",
     "productName": "MUNDO CEL DIAZ",
     "win": {
-      "target": "nsis"
+      "target": "nsis",
+      "icon": "assets/icon.ico"
     },
     "nsis": {
       "oneClick": false,
@@ -27,13 +28,15 @@
     "files": [
       "dist/**/*",
       "electron/**/*",
-      "node_modules/**/*"
+      "node_modules/**/*",
+      "assets/**/*"
     ],
     "directories": {
       "output": "release"
     }
   },
   "dependencies": {
+    "axios": "^1.17.0",
     "electron-store": "^8.1.0",
     "react": "^18.3.1",
     "react-dom": "^18.3.1",
@@ -46,6 +49,7 @@
     "cross-env": "^7.0.3",
     "electron": "^28.3.3",
     "electron-builder": "^24.13.3",
+    "rcedit": "^4.0.1",
     "vite": "^5.4.1"
   }
 }

@@ -1,0 +1,130 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>MUNDO CEL DIAZ</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+    background: #1a2535;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    height: 100vh;
+    overflow: hidden;
+    user-select: none;
+    -webkit-app-region: drag;
+  }
+
+  .logo-wrap {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    animation: fadeIn 0.6s ease;
+  }
+
+  .icon-box {
+    width: 80px;
+    height: 80px;
+    background: linear-gradient(135deg, #1D9E75, #0a6b4a);
+    border-radius: 20px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    margin-bottom: 20px;
+    box-shadow: 0 8px 32px rgba(29,158,117,0.4);
+  }
+
+  .icon-box svg { width: 46px; height: 46px; }
+
+  .title {
+    font-size: 28px;
+    font-weight: 800;
+    color: #ffffff;
+    letter-spacing: -0.5px;
+    margin-bottom: 4px;
+  }
+
+  .subtitle {
+    font-size: 13px;
+    font-weight: 600;
+    color: #1D9E75;
+    letter-spacing: 2px;
+    text-transform: uppercase;
+    margin-bottom: 6px;
+  }
+
+  .tagline {
+    font-size: 12px;
+    color: rgba(255,255,255,0.3);
+    margin-bottom: 40px;
+  }
+
+  /* Barra de progreso */
+  .progress-wrap {
+    width: 200px;
+    height: 3px;
+    background: rgba(255,255,255,0.08);
+    border-radius: 10px;
+    overflow: hidden;
+    margin-bottom: 20px;
+  }
+  .progress-bar {
+    height: 100%;
+    background: linear-gradient(90deg, #1D9E75, #2ed8a0);
+    border-radius: 10px;
+    animation: progress 1.8s ease-in-out forwards;
+  }
+
+  .version {
+    font-size: 11px;
+    color: rgba(255,255,255,0.2);
+    position: absolute;
+    bottom: 18px;
+  }
+
+  .copy {
+    font-size: 10px;
+    color: rgba(255,255,255,0.15);
+    position: absolute;
+    bottom: 6px;
+  }
+
+  @keyframes fadeIn {
+    from { opacity: 0; transform: translateY(10px); }
+    to   { opacity: 1; transform: translateY(0); }
+  }
+
+  @keyframes progress {
+    0%   { width: 0%; }
+    30%  { width: 40%; }
+    70%  { width: 75%; }
+    100% { width: 100%; }
+  }
+</style>
+</head>
+<body>
+  <div class="logo-wrap">
+    <div class="icon-box">
+      <svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+        <rect x="5" y="2" width="14" height="20" rx="2.5" stroke="white" stroke-width="1.8"/>
+        <circle cx="12" cy="17.5" r="1.4" fill="white"/>
+        <line x1="9" y1="5.5" x2="15" y2="5.5" stroke="white" stroke-width="1.5" stroke-linecap="round"/>
+        <line x1="10" y1="9.5" x2="14" y2="9.5" stroke="rgba(255,255,255,0.5)" stroke-width="1.2" stroke-linecap="round"/>
+        <line x1="10" y1="12" x2="14" y2="12" stroke="rgba(255,255,255,0.5)" stroke-width="1.2" stroke-linecap="round"/>
+      </svg>
+    </div>
+    <p class="title">MUNDO CEL DIAZ</p>
+    <p class="subtitle">Sistema de Gestión</p>
+    <p class="tagline">Reparaciones · Ventas · Control</p>
+    <div class="progress-wrap">
+      <div class="progress-bar"></div>
+    </div>
+  </div>
+  <p class="version">v2.1.1</p>
+  <p class="copy">© 2026 MUNDO CEL DIAZ · Guatemala</p>
+</body>
+</html>
