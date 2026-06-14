@@ -73,9 +73,9 @@ var UK       = "mnpos-users-v1";
 var SESS_KEY = "mnpos-session-v1";
 
 var PERMS = {
-  admin:   ["dashboard","pos","caja","accounts","returns","defective","products","inventory","history","backup","users","clients","repairs"],
+  admin:   ["dashboard","pos","caja","accounts","returns","defective","products","inventory","history","backup","users","clients","repairs","cuadres"],
   cajero:  ["dashboard","pos","caja","accounts","returns","history","clients","repairs"],
-  auditor: ["dashboard","caja","history","inventory"],
+  auditor: ["dashboard","caja","history","inventory","cuadres"],
 };
 var ROLE_LABEL = { admin:"Administrador", cajero:"Cajero", auditor:"Auditor" };
 var ROLE_COLOR = { admin:TEAL, cajero:"#378ADD", auditor:"#7F77DD" };
@@ -548,6 +548,7 @@ function Sidebar(props) {
     {id:"products",  ic:"📦", lb:"Productos"},
     {id:"inventory", ic:"🗄️", lb:"Inventario"},
     {id:"history",   ic:"📋", lb:"Historial"},
+    {id:"cuadres",   ic:"📈", lb:"Cuadres"},
     {id:"backup",    ic:"💾", lb:"Respaldo"},
     {id:"users",     ic:"👥", lb:"Usuarios"},
   ];
@@ -2480,6 +2481,7 @@ function App(props) {
           {view==="products" &&canAccess(session.role,"products")&&<ProductsScreen products={products} saveProduct={saveProduct} deleteProduct={deleteProduct}/>}
           {view==="inventory"&&canAccess(session.role,"inventory")&&<InventoryScreen products={products}/>}
           {view==="history"  &&canAccess(session.role,"history")&&<HistoryScreen sales={sales} selectedSale={selSale} setSelectedSale={setSelSale}/>}
+          {view==="cuadres"  &&canAccess(session.role,"cuadres")&&<CuadresScreen sales={sales} accounts={accounts} returns={returns} products={products} repairs={repairs} session={session}/>}
           {view==="backup"   &&canAccess(session.role,"backup")&&<BackupScreen products={products} sales={sales} accounts={accounts} returns={returns} defectives={defectives} onExportJSON={exportJSON} onExportExcel={exportExcel} onImport={importData}/>}
           {view==="users"    &&canAccess(session.role,"users")&&<UsersScreen session={session} showFlash={showFlash}/>}
           {view==="clients"  &&canAccess(session.role,"clients")&&<ClientsScreen clients={clients} sales={sales} accounts={accounts} returns={returns} saveClient={saveClient} session={session} showFlash={showFlash}/>}
@@ -2930,6 +2932,305 @@ function RepairsScreen(props){
                 </tbody>
               </table>
           )}
+        </div>
+      </div>
+  );
+}
+
+/* ══════════════════════════════════════════════════════════════════════
+   MÓDULO CUADRES / REPORTES DE CIERRE
+   ══════════════════════════════════════════════════════════════════════ */
+function CuadresScreen(props){
+  var sales=props.sales||[]; var accounts=props.accounts||[];
+  var returns=props.returns||[]; var products=props.products||[];
+  var repairs=props.repairs||[]; var session=props.session||{};
+
+  var now=new Date();
+  var _rng=useState("hoy"); var rango=_rng[0]; var setRango=_rng[1];
+  var _df=useState(""); var dateFrom=_df[0]; var setDateFrom=_df[1];
+  var _dt=useState(""); var dateTo=_dt[0]; var setDateTo=_dt[1];
+
+  // Calcular fechas del rango
+  function getRangeLabel(){
+    if(rango==="hoy") return "Hoy — "+now.toLocaleDateString("es-GT",{day:"2-digit",month:"long",year:"numeric"});
+    if(rango==="semana") return "Esta semana";
+    if(rango==="mes") return now.toLocaleDateString("es-GT",{month:"long",year:"numeric"});
+    if(rango==="mes_ant"){
+      var d=new Date(now.getFullYear(),now.getMonth()-1,1);
+      return d.toLocaleDateString("es-GT",{month:"long",year:"numeric"});
+    }
+    if(rango==="custom"&&dateFrom&&dateTo) return dateFrom+" al "+dateTo;
+    return "Período seleccionado";
+  }
+
+  function inRange(dateStr){
+    var d=new Date(dateStr);
+    if(rango==="hoy") return d.toDateString()===now.toDateString();
+    if(rango==="semana"){
+      var wStart=new Date(now); wStart.setDate(now.getDate()-now.getDay());
+      wStart.setHours(0,0,0,0); return d>=wStart&&d<=now;
+    }
+    if(rango==="mes") return d.getMonth()===now.getMonth()&&d.getFullYear()===now.getFullYear();
+    if(rango==="mes_ant"){
+      var pm=now.getMonth()===0?11:now.getMonth()-1;
+      var py=now.getMonth()===0?now.getFullYear()-1:now.getFullYear();
+      return d.getMonth()===pm&&d.getFullYear()===py;
+    }
+    if(rango==="custom"&&dateFrom&&dateTo){
+      var from=new Date(dateFrom+"T00:00:00"); var to=new Date(dateTo+"T23:59:59");
+      return d>=from&&d<=to;
+    }
+    return false;
+  }
+
+  // Ventas del período
+  var periodSales=sales.filter(function(s){return inRange(s.date);});
+
+  // Ingresos por método
+  var byMethod={Efectivo:0,Tarjeta:0,Transferencia:0};
+  periodSales.forEach(function(s){if(byMethod[s.method]!==undefined)byMethod[s.method]+=s.total;else byMethod["Transferencia"]+=s.total;});
+
+  // Abonos cobrados en el período (pagos sobre cuentas)
+  var abonosPeriod=0;
+  var abonosEfectivo=0;
+  accounts.forEach(function(a){
+    (a.payments||[]).forEach(function(p){
+      if(inRange(p.date)){
+        abonosPeriod+=p.amount;
+        if(p.method==="Efectivo") abonosEfectivo+=p.amount;
+      }
+    });
+  });
+
+  // Reembolsos del período
+  var reembolsosPeriod=returns.filter(function(r){return inRange(r.date)&&r.refundAmount>0;}).reduce(function(s,r){return s+r.refundAmount;},0);
+  var reembolsosEfectivo=returns.filter(function(r){return inRange(r.date)&&r.refundMethod==="Efectivo"&&r.refundAmount>0;}).reduce(function(s,r){return s+r.refundAmount;},0);
+
+  // Totales
+  var totalVentas=periodSales.reduce(function(s,x){return s+x.total;},0);
+  var totalEfectivo=byMethod.Efectivo+abonosEfectivo-reembolsosEfectivo;
+  var totalIngresos=totalVentas+abonosPeriod;
+
+  // Costo y ganancia bruta
+  var costoVentas=0;
+  periodSales.forEach(function(s){
+    s.items.forEach(function(it){
+      var prod=products.find(function(p){return p.id===it.id||p.code===it.code;});
+      if(prod&&prod.cost>0) costoVentas+=prod.cost*it.qty;
+    });
+  });
+  var gananciaBruta=totalVentas-costoVentas;
+
+  // Reparaciones activas
+  var repActivas=repairs.filter(function(r){return r.status!=="entregado";}).length;
+  var repListas=repairs.filter(function(r){return r.status==="listo";}).length;
+
+  // Más vendidos del período
+  var qtyMap={};
+  periodSales.forEach(function(s){s.items.forEach(function(it){qtyMap[it.name]=(qtyMap[it.name]||0)+it.qty;});});
+  var top5=Object.keys(qtyMap).map(function(k){return [k,qtyMap[k]];}).sort(function(a,b){return b[1]-a[1];}).slice(0,5);
+
+  function printCuadre(){
+    var salesRows=periodSales.slice().sort(function(a,b){return new Date(b.date)-new Date(a.date);}).map(function(s){
+      return '<tr><td>'+new Date(s.date).toLocaleDateString("es-GT",{day:"2-digit",month:"short"})+'</td>'+
+          '<td>'+new Date(s.date).toLocaleTimeString("es-GT",{hour:"2-digit",minute:"2-digit"})+'</td>'+
+          '<td>'+s.client+'</td>'+
+          '<td>'+s.items.length+' art.</td>'+
+          '<td><span style="background:#E1F5EE;color:#085041;padding:2px 8px;border-radius:12px;font-size:11px;">'+s.method+'</span></td>'+
+          '<td style="text-align:right;font-weight:700;color:#1D9E75;">Q '+Number(s.total).toFixed(2)+'</td></tr>';
+    }).join("");
+
+    var html='<!DOCTYPE html><html><head><meta charset="UTF-8"><title>Cuadre — MUNDO CEL DIAZ</title>'+
+        '<style>*{margin:0;padding:0;box-sizing:border-box;}body{font-family:Arial,sans-serif;font-size:12px;color:#222;padding:24px;max-width:900px;margin:0 auto;}'+
+        '.header{border-bottom:3px solid #1D9E75;padding-bottom:14px;margin-bottom:20px;display:flex;justify-content:space-between;align-items:flex-start;}'+
+        '.brand h1{font-size:20px;font-weight:900;color:#1a2535;}.brand p{font-size:10px;color:#1D9E75;font-weight:700;letter-spacing:2px;}'+
+        '.period{text-align:right;}.period .lbl{font-size:10px;color:#999;text-transform:uppercase;}.period .val{font-size:16px;font-weight:700;color:#1D9E75;margin-top:2px;}'+
+        '.grid4{display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin-bottom:20px;}'+
+        '.grid3{display:grid;grid-template-columns:repeat(3,1fr);gap:12px;margin-bottom:20px;}'+
+        '.metric{background:#f8f9fa;border-radius:8px;padding:12px;border-left:4px solid #1D9E75;}'+
+        '.metric .lbl{font-size:10px;color:#999;text-transform:uppercase;letter-spacing:0.8px;margin-bottom:4px;}'+
+        '.metric .val{font-size:18px;font-weight:800;color:#1D9E75;}'+
+        '.metric.red .val{color:#E24B4A;}.metric.gray .val{color:#444;}.metric.navy .val{color:#1a2535;}'+
+        '.section{margin-bottom:20px;}'+
+        '.section-title{font-size:13px;font-weight:700;color:#444;border-bottom:1px solid #eee;padding-bottom:6px;margin-bottom:12px;}'+
+        'table{width:100%;border-collapse:collapse;}'+
+        'thead th{background:#1a2535;color:#fff;padding:7px 10px;text-align:left;font-size:11px;font-weight:600;}'+
+        'tbody tr:nth-child(even){background:#f9f9f9;}'+
+        'td{padding:6px 10px;border-bottom:1px solid #eee;font-size:12px;}'+
+        '.footer{border-top:2px dashed #ccc;padding-top:14px;margin-top:20px;display:flex;justify-content:space-between;font-size:11px;color:#999;}'+
+        '@media print{body{padding:12px;}}'+
+        '</style></head><body>'+
+        '<div class="header">'+
+        '<div class="brand"><h1>MUNDO CEL DIAZ</h1><p>CUADRE / REPORTE DE CIERRE</p></div>'+
+        '<div class="period"><div class="lbl">Período</div><div class="val">'+getRangeLabel()+'</div>'+
+        '<div style="font-size:11px;color:#999;margin-top:4px;">Generado por: '+session.name+' · '+(ROLE_LABEL[session.role]||session.role)+'</div>'+
+        '</div>'+
+        '</div>'+
+
+        '<div class="section"><div class="section-title">📊 Resumen de ventas</div>'+
+        '<div class="grid4">'+
+        '<div class="metric"><div class="lbl">Total ventas</div><div class="val">'+periodSales.length+'</div></div>'+
+        '<div class="metric"><div class="lbl">Ingresos ventas</div><div class="val">Q '+totalVentas.toFixed(2)+'</div></div>'+
+        '<div class="metric"><div class="lbl">Abonos cobrados</div><div class="val">Q '+abonosPeriod.toFixed(2)+'</div></div>'+
+        '<div class="metric"><div class="lbl">Total ingresado</div><div class="val">Q '+totalIngresos.toFixed(2)+'</div></div>'+
+        '</div></div>'+
+
+        '<div class="section"><div class="section-title">💵 Por método de pago</div>'+
+        '<div class="grid3">'+
+        '<div class="metric"><div class="lbl">Efectivo (neto)</div><div class="val">Q '+totalEfectivo.toFixed(2)+'</div></div>'+
+        '<div class="metric navy"><div class="lbl">Tarjeta</div><div class="val">Q '+byMethod.Tarjeta.toFixed(2)+'</div></div>'+
+        '<div class="metric gray"><div class="lbl">Transferencia</div><div class="val">Q '+byMethod.Transferencia.toFixed(2)+'</div></div>'+
+        '</div></div>'+
+
+        (costoVentas>0?'<div class="section"><div class="section-title">📉 Costos y ganancia bruta</div>'+
+            '<div class="grid3">'+
+            '<div class="metric"><div class="lbl">Ventas brutas</div><div class="val">Q '+totalVentas.toFixed(2)+'</div></div>'+
+            '<div class="metric red"><div class="lbl">Costo productos</div><div class="val">Q '+costoVentas.toFixed(2)+'</div></div>'+
+            '<div class="metric" style="border-left-color:#2E7D32;"><div class="lbl">Ganancia bruta</div><div class="val" style="color:#2E7D32;">Q '+gananciaBruta.toFixed(2)+'</div></div>'+
+            '</div></div>':'')+
+
+        (reembolsosPeriod>0?'<div class="section"><div class="section-title">🔄 Reembolsos del período</div>'+
+            '<div class="grid3">'+
+            '<div class="metric red"><div class="lbl">Total reembolsado</div><div class="val">Q '+reembolsosPeriod.toFixed(2)+'</div></div>'+
+            '<div class="metric red"><div class="lbl">Reemb. en efectivo</div><div class="val">Q '+reembolsosEfectivo.toFixed(2)+'</div></div>'+
+            '<div class="metric gray"><div class="lbl">Devoluciones</div><div class="val">'+returns.filter(function(r){return inRange(r.date);}).length+'</div></div>'+
+            '</div></div>':'')+
+
+        (top5.length>0?'<div class="section"><div class="section-title">🏆 Más vendidos del período</div>'+
+            '<table><thead><tr><th>#</th><th>Producto</th><th>Unidades vendidas</th></tr></thead><tbody>'+
+            top5.map(function(item,i){return '<tr><td>'+(i+1)+'</td><td>'+item[0]+'</td><td style="font-weight:700;color:#1D9E75;">'+item[1]+' uds</td></tr>';}).join("")+
+            '</tbody></table></div>':'')+
+
+        (periodSales.length>0?'<div class="section"><div class="section-title">📋 Detalle de ventas</div>'+
+            '<table><thead><tr><th>Fecha</th><th>Hora</th><th>Cliente</th><th>Artículos</th><th>Método</th><th style="text-align:right;">Total</th></tr></thead>'+
+            '<tbody>'+salesRows+'</tbody>'+
+            '<tfoot><tr style="background:#1a2535;color:#fff;"><td colspan="5" style="padding:8px 10px;font-weight:700;">TOTAL DEL PERÍODO</td>'+
+            '<td style="padding:8px 10px;text-align:right;font-weight:800;font-size:14px;">Q '+totalVentas.toFixed(2)+'</td></tr></tfoot>'+
+            '</table></div>':
+            '<div class="section" style="text-align:center;color:#999;padding:40px;">Sin ventas en el período seleccionado</div>')+
+
+        '<div class="footer">'+
+        '<div><b>Mundo Cel Diaz</b> · Guatemala · Sistema de Gestión v2.1</div>'+
+        '<div>Impreso: '+now.toLocaleDateString("es-GT",{day:"2-digit",month:"short",year:"numeric"})+' '+now.toLocaleTimeString("es-GT",{hour:"2-digit",minute:"2-digit"})+'</div>'+
+        '</div>'+
+        '</body></html>';
+
+    var w=window.open("","_blank","width=900,height=700");
+    w.document.write(html); w.document.close();
+    w.onload=function(){w.print();};
+  }
+
+  var rangos=[["hoy","Hoy"],["semana","Esta semana"],["mes","Este mes"],["mes_ant","Mes anterior"],["custom","Personalizado"]];
+
+  return (
+      <div>
+        <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:20}}>
+          <p style={H1}>📈 Cuadres y Reportes</p>
+          <button style={Object.assign({},mB("teal"),{padding:"10px 20px"})} onClick={printCuadre}>🖨 Imprimir / PDF</button>
+        </div>
+
+        {/* Selector de rango */}
+        <div style={Object.assign({},sC,{marginBottom:16})}>
+          <p style={{fontWeight:600,fontSize:13,margin:"0 0 12px",color:"#555"}}>📅 Período del cuadre</p>
+          <div style={{display:"flex",gap:8,flexWrap:"wrap",marginBottom:rango==="custom"?12:0}}>
+            {rangos.map(function(pair){
+              return <button key={pair[0]} style={Object.assign({},mB(rango===pair[0]?"teal":"gray"),{padding:"7px 16px"})} onClick={function(){setRango(pair[0]);}}>{pair[1]}</button>;
+            })}
+          </div>
+          {rango==="custom"&&(
+              <div style={{display:"flex",gap:12,alignItems:"center",marginTop:10}}>
+                <div><label style={sL}>Desde</label><input type="date" style={Object.assign({},sI,{width:160})} value={dateFrom} onChange={function(e){setDateFrom(e.target.value);}}/></div>
+                <div><label style={sL}>Hasta</label><input type="date" style={Object.assign({},sI,{width:160})} value={dateTo} onChange={function(e){setDateTo(e.target.value);}}/></div>
+              </div>
+          )}
+        </div>
+
+        {/* Período activo */}
+        <div style={{background:"linear-gradient(135deg,"+NAVY+" 0%,#1a3a2a 100%)",borderRadius:12,padding:"14px 20px",marginBottom:16,display:"flex",justifyContent:"space-between",alignItems:"center"}}>
+          <div>
+            <p style={{color:"rgba(255,255,255,0.5)",fontSize:10,textTransform:"uppercase",letterSpacing:"1px",margin:0}}>Período activo</p>
+            <p style={{color:"#fff",fontWeight:700,fontSize:16,margin:"2px 0 0"}}>{getRangeLabel()}</p>
+          </div>
+          <p style={{color:TEAL,fontSize:28,fontWeight:800,margin:0}}>Q {totalIngresos.toFixed(2)}</p>
+        </div>
+
+        {/* Métricas principales */}
+        <div style={{display:"grid",gridTemplateColumns:"repeat(4,1fr)",gap:14,marginBottom:16}}>
+          <MetricBox label="Ventas del período" value={periodSales.length} color="#378ADD"/>
+          <MetricBox label="Ingresos ventas" value={Q(totalVentas)} color={TEAL}/>
+          <MetricBox label="Abonos cobrados" value={Q(abonosPeriod)} color="#7F77DD"/>
+          <MetricBox label="Reembolsos" value={Q(reembolsosPeriod)} color="#E24B4A"/>
+        </div>
+
+        {/* Por método */}
+        <div style={{display:"grid",gridTemplateColumns:"1fr 1fr 2fr",gap:14,marginBottom:16}}>
+          <div style={sC}>
+            <p style={{fontSize:11,color:"#999",textTransform:"uppercase",margin:"0 0 8px"}}>💵 Saldo caja efectivo</p>
+            <p style={{fontSize:26,fontWeight:800,color:totalEfectivo>=0?TEAL:"#E24B4A",margin:0}}>Q {totalEfectivo.toFixed(2)}</p>
+            <p style={{fontSize:11,color:"#999",margin:"4px 0 0"}}>Ventas + abonos − reembolsos en efectivo</p>
+          </div>
+          <div style={sC}>
+            <p style={{fontSize:11,color:"#999",textTransform:"uppercase",margin:"0 0 8px"}}>💳 Tarjeta + Transferencia</p>
+            <p style={{fontSize:26,fontWeight:800,color:"#378ADD",margin:0}}>Q {(byMethod.Tarjeta+byMethod.Transferencia).toFixed(2)}</p>
+            <p style={{fontSize:11,color:"#999",margin:"4px 0 0"}}>Tarjeta: Q {byMethod.Tarjeta.toFixed(2)} · Trans: Q {byMethod.Transferencia.toFixed(2)}</p>
+          </div>
+          {costoVentas>0?(
+              <div style={sC}>
+                <p style={{fontSize:11,color:"#999",textTransform:"uppercase",margin:"0 0 10px"}}>📉 Ganancia bruta estimada</p>
+                <div style={{display:"flex",gap:16,alignItems:"center"}}>
+                  <div><p style={{fontSize:11,color:"#999",margin:"0 0 2px"}}>Ventas</p><p style={{fontWeight:700,color:TEAL}}>Q {totalVentas.toFixed(2)}</p></div>
+                  <span style={{color:"#E24B4A",fontSize:18}}>−</span>
+                  <div><p style={{fontSize:11,color:"#999",margin:"0 0 2px"}}>Costo</p><p style={{fontWeight:700,color:"#E24B4A"}}>Q {costoVentas.toFixed(2)}</p></div>
+                  <span style={{color:"#2E7D32",fontSize:18}}>=</span>
+                  <div><p style={{fontSize:11,color:"#999",margin:"0 0 2px"}}>Ganancia</p><p style={{fontWeight:800,fontSize:18,color:"#2E7D32"}}>Q {gananciaBruta.toFixed(2)}</p></div>
+                </div>
+              </div>
+          ):(
+              <div style={sC}>
+                <p style={{fontSize:11,color:"#999",textTransform:"uppercase",margin:"0 0 8px"}}>🔧 Reparaciones activas</p>
+                <p style={{fontSize:26,fontWeight:800,color:"#378ADD",margin:0}}>{repActivas}</p>
+                <p style={{fontSize:11,color:repListas>0?TEAL:"#999",margin:"4px 0 0"}}>{repListas>0?"✅ "+repListas+" listas para entregar":"Sin órdenes listas aún"}</p>
+              </div>
+          )}
+        </div>
+
+        {/* Top 5 + Detalle ventas */}
+        <div style={{display:"grid",gridTemplateColumns:"1fr 2fr",gap:16}}>
+          <div style={sC}>
+            <p style={{fontWeight:600,fontSize:14,margin:"0 0 12px"}}>🏆 Más vendidos</p>
+            {top5.length===0?<p style={{color:"#999",fontSize:13}}>Sin ventas en el período</p>:
+                top5.map(function(item,i){return (
+                        <div key={i} style={{display:"flex",justifyContent:"space-between",padding:"7px 0",borderBottom:"1px solid rgba(0,0,0,0.06)",fontSize:13}}>
+                          <span style={{color:"#666"}}><b style={{color:TEAL,marginRight:6}}>{i+1}.</b>{item[0]}</span>
+                          <span style={{fontWeight:700,color:TEAL}}>{item[1]} uds</span>
+                        </div>
+                    );}
+                )}
+          </div>
+          <div style={sC}>
+            <p style={{fontWeight:600,fontSize:14,margin:"0 0 12px"}}>📋 Ventas del período <span style={{fontWeight:400,color:"#999",fontSize:12}}>({periodSales.length})</span></p>
+            {periodSales.length===0?<p style={{color:"#999",fontSize:13,padding:"20px 0",textAlign:"center"}}>Sin ventas en el período seleccionado</p>:(
+                <div style={{maxHeight:280,overflowY:"auto"}}>
+                  <table style={{width:"100%",borderCollapse:"collapse"}}>
+                    <thead><tr>{["Fecha","Hora","Cliente","Método","Total"].map(function(h){return <th key={h} style={sTH}>{h}</th>;})}</tr></thead>
+                    <tbody>
+                    {periodSales.slice().sort(function(a,b){return new Date(b.date)-new Date(a.date);}).map(function(s){
+                      return <tr key={s.id}>
+                        <td style={sTD}>{fmtD(s.date)}</td>
+                        <td style={sTD}>{fmtT(s.date)}</td>
+                        <td style={Object.assign({},sTD,{fontWeight:500})}>{s.client}</td>
+                        <td style={sTD}><span style={mBg("teal")}>{s.method}</span></td>
+                        <td style={Object.assign({},sTD,{fontWeight:700,color:TEAL})}>{Q(s.total)}</td>
+                      </tr>;
+                    })}
+                    </tbody>
+                  </table>
+                  <div style={{borderTop:"2px solid rgba(0,0,0,0.1)",marginTop:8,paddingTop:8,textAlign:"right",fontSize:14,fontWeight:700,color:TEAL}}>
+                    Total: {Q(totalVentas)}
+                  </div>
+                </div>
+            )}
+          </div>
         </div>
       </div>
   );
