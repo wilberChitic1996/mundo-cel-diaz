@@ -800,9 +800,51 @@ function POSScreen(props) {
   var cashIn=props.cashIn; var setCashIn=props.setCashIn;
   var initialPay=props.initialPay; var setInitialPay=props.setInitialPay;
   var clientName=props.clientName; var setClientName=props.setClientName;
+  var selectedClientId=props.selectedClientId; var setSelectedClientId=props.setSelectedClientId;
   var cartTotal=props.cartTotal; var vuelto=props.vuelto; var initPaidVal=props.initPaidVal;
   var addToCart=props.addToCart; var changeQty=props.changeQty; var removeFromCart=props.removeFromCart;
   var checkout=props.checkout; var resetPOS=props.resetPOS; var flash=props.flash;
+  var clients=props.clients||[]; var accounts=props.accounts||[];
+
+  // Estado local del buscador de cliente
+  var _cq=useState(""); var cliQ=_cq[0]; var setCliQ=_cq[1];
+  var _cdd=useState(false); var showDrop=_cdd[0]; var setShowDrop=_cdd[1];
+
+  // Clientes filtrados por búsqueda
+  var cliResults=cliQ.trim().length>0?clients.filter(function(c){
+    var q=cliQ.toLowerCase();
+    return (c.name||"").toLowerCase().includes(q)||(c.dpi||"").includes(cliQ.trim())||(c.cliCode||"").toLowerCase().includes(q)||(c.phone||"").includes(cliQ.trim());
+  }).slice(0,5):[];
+
+  // Cliente seleccionado actualmente
+  var selCli=selectedClientId?clients.find(function(c){return c.id===selectedClientId;}):null;
+
+  // Deuda pendiente del cliente seleccionado
+  var deudaCliente=selCli?accounts.filter(function(a){
+    return (a.clientId===selCli.id||(a.client===selCli.name&&!a.clientId))&&a.status!=="pagado";
+  }).reduce(function(s,a){return s+a.balance;},0):0;
+
+  function selectClient(c){
+    setSelectedClientId(c.id);
+    setClientName(c.name);
+    setCliQ("");
+    setShowDrop(false);
+  }
+
+  function clearClient(){
+    setSelectedClientId(null);
+    setClientName("");
+    setCliQ("");
+    setShowDrop(false);
+  }
+
+  function handleCliInput(val){
+    setCliQ(val);
+    setClientName(val);
+    setSelectedClientId(null);
+    setShowDrop(true);
+  }
+
   var FC={ok:"#EAF3DE",warn:"#FAEEDA"};
   var FT={ok:"#27500A",warn:"#633806"};
   var FB={ok:"#97C459",warn:"#EF9F27"};
@@ -865,7 +907,56 @@ function POSScreen(props) {
               </div>
               <div style={{marginBottom:10}}>
                 <label style={sL}>👤 Cliente</label>
-                <input style={sI} value={clientName} placeholder="Nombre (opcional)" onChange={function(e){setClientName(e.target.value);}}/>
+
+                {/* Cliente ya seleccionado */}
+                {selCli?(
+                    <div>
+                      <div style={{display:"flex",alignItems:"center",gap:8,padding:"8px 12px",borderRadius:8,border:"1.5px solid "+TEAL,background:"#E1F5EE"}}>
+                        <div style={{flex:1}}>
+                          <div style={{fontSize:13,fontWeight:600,color:"#085041"}}>{selCli.name}</div>
+                          <div style={{fontSize:11,color:"#0F6E56",fontFamily:"monospace"}}>{selCli.cliCode}{selCli.dpi?" · DPI: "+selCli.dpi:""}</div>
+                        </div>
+                        <span onClick={clearClient} style={{cursor:"pointer",color:"#E24B4A",fontSize:16,fontWeight:700,padding:"2px 6px"}}>×</span>
+                      </div>
+                      {deudaCliente>0&&(
+                          <div style={{background:"#FCEBEB",border:"1px solid #F09595",borderRadius:6,padding:"6px 10px",marginTop:6,fontSize:12,color:"#791F1F"}}>
+                            ⚠ Este cliente tiene <b>{Q(deudaCliente)}</b> pendiente de pago
+                          </div>
+                      )}
+                    </div>
+                ):(
+                    <div style={{position:"relative"}}>
+                      <input
+                          style={sI}
+                          value={cliQ||clientName}
+                          placeholder="Buscar cliente por nombre, DPI o código..."
+                          onChange={function(e){handleCliInput(e.target.value);}}
+                          onFocus={function(){setShowDrop(true);}}
+                          onBlur={function(){setTimeout(function(){setShowDrop(false);},200);}}
+                      />
+                      {showDrop&&(cliQ.trim().length>0)&&(
+                          <div style={{position:"absolute",top:"100%",left:0,right:0,background:"#fff",border:"1px solid rgba(0,0,0,0.15)",borderRadius:8,boxShadow:"0 4px 16px rgba(0,0,0,0.1)",zIndex:100,maxHeight:200,overflowY:"auto",marginTop:2}}>
+                            {cliResults.map(function(c){
+                              var deuda=accounts.filter(function(a){return (a.clientId===c.id||(a.client===c.name&&!a.clientId))&&a.status!=="pagado";}).reduce(function(s,a){return s+a.balance;},0);
+                              return (
+                                  <div key={c.id} onMouseDown={function(){selectClient(c);}} style={{padding:"10px 14px",cursor:"pointer",borderBottom:"1px solid rgba(0,0,0,0.06)",display:"flex",justifyContent:"space-between",alignItems:"center"}}>
+                                    <div>
+                                      <div style={{fontSize:13,fontWeight:600}}>{c.name}</div>
+                                      <div style={{fontSize:11,color:"#999",fontFamily:"monospace"}}>{c.cliCode}{c.dpi?" · "+c.dpi:""}{c.phone?" · "+c.phone:""}</div>
+                                    </div>
+                                    {deuda>0&&<span style={mBg("red")}>{Q(deuda)}</span>}
+                                  </div>
+                              );
+                            })}
+                            {cliResults.length===0&&(
+                                <div style={{padding:"10px 14px",fontSize:13,color:"#999"}}>
+                                  No se encontró "{cliQ}" — se registrará como cliente ocasional
+                                </div>
+                            )}
+                          </div>
+                      )}
+                    </div>
+                )}
               </div>
               <div style={{marginBottom:10}}>
                 <label style={sL}>Tipo de cobro</label>
@@ -1855,6 +1946,7 @@ function App(props) {
   var _ci=useState(""); var cashIn=_ci[0]; var setCashIn=_ci[1];
   var _ip=useState(""); var initialPay=_ip[0]; var setInitialPay=_ip[1];
   var _cn=useState(""); var clientName=_cn[0]; var setClientName=_cn[1];
+  var _sci=useState(null); var selectedClientId=_sci[0]; var setSelectedClientId=_sci[1];
 
   function showFlash(msg,type){
     setFlash({msg:msg,type:type||"ok"});
@@ -1883,7 +1975,7 @@ function App(props) {
   var vuelto=payMethod==="Efectivo"&&payType==="completo"&&cashIn?cashVal-cartTotal:null;
   var initPaidVal=parseFloat(initialPay)||0;
 
-  function resetPOS(){ setCart([]);setCashIn("");setClientName("");setInitialPay("");setPayType("completo");setPayMethod("Efectivo"); }
+  function resetPOS(){ setCart([]);setCashIn("");setClientName("");setInitialPay("");setPayType("completo");setPayMethod("Efectivo");setSelectedClientId(null); }
 
   async function checkout(){
     if(!cart.length)return;
@@ -1891,7 +1983,7 @@ function App(props) {
     var client=clientName.trim();
     var items=cart.map(function(i){return {id:i.id,code:i.code,name:i.name,price:i.price,qty:i.qty,shelf:i.shelf};});
     var registradoPor={userId:session.userId,name:session.name,role:session.role};
-    var base={id:gid(),date:new Date().toISOString(),client:client,items:items,total:cartTotal,method:payMethod,registradoPor:registradoPor};
+    var base={id:gid(),date:new Date().toISOString(),client:client,clientId:selectedClientId||null,items:items,total:cartTotal,method:payMethod,registradoPor:registradoPor};
     function deduct(){ setProducts(function(p){return p.map(function(x){var ci=cart.find(function(i){return i.id===x.id;});return ci&&x.unit!=="serv"?Object.assign({},x,{stock:x.stock-ci.qty}):x;}); }); }
     if(payType==="completo"){
       if(isOnline){
@@ -2152,7 +2244,7 @@ function App(props) {
         <Sidebar view={view} setView={setView} cartCount={cart.length} pendingCount={pendingAccs.length} products={products} sales={sales} session={session} onLogout={onLogout} isOnline={isOnline}/>
         <div style={{flex:1,padding:"24px 28px",overflowY:"auto",minWidth:0}}>
           {view==="dashboard"&&canAccess(session.role,"dashboard")&&<DashboardScreen sales={sales} todaySales={todaySales} pendingAccs={pendingAccs} totalPend={totalPend} products={products} top5={top5} setSelectedSale={setSelSale} setView={setView} accounts={accounts} returns={returns}/>}
-          {view==="pos"      &&canAccess(session.role,"pos")&&<POSScreen products={products} filteredPOS={filteredPOS} cart={cart} posQ={posQ} setPosQ={setPosQ} payMethod={payMethod} setPayMethod={setPayMethod} payType={payType} setPayType={setPayType} cashIn={cashIn} setCashIn={setCashIn} initialPay={initialPay} setInitialPay={setInitialPay} clientName={clientName} setClientName={setClientName} cartTotal={cartTotal} vuelto={vuelto} initPaidVal={initPaidVal} addToCart={addToCart} changeQty={changeQty} removeFromCart={removeFromCart} checkout={checkout} resetPOS={resetPOS} flash={flash} clients={clients}/>}
+          {view==="pos"      &&canAccess(session.role,"pos")&&<POSScreen products={products} filteredPOS={filteredPOS} cart={cart} posQ={posQ} setPosQ={setPosQ} payMethod={payMethod} setPayMethod={setPayMethod} payType={payType} setPayType={setPayType} cashIn={cashIn} setCashIn={setCashIn} initialPay={initialPay} setInitialPay={setInitialPay} clientName={clientName} setClientName={setClientName} selectedClientId={selectedClientId} setSelectedClientId={setSelectedClientId} cartTotal={cartTotal} vuelto={vuelto} initPaidVal={initPaidVal} addToCart={addToCart} changeQty={changeQty} removeFromCart={removeFromCart} checkout={checkout} resetPOS={resetPOS} flash={flash} clients={clients} accounts={accounts}/>}
           {view==="caja"     &&canAccess(session.role,"caja")&&<CajaScreen sales={sales} accounts={accounts} returns={returns}/>}
           {view==="accounts" &&canAccess(session.role,"accounts")&&<AccountsScreen accounts={accounts} pendingAccs={pendingAccs} totalPend={totalPend} addPayment={addPayment} showFlash={showFlash}/>}
           {view==="returns"  &&canAccess(session.role,"returns")&&<ReturnsScreen returns={returns} products={products} onProcess={processReturn} showFlash={showFlash}/>}
