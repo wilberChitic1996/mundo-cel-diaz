@@ -810,6 +810,18 @@ function POSScreen(props) {
   var _cq=useState(""); var cliQ=_cq[0]; var setCliQ=_cq[1];
   var _cdd=useState(false); var showDrop=_cdd[0]; var setShowDrop=_cdd[1];
 
+  // Estado de descuento por ítem
+  var _di=useState(null); var discountItemId=_di[0]; var setDiscountItemId=_di[1];
+  var _dv=useState(""); var discountVal=_dv[0]; var setDiscountVal=_dv[1];
+
+  function applyDiscount(itemId){
+    var newPrice=parseFloat(discountVal);
+    if(!newPrice||newPrice<=0){setDiscountItemId(null);setDiscountVal("");return;}
+    props.applyDiscount(itemId, newPrice);
+    setDiscountItemId(null);
+    setDiscountVal("");
+  }
+
   // Clientes filtrados por búsqueda
   var cliResults=cliQ.trim().length>0?clients.filter(function(c){
     var q=cliQ.toLowerCase();
@@ -879,12 +891,15 @@ function POSScreen(props) {
                 ?<div style={{flex:1,display:"flex",alignItems:"center",justifyContent:"center",color:"#bbb",fontSize:13,textAlign:"center",minHeight:180}}>Seleccioná productos del catálogo</div>
                 :<div style={{flex:1,overflowY:"auto",marginBottom:14}}>
                   {cart.map(function(item){
+                    var isEditingDiscount=discountItemId===item.id;
+                    var hasDiscount=item.originalPrice&&item.price<item.originalPrice;
                     return (
                         <div key={item.id} style={{padding:"10px 0",borderBottom:"1px solid rgba(0,0,0,0.07)"}}>
                           <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start",marginBottom:8}}>
                             <div style={{flex:1,marginRight:8}}>
                               <div style={{fontSize:13,fontWeight:600,lineHeight:1.3}}>{item.name}</div>
                               <div style={{fontSize:10,color:"#999",fontFamily:"monospace"}}>{item.code}</div>
+                              {hasDiscount&&<div style={{fontSize:10,color:"#E65100",marginTop:2}}>Desc. auto. por: {item.discountBy||"usuario"}</div>}
                             </div>
                             <span style={{cursor:"pointer",color:"#E24B4A",fontSize:18,lineHeight:1,flexShrink:0}} onClick={function(){removeFromCart(item.id);}}>×</span>
                           </div>
@@ -894,8 +909,38 @@ function POSScreen(props) {
                               <span style={{fontSize:14,fontWeight:600,minWidth:22,textAlign:"center"}}>{item.qty}</span>
                               <div style={sQB} onClick={function(){changeQty(item.id,1);}}>+</div>
                             </div>
-                            <span style={{fontSize:14,fontWeight:700,color:TEAL}}>{Q(item.price*item.qty)}</span>
+                            <div style={{textAlign:"right"}}>
+                              {hasDiscount&&<div style={{fontSize:10,color:"#999",textDecoration:"line-through"}}>{Q(item.originalPrice*item.qty)}</div>}
+                              <span style={{fontSize:14,fontWeight:700,color:hasDiscount?"#E65100":TEAL}}>{Q(item.price*item.qty)}</span>
+                            </div>
                           </div>
+                          {/* Botón de descuento */}
+                          {!isEditingDiscount?(
+                              <div style={{marginTop:6,textAlign:"right"}}>
+                              <span onClick={function(){setDiscountItemId(item.id);setDiscountVal(item.price.toFixed(2));}} style={{fontSize:10,color:"#E65100",cursor:"pointer",textDecoration:"underline"}}>
+                                {hasDiscount?"Editar descuento":"% Aplicar descuento"}
+                              </span>
+                              </div>
+                          ):(
+                              <div style={{marginTop:8,display:"flex",gap:6,alignItems:"center"}}>
+                                <div style={{flex:1}}>
+                                  <div style={{fontSize:10,color:"#666",marginBottom:2}}>Precio c/descuento (precio lista: {Q(item.originalPrice||item.price)})</div>
+                                  <input
+                                      type="number"
+                                      style={Object.assign({},sI,{padding:"5px 8px",fontSize:12})}
+                                      value={discountVal}
+                                      placeholder="Nuevo precio Q"
+                                      onChange={function(e){setDiscountVal(e.target.value);}}
+                                      onKeyDown={function(e){if(e.key==="Enter")applyDiscount(item.id);if(e.key==="Escape"){setDiscountItemId(null);setDiscountVal("");}}}
+                                      autoFocus
+                                  />
+                                </div>
+                                <div style={{display:"flex",gap:4,marginTop:14}}>
+                                  <button style={Object.assign({},mB("teal"),{padding:"4px 8px",fontSize:11})} onClick={function(){applyDiscount(item.id);}}>✓</button>
+                                  <button style={Object.assign({},mB("gray"),{padding:"4px 8px",fontSize:11})} onClick={function(){setDiscountItemId(null);setDiscountVal("");}}>✕</button>
+                                </div>
+                              </div>
+                          )}
                         </div>
                     );
                   })}
@@ -1480,7 +1525,21 @@ function HistoryScreen(props) {
               <thead><tr>{["Código","Producto","Cant.","Precio unit.","Subtotal"].map(function(h){return <th key={h} style={sTH}>{h}</th>;})}</tr></thead>
               <tbody>
               {selectedSale.items.map(function(it,i){
-                return <tr key={i}><td style={Object.assign({},sTD,{fontFamily:"monospace",fontSize:12})}>{it.code}</td><td style={Object.assign({},sTD,{fontWeight:600})}>{it.name}</td><td style={sTD}>{it.qty}</td><td style={sTD}>{Q(it.price)}</td><td style={Object.assign({},sTD,{fontWeight:700,color:TEAL})}>{Q(it.price*it.qty)}</td></tr>;
+                var hasDisc=it.originalPrice&&it.price<it.originalPrice;
+                return <tr key={i}>
+                  <td style={Object.assign({},sTD,{fontFamily:"monospace",fontSize:12})}>{it.code}</td>
+                  <td style={Object.assign({},sTD,{fontWeight:600})}>
+                    {it.name}
+                    {hasDisc&&<span style={Object.assign({},mBg("amber"),{marginLeft:6,fontSize:10})}>% Desc.</span>}
+                  </td>
+                  <td style={sTD}>{it.qty}</td>
+                  <td style={sTD}>
+                    {hasDisc&&<div style={{fontSize:10,color:"#999",textDecoration:"line-through"}}>{Q(it.originalPrice)}</div>}
+                    <div style={{color:hasDisc?"#E65100":"inherit"}}>{Q(it.price)}</div>
+                    {hasDisc&&<div style={{fontSize:10,color:"#E65100"}}>Por: {it.discountBy}</div>}
+                  </td>
+                  <td style={Object.assign({},sTD,{fontWeight:700,color:TEAL})}>{Q(it.price*it.qty)}</td>
+                </tr>;
               })}
               </tbody>
             </table>
@@ -1970,6 +2029,20 @@ function App(props) {
   function changeQty(id,d){ setCart(function(c){return c.map(function(i){return i.id===id?Object.assign({},i,{qty:Math.max(1,Math.min(i.qty+d,i.maxStock))}):i;});}); }
   function removeFromCart(id){ setCart(function(c){return c.filter(function(i){return i.id!==id;});}); }
 
+  function applyDiscount(itemId, newPrice){
+    setCart(function(c){return c.map(function(i){
+      if(i.id!==itemId) return i;
+      var orig=i.originalPrice||i.price;
+      return Object.assign({},i,{
+        price:newPrice,
+        originalPrice:orig,
+        discountBy:session.name,
+        discountByRole:session.role,
+        discountAt:new Date().toISOString()
+      });
+    });});
+  }
+
   var cartTotal=cart.reduce(function(s,i){return s+i.price*i.qty;},0);
   var cashVal=parseFloat(cashIn)||0;
   var vuelto=payMethod==="Efectivo"&&payType==="completo"&&cashIn?cashVal-cartTotal:null;
@@ -1981,7 +2054,7 @@ function App(props) {
     if(!cart.length)return;
     if(!clientName.trim()){showFlash("El nombre del cliente es obligatorio","err");return;}
     var client=clientName.trim();
-    var items=cart.map(function(i){return {id:i.id,code:i.code,name:i.name,price:i.price,qty:i.qty,shelf:i.shelf};});
+    var items=cart.map(function(i){return {id:i.id,code:i.code,name:i.name,price:i.price,qty:i.qty,shelf:i.shelf,originalPrice:i.originalPrice||null,discountBy:i.discountBy||null,discountByRole:i.discountByRole||null,discountAt:i.discountAt||null};});
     var registradoPor={userId:session.userId,name:session.name,role:session.role};
     var base={id:gid(),date:new Date().toISOString(),client:client,clientId:selectedClientId||null,items:items,total:cartTotal,method:payMethod,registradoPor:registradoPor};
     function deduct(){ setProducts(function(p){return p.map(function(x){var ci=cart.find(function(i){return i.id===x.id;});return ci&&x.unit!=="serv"?Object.assign({},x,{stock:x.stock-ci.qty}):x;}); }); }
@@ -2244,7 +2317,7 @@ function App(props) {
         <Sidebar view={view} setView={setView} cartCount={cart.length} pendingCount={pendingAccs.length} products={products} sales={sales} session={session} onLogout={onLogout} isOnline={isOnline}/>
         <div style={{flex:1,padding:"24px 28px",overflowY:"auto",minWidth:0}}>
           {view==="dashboard"&&canAccess(session.role,"dashboard")&&<DashboardScreen sales={sales} todaySales={todaySales} pendingAccs={pendingAccs} totalPend={totalPend} products={products} top5={top5} setSelectedSale={setSelSale} setView={setView} accounts={accounts} returns={returns}/>}
-          {view==="pos"      &&canAccess(session.role,"pos")&&<POSScreen products={products} filteredPOS={filteredPOS} cart={cart} posQ={posQ} setPosQ={setPosQ} payMethod={payMethod} setPayMethod={setPayMethod} payType={payType} setPayType={setPayType} cashIn={cashIn} setCashIn={setCashIn} initialPay={initialPay} setInitialPay={setInitialPay} clientName={clientName} setClientName={setClientName} selectedClientId={selectedClientId} setSelectedClientId={setSelectedClientId} cartTotal={cartTotal} vuelto={vuelto} initPaidVal={initPaidVal} addToCart={addToCart} changeQty={changeQty} removeFromCart={removeFromCart} checkout={checkout} resetPOS={resetPOS} flash={flash} clients={clients} accounts={accounts}/>}
+          {view==="pos"      &&canAccess(session.role,"pos")&&<POSScreen products={products} filteredPOS={filteredPOS} cart={cart} posQ={posQ} setPosQ={setPosQ} payMethod={payMethod} setPayMethod={setPayMethod} payType={payType} setPayType={setPayType} cashIn={cashIn} setCashIn={setCashIn} initialPay={initialPay} setInitialPay={setInitialPay} clientName={clientName} setClientName={setClientName} selectedClientId={selectedClientId} setSelectedClientId={setSelectedClientId} cartTotal={cartTotal} vuelto={vuelto} initPaidVal={initPaidVal} addToCart={addToCart} changeQty={changeQty} removeFromCart={removeFromCart} applyDiscount={applyDiscount} checkout={checkout} resetPOS={resetPOS} flash={flash} clients={clients} accounts={accounts}/>}
           {view==="caja"     &&canAccess(session.role,"caja")&&<CajaScreen sales={sales} accounts={accounts} returns={returns}/>}
           {view==="accounts" &&canAccess(session.role,"accounts")&&<AccountsScreen accounts={accounts} pendingAccs={pendingAccs} totalPend={totalPend} addPayment={addPayment} showFlash={showFlash}/>}
           {view==="returns"  &&canAccess(session.role,"returns")&&<ReturnsScreen returns={returns} products={products} onProcess={processReturn} showFlash={showFlash}/>}
