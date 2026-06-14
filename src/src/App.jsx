@@ -198,7 +198,28 @@ function UsersScreen(props) {
   var _fr=useState("cajero"); var fRole=_fr[0]; var setFRole=_fr[1];
   var _fer=useState(""); var fErr=_fer[0]; var setFErr=_fer[1];
 
-  useEffect(function(){async function load(){var u=await db.load(UK,[]);setUsers(u||[]);setUsersLoaded(true);}load();},[]);
+  useEffect(function(){
+    async function load(){
+      var u=await db.load(UK,[]);
+      setUsers(u||[]);
+      try {
+        var apiUsers=await usersAPI.getAll();
+        if(apiUsers&&apiUsers.length>0){
+          var merged=apiUsers.map(function(au){
+            var local=(u||[]).find(function(lu){return lu.email.toLowerCase()===au.email.toLowerCase();});
+            return {id:au.id,name:au.name,email:au.email,role:au.role,active:au.active,
+              passwordHash:local?local.passwordHash:"",secQuestion:local?local.secQuestion:"",
+              secAnswerHash:local?local.secAnswerHash:"",lastLogin:au.last_login||null,
+              createdAt:au.created_at||new Date().toISOString()};
+          });
+          setUsers(merged);
+          await db.save(UK,merged);
+        }
+      } catch(e){ console.warn("No se pudo cargar usuarios desde API:",e); }
+      setUsersLoaded(true);
+    }
+    load();
+  },[]);
   useEffect(function(){if(usersLoaded)db.save(UK,users);},[users,usersLoaded]);
 
   function resetForm(){setFName("");setFEmail("");setFPass("");setFRole("cajero");setFErr("");setEditUser(null);setShowForm(false);}
@@ -220,12 +241,14 @@ function UsersScreen(props) {
     resetForm();
   }
 
-  function toggleActive(uid){
+  async function toggleActive(uid){
     if(uid===session.userId){showFlash("No podés desactivar tu propia cuenta","warn");return;}
     var admins=users.filter(function(u){return u.role==="admin"&&u.active;});
     var tgt=users.find(function(u){return u.id===uid;});
     if(tgt&&tgt.role==="admin"&&admins.length<=1&&tgt.active){showFlash("Debe existir al menos un administrador activo","warn");return;}
-    setUsers(function(p){return p.map(function(u){return u.id===uid?Object.assign({},u,{active:!u.active}):u;});});
+    var newActive=!tgt.active;
+    setUsers(function(p){return p.map(function(u){return u.id===uid?Object.assign({},u,{active:newActive}):u;});});
+    try{ await usersAPI.update(uid,{active:newActive}); }catch(e){ console.warn("Sync Supabase toggleActive:",e); }
   }
 
   function startEdit(u){setEditUser(u);setFName(u.name);setFEmail(u.email);setFPass("");setFRole(u.role);setFErr("");setShowForm(true);}
@@ -1368,7 +1391,7 @@ function App(props) {
           var s2 = await db.load(SK, []);
           var a2 = await db.load(AK, []);
           var r2 = await db.load(RK, []);
-          var d2 = await db.load(DFK, []);
+        var d2 = await db.load(DFK, []);
           setProducts(p2); setSales(s2); setAccounts(a2); setReturns(r2); setDefectives(d2);
         }
       } else {
