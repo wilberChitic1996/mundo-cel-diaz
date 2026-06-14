@@ -156,7 +156,10 @@ function LoginScreen(props) {
     }
     var updated=(users||[]).map(function(u){return u.id===user.id?Object.assign({},u,{lastLogin:new Date().toISOString()}):u;});
     await db.save(UK,updated);
-    try { await authAPI.login(email.trim(),pass); } catch(e){}
+    try {
+      var apiResult = await authAPI.login(email.trim(),pass);
+      if(apiResult) sessionStorage.setItem('mnpos-api-session', 'true');
+    } catch(e){}
     setLoading(false);
     onLogin(createSession(user));
   }
@@ -489,14 +492,15 @@ function MetricBox(props) {
 
 /* ── ProductForm ── */
 var FORM_FIELDS = [
-  {k:"code",    l:"Código",           ph:"A001",            tp:"text"  },
-  {k:"name",    l:"Nombre",           ph:"Ej: Pantalla...", tp:"text"  },
-  {k:"category",l:"Categoría",        ph:"Pantallas",       tp:"text"  },
-  {k:"shelf",   l:"Estantería",       ph:"A-01",            tp:"text"  },
-  {k:"price",   l:"Precio venta (Q)", ph:"0.00",            tp:"number"},
-  {k:"cost",    l:"Costo (Q)",        ph:"0.00",            tp:"number"},
-  {k:"stock",   l:"Stock",            ph:"0",               tp:"number"},
-  {k:"unit",    l:"Unidad",           ph:"uni / serv",      tp:"text"  },
+  {k:"code",     l:"Código",              ph:"A001",            tp:"text"  },
+  {k:"name",     l:"Nombre",              ph:"Ej: Pantalla...", tp:"text"  },
+  {k:"category", l:"Categoría",           ph:"Pantallas",       tp:"text"  },
+  {k:"shelf",    l:"Estantería",          ph:"A-01",            tp:"text"  },
+  {k:"price",    l:"Precio venta (Q)",    ph:"0.00",            tp:"number"},
+  {k:"cost",     l:"Costo (Q)",           ph:"0.00",            tp:"number"},
+  {k:"stock",    l:"Stock actual",        ph:"0",               tp:"number"},
+  {k:"minStock", l:"Stock mínimo (alerta)",ph:"5",              tp:"number"},
+  {k:"unit",     l:"Unidad",              ph:"uni / serv",      tp:"text"  },
 ];
 function ProductForm(props) {
   var product=props.product; var onSave=props.onSave; var onCancel=props.onCancel;
@@ -505,7 +509,7 @@ function ProductForm(props) {
   function set(k,v){ setForm(function(f){ var n=Object.assign({},f); n[k]=v; return n; }); }
   function doSave(){
     if(!form.code||!form.code.trim()||!form.name||!form.name.trim()){setErr("Código y Nombre son obligatorios");return;}
-    onSave(Object.assign({},form,{price:parseFloat(form.price)||0,cost:parseFloat(form.cost)||0,stock:parseInt(form.stock)||0}));
+    onSave(Object.assign({},form,{price:parseFloat(form.price)||0,cost:parseFloat(form.cost)||0,stock:parseInt(form.stock)||0,minStock:parseInt(form.minStock)||0}));
   }
   return (
       <div style={Object.assign({},sC,{marginBottom:16,borderColor:TEAL,borderWidth:"1.5px"})}>
@@ -625,24 +629,68 @@ function DashboardScreen(props) {
   var products=props.products; var top5=props.top5;
   var setSelectedSale=props.setSelectedSale; var setView=props.setView;
   var accounts=props.accounts; var returns=props.returns;
+  var repairs=props.repairs||[];
 
   var todayRev=todaySales.reduce(function(s,x){return s+x.total;},0);
-  var totalRev=sales.reduce(function(s,x){return s+x.total;},0);
   var todayStr=new Date().toDateString();
 
   var cajaDia=todaySales.filter(function(s){return s.method==="Efectivo";}).reduce(function(s,x){return s+x.total;},0);
   var returnsDia=returns.filter(function(r){return new Date(r.date).toDateString()===todayStr&&r.refundMethod==="Efectivo"&&r.refundAmount>0;}).reduce(function(s,r){return s+r.refundAmount;},0);
   var saldoCaja=cajaDia-returnsDia;
 
+  // Reparaciones
+  var repsActivas=repairs.filter(function(r){return r.status!=="entregado";});
+  var repsListas=repairs.filter(function(r){return r.status==="listo";});
+  var repsVencidas=repairs.filter(function(r){
+    return r.status!=="entregado"&&r.promisedDate&&new Date(r.promisedDate+"T23:59:59")<new Date();
+  });
+
+  // Stock mínimo
+  var stockAlertas=products.filter(function(p){
+    return p.unit!=="serv"&&p.minStock>0&&p.stock<=p.minStock;
+  });
+  var stockCero=products.filter(function(p){return p.unit!=="serv"&&p.stock===0;});
+
   return (
       <div>
         <p style={H1}>📊 Panel de Control</p>
-        <div style={{display:"grid",gridTemplateColumns:"repeat(4,1fr)",gap:14,marginBottom:22}}>
-          <MetricBox label="Ventas hoy"       value={todaySales.length}   color={TEAL}/>
-          <MetricBox label="Ingresos hoy"     value={Q(todayRev)}          color="#378ADD"/>
-          <MetricBox label="Saldo caja hoy"   value={Q(saldoCaja)}         color={saldoCaja>=0?"#1D9E75":"#E24B4A"}/>
-          <MetricBox label="Por cobrar"        value={Q(totalPend)}         color="#E24B4A"/>
+
+        {/* Alertas críticas arriba */}
+        {(repsVencidas.length>0||stockCero.length>0)&&(
+            <div style={{background:"#FCEBEB",border:"1px solid #F09595",borderRadius:10,padding:"12px 16px",marginBottom:16}}>
+              <p style={{fontWeight:700,fontSize:13,color:"#791F1F",margin:"0 0 8px"}}>⚠ Atención requerida</p>
+              <div style={{display:"flex",gap:20,flexWrap:"wrap"}}>
+                {repsVencidas.length>0&&<span style={{fontSize:13,color:"#791F1F",cursor:"pointer"}} onClick={function(){setView("repairs");}}>🔧 {repsVencidas.length} reparación{repsVencidas.length>1?"es":""} vencida{repsVencidas.length>1?"s":""} sin entregar →</span>}
+                {stockCero.length>0&&<span style={{fontSize:13,color:"#791F1F",cursor:"pointer"}} onClick={function(){setView("products");}}>📦 {stockCero.length} producto{stockCero.length>1?"s":""} sin stock →</span>}
+              </div>
+            </div>
+        )}
+
+        <div style={{display:"grid",gridTemplateColumns:"repeat(4,1fr)",gap:14,marginBottom:16}}>
+          <MetricBox label="Ventas hoy"     value={todaySales.length}                  color={TEAL}/>
+          <MetricBox label="Ingresos hoy"   value={Q(todayRev)}                        color="#378ADD"/>
+          <MetricBox label="Saldo caja hoy" value={Q(saldoCaja)}                       color={saldoCaja>=0?"#1D9E75":"#E24B4A"}/>
+          <MetricBox label="Por cobrar"     value={Q(totalPend)}                       color="#E24B4A"/>
         </div>
+
+        {/* Reparaciones */}
+        <div style={{display:"grid",gridTemplateColumns:"repeat(3,1fr)",gap:14,marginBottom:16}}>
+          <div onClick={function(){setView("repairs");}} style={Object.assign({},sC,{cursor:"pointer",borderLeft:"4px solid #378ADD"})}>
+            <p style={{fontSize:12,color:"#666",margin:"0 0 6px"}}>🔧 Reparaciones activas</p>
+            <p style={{fontSize:26,fontWeight:700,margin:0,color:"#378ADD"}}>{repsActivas.length}</p>
+          </div>
+          <div onClick={function(){setView("repairs");}} style={Object.assign({},sC,{cursor:"pointer",borderLeft:"4px solid "+TEAL})}>
+            <p style={{fontSize:12,color:"#666",margin:"0 0 6px"}}>✅ Listas para entregar</p>
+            <p style={{fontSize:26,fontWeight:700,margin:0,color:TEAL}}>{repsListas.length}</p>
+            {repsListas.length>0&&<p style={{fontSize:11,color:TEAL,margin:"4px 0 0"}}>¡Notificá a los clientes!</p>}
+          </div>
+          <div onClick={function(){setView("products");}} style={Object.assign({},sC,{cursor:"pointer",borderLeft:"4px solid "+(stockAlertas.length>0?"#E65100":"#ccc")})}>
+            <p style={{fontSize:12,color:"#666",margin:"0 0 6px"}}>📦 Stock bajo mínimo</p>
+            <p style={{fontSize:26,fontWeight:700,margin:0,color:stockAlertas.length>0?"#E65100":"#999"}}>{stockAlertas.length}</p>
+            {stockAlertas.length>0&&<p style={{fontSize:11,color:"#E65100",margin:"4px 0 0"}}>{stockAlertas.slice(0,2).map(function(p){return p.name;}).join(", ")}{stockAlertas.length>2?"...":""}</p>}
+          </div>
+        </div>
+
         <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:18,marginBottom:18}}>
           <div style={sC}>
             <p style={{fontWeight:600,margin:"0 0 14px",fontSize:15}}>🏆 Más vendidos</p>
@@ -1183,13 +1231,54 @@ function AccountsScreen(props) {
   );
 }
 
-/* ── Devoluciones (con lógica de reembolso y condición del artículo) ── */
+/* ── Devoluciones ── */
 function ReturnsScreen(props) {
   var returns=props.returns; var products=props.products; var onProcess=props.onProcess;
-  var BLANK={client:"",items:[{code:"",name:"",qty:1,price:0}],reason:"",refundMethod:"Efectivo",refundAmount:"",itemCondition:"bueno"};
+  var clients=props.clients||[]; var sales=props.sales||[];
+
+  var BLANK={clientId:null,client:"",items:[{code:"",name:"",qty:1,price:0}],reason:"",refundMethod:"Efectivo",refundAmount:"",itemCondition:"bueno"};
   var _sh=useState(false); var show=_sh[0]; var setShow=_sh[1];
   var _fo=useState(BLANK); var form=_fo[0]; var setForm=_fo[1];
   var _er=useState(""); var err=_er[0]; var setErr=_er[1];
+
+  // Búsqueda de cliente
+  var _cq=useState(""); var cliQ=_cq[0]; var setCliQ=_cq[1];
+  var _cdrop=useState(false); var showDrop=_cdrop[0]; var setShowDrop=_cdrop[1];
+  var _selCli=useState(null); var selCli=_selCli[0]; var setSelCli=_selCli[1];
+  var _step=useState("search"); var step=_step[0]; var setStep=_step[1];
+  // Venta seleccionada para devolver
+  var _selSale=useState(null); var selSale=_selSale[0]; var setSelSale=_selSale[1];
+
+  var cliResults=cliQ.trim().length>0?clients.filter(function(c){
+    var q=cliQ.toLowerCase();
+    return (c.name||"").toLowerCase().includes(q)||(c.dpi||"").includes(cliQ.trim())||(c.cliCode||"").toLowerCase().includes(q);
+  }).slice(0,5):[];
+
+  // Ventas del cliente seleccionado
+  var cliSales=selCli?sales.filter(function(s){
+    return s.clientId===selCli.id||(s.client===selCli.name&&!s.clientId);
+  }).slice().sort(function(a,b){return new Date(b.date)-new Date(a.date);}):[];
+
+  function pickClient(c){
+    setSelCli(c);
+    setCliQ(c.name);
+    setShowDrop(false);
+    setForm(function(f){return Object.assign({},f,{clientId:c.id,client:c.name});});
+    setStep("sale");
+  }
+
+  function pickSale(s){
+    setSelSale(s);
+    // Pre-llenar items con los productos de esa venta
+    var items=s.items.map(function(it){return {code:it.code,name:it.name,qty:it.qty,price:it.price};});
+    setForm(function(f){return Object.assign({},f,{items:items});});
+    setStep("form");
+  }
+
+  function resetFlow(){
+    setSelCli(null); setSelSale(null); setCliQ(""); setStep("search");
+    setForm(BLANK); setErr(""); setShow(false);
+  }
 
   function setF(k,v){ setForm(function(f){var n=Object.assign({},f);n[k]=v;return n;}); }
   function setItem(i,k,v){ setForm(function(f){return Object.assign({},f,{items:f.items.map(function(it,idx){return idx===i?Object.assign({},it,(function(){var o={};o[k]=v;return o;})()) :it;})});}); }
@@ -1208,11 +1297,10 @@ function ReturnsScreen(props) {
     if(!valid.length){setErr("Agregá al menos un producto válido");return;}
     if(!form.reason.trim()){setErr("Indicá el motivo");return;}
     var refAmt=form.refundMethod==="Sin reembolso"?0:(parseFloat(form.refundAmount)||itemsTotal);
-    onProcess({client:form.client.trim()||"Cliente general",items:valid,reason:form.reason,refundMethod:form.refundMethod,refundAmount:refAmt,itemCondition:form.itemCondition});
-    setForm(BLANK);setShow(false);setErr("");
+    onProcess({clientId:form.clientId||null,client:form.client.trim()||"Cliente general",saleId:selSale?selSale.id:null,items:valid,reason:form.reason,refundMethod:form.refundMethod,refundAmount:refAmt,itemCondition:form.itemCondition});
+    resetFlow();
   }
 
-  var totalRet=returns.reduce(function(s,r){return s+r.total;},0);
   var totalReembolsado=returns.filter(function(r){return r.refundAmount>0;}).reduce(function(s,r){return s+r.refundAmount;},0);
   var totalPendReemb=returns.filter(function(r){return r.refundMethod==="Sin reembolso"||r.refundAmount===0;}).length;
 
@@ -1220,78 +1308,154 @@ function ReturnsScreen(props) {
       <div>
         <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:20}}>
           <p style={H1}>🔄 Devoluciones</p>
-          <button style={mB(show?"red":"teal")} onClick={function(){setShow(!show);setErr("");setForm(BLANK);}}>{show?"✕ Cancelar":"+ Nueva devolución"}</button>
+          <button style={mB(show?"red":"teal")} onClick={function(){if(show){resetFlow();}else{setShow(true);}}}>
+            {show?"✕ Cancelar":"+ Nueva devolución"}
+          </button>
         </div>
 
         {show&&(
             <div style={Object.assign({},sC,{marginBottom:16,borderColor:"#378ADD",borderWidth:"1.5px"})}>
-              <p style={{fontWeight:600,margin:"0 0 14px",fontSize:15}}>🔄 Registrar devolución</p>
-              {err&&<p style={{color:"#E24B4A",fontSize:13,margin:"0 0 10px"}}>⚠ {err}</p>}
+              <p style={{fontWeight:700,margin:"0 0 16px",fontSize:15}}>🔄 Registrar devolución</p>
 
-              <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:12,marginBottom:14}}>
-                <div><label style={sL}>👤 Cliente</label>
-                  <input style={sI} value={form.client} placeholder="Nombre del cliente" onChange={function(e){setF("client",e.target.value);}}/></div>
-                <div><label style={sL}>📋 Motivo de devolución</label>
-                  <input style={sI} value={form.reason} placeholder="Ej: Pantalla defectuosa" onChange={function(e){setErr("");setF("reason",e.target.value);}}/></div>
-              </div>
-
-              <p style={{fontWeight:500,margin:"0 0 8px",fontSize:13,color:"#666"}}>Productos a devolver</p>
-              {form.items.map(function(it,i){
-                return (
-                    <div key={i} style={{display:"grid",gridTemplateColumns:"110px 1fr 80px 100px 28px",gap:8,marginBottom:8,alignItems:"center"}}>
-                      <input style={sI} placeholder="Código" value={it.code} onChange={function(e){fillCode(i,e.target.value);}}/>
-                      <input style={sI} placeholder="Nombre del producto" value={it.name} onChange={function(e){setErr("");setItem(i,"name",e.target.value);}}/>
-                      <input type="number" style={sI} placeholder="Cant." value={it.qty} min={1} onChange={function(e){setItem(i,"qty",parseInt(e.target.value)||1);}}/>
-                      <input type="number" style={sI} placeholder="Precio Q" value={it.price||""} onChange={function(e){setItem(i,"price",parseFloat(e.target.value)||0);}}/>
-                      {form.items.length>1&&<span style={{cursor:"pointer",color:"#E24B4A",fontSize:20,textAlign:"center"}} onClick={function(){delItem(i);}}>×</span>}
+              {/* PASO 1: Buscar cliente */}
+              {step==="search"&&(
+                  <div>
+                    <p style={{fontSize:13,color:"#555",margin:"0 0 12px"}}>Paso 1 — Buscá al cliente por nombre, DPI o código</p>
+                    <div style={{position:"relative",marginBottom:16}}>
+                      <input style={sI} value={cliQ} placeholder="Nombre, DPI o código CLI..."
+                             onChange={function(e){setCliQ(e.target.value);setShowDrop(true);}}
+                             onFocus={function(){setShowDrop(true);}}
+                             onBlur={function(){setTimeout(function(){setShowDrop(false);},200);}}
+                      />
+                      {showDrop&&cliQ.trim().length>0&&(
+                          <div style={{position:"absolute",top:"100%",left:0,right:0,background:"#fff",border:"1px solid rgba(0,0,0,0.15)",borderRadius:8,boxShadow:"0 4px 12px rgba(0,0,0,0.1)",zIndex:100,marginTop:2}}>
+                            {cliResults.map(function(c){return (
+                                <div key={c.id} onMouseDown={function(){pickClient(c);}} style={{padding:"10px 14px",cursor:"pointer",borderBottom:"1px solid #f0f0f0",display:"flex",justifyContent:"space-between"}}>
+                                  <div><b style={{fontSize:13}}>{c.name}</b> <span style={{fontSize:11,color:"#999",fontFamily:"monospace"}}>{c.cliCode}{c.dpi?" · DPI: "+c.dpi:""}</span></div>
+                                </div>
+                            );})}
+                            {cliResults.length===0&&<div style={{padding:"10px 14px",fontSize:12,color:"#999"}}>Sin resultados — podés continuar sin vincular cliente</div>}
+                          </div>
+                      )}
                     </div>
-                );
-              })}
-              <button style={Object.assign({},mB("gray"),{padding:"5px 12px",fontSize:12,marginBottom:16})} onClick={addItem}>+ Agregar fila</button>
+                    <div style={{display:"flex",gap:10}}>
+                      <button style={mB("blue")} onClick={function(){
+                        if(!cliQ.trim()){setErr("Ingresá el nombre del cliente");return;}
+                        setForm(function(f){return Object.assign({},f,{client:cliQ.trim()});});
+                        setStep("form");
+                      }}>Continuar sin vincular →</button>
+                    </div>
+                    {err&&<p style={{color:"#E24B4A",fontSize:13,marginTop:10}}>⚠ {err}</p>}
+                  </div>
+              )}
 
-              {itemsTotal>0&&<div style={{background:"#f5f4f0",borderRadius:8,padding:"8px 14px",marginBottom:14,fontSize:13}}>Valor total de artículos: <b>{Q(itemsTotal)}</b></div>}
+              {/* PASO 2: Elegir venta a devolver */}
+              {step==="sale"&&selCli&&(
+                  <div>
+                    <div style={{background:"#E1F5EE",borderRadius:8,padding:"10px 14px",marginBottom:16,display:"flex",justifyContent:"space-between",alignItems:"center"}}>
+                      <div>
+                        <span style={{fontWeight:700,color:"#085041"}}>{selCli.name}</span>
+                        <span style={{fontSize:11,color:"#0F6E56",marginLeft:8,fontFamily:"monospace"}}>{selCli.cliCode}{selCli.dpi?" · DPI: "+selCli.dpi:""}</span>
+                      </div>
+                      <span onClick={function(){setSelCli(null);setCliQ("");setStep("search");}} style={{cursor:"pointer",color:"#E24B4A",fontWeight:700}}>× Cambiar</span>
+                    </div>
+                    <p style={{fontSize:13,color:"#555",margin:"0 0 12px"}}>Paso 2 — Seleccioná la venta a devolver (o saltá este paso)</p>
+                    {cliSales.length===0?(
+                        <div style={{background:"#f5f4f0",borderRadius:8,padding:"12px 14px",marginBottom:12,fontSize:13,color:"#666"}}>Sin ventas registradas para este cliente</div>
+                    ):(
+                        <div style={{maxHeight:240,overflowY:"auto",marginBottom:12}}>
+                          <table style={{width:"100%",borderCollapse:"collapse"}}>
+                            <thead><tr>{["Fecha","Artículos","Total","Método",""].map(function(h){return <th key={h} style={sTH}>{h}</th>;})}</tr></thead>
+                            <tbody>
+                            {cliSales.map(function(s){return (
+                                <tr key={s.id} style={{cursor:"pointer"}} onClick={function(){pickSale(s);}}>
+                                  <td style={sTD}>{fmtD(s.date)} {fmtT(s.date)}</td>
+                                  <td style={Object.assign({},sTD,{color:"#666"})}>{s.items.length} art.</td>
+                                  <td style={Object.assign({},sTD,{fontWeight:700,color:TEAL})}>{Q(s.total)}</td>
+                                  <td style={sTD}><span style={mBg("teal")}>{s.method}</span></td>
+                                  <td style={Object.assign({},sTD,{color:TEAL,fontSize:12})}>Seleccionar →</td>
+                                </tr>
+                            );})}
+                            </tbody>
+                          </table>
+                        </div>
+                    )}
+                    <button style={Object.assign({},mB("gray"),{fontSize:12})} onClick={function(){setStep("form");}}>Continuar sin elegir venta específica →</button>
+                  </div>
+              )}
 
-              <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:12,marginBottom:14}}>
-                <div>
-                  <label style={sL}>💰 Estado del artículo devuelto</label>
-                  <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:8}}>
-                    {[["bueno","✅ Buen estado"],["defectuoso","⚠️ Defectuoso"]].map(function(pair){
-                      var active=form.itemCondition===pair[0];
+              {/* PASO 3: Formulario de devolución */}
+              {step==="form"&&(
+                  <div>
+                    {selCli&&(
+                        <div style={{background:"#E1F5EE",borderRadius:8,padding:"8px 14px",marginBottom:12,display:"flex",justifyContent:"space-between",alignItems:"center"}}>
+                          <span style={{fontWeight:600,color:"#085041",fontSize:13}}>{selCli.name} {selCli.cliCode&&<span style={{fontFamily:"monospace",fontWeight:400,color:"#0F6E56"}}>{selCli.cliCode}</span>}</span>
+                          {selSale&&<span style={{fontSize:12,color:"#0F6E56"}}>Venta: {fmtD(selSale.date)} — {Q(selSale.total)}</span>}
+                        </div>
+                    )}
+                    {!selCli&&<div style={{marginBottom:12}}>
+                      <label style={sL}>👤 Cliente</label>
+                      <input style={sI} value={form.client} placeholder="Nombre del cliente" onChange={function(e){setF("client",e.target.value);}}/>
+                    </div>}
+
+                    {err&&<p style={{color:"#E24B4A",fontSize:13,margin:"0 0 10px"}}>⚠ {err}</p>}
+
+                    <div style={{marginBottom:12}}>
+                      <label style={sL}>📋 Motivo de devolución</label>
+                      <input style={sI} value={form.reason} placeholder="Ej: Pantalla defectuosa" onChange={function(e){setErr("");setF("reason",e.target.value);}}/>
+                    </div>
+
+                    <p style={{fontWeight:500,margin:"0 0 8px",fontSize:13,color:"#666"}}>Productos a devolver</p>
+                    {form.items.map(function(it,i){
                       return (
-                          <div key={pair[0]} onClick={function(){setF("itemCondition",pair[0]);}} style={{padding:"10px 12px",borderRadius:8,cursor:"pointer",border:"2px solid "+(active?TEAL:"rgba(0,0,0,0.15)"),background:active?"#E1F5EE":"#fff",fontSize:13,fontWeight:active?600:400,color:active?"#085041":"#444",textAlign:"center"}}>
-                            {pair[1]}
+                          <div key={i} style={{display:"grid",gridTemplateColumns:"110px 1fr 80px 100px 28px",gap:8,marginBottom:8,alignItems:"center"}}>
+                            <input style={sI} placeholder="Código" value={it.code} onChange={function(e){fillCode(i,e.target.value);}}/>
+                            <input style={sI} placeholder="Nombre del producto" value={it.name} onChange={function(e){setErr("");setItem(i,"name",e.target.value);}}/>
+                            <input type="number" style={sI} placeholder="Cant." value={it.qty} min={1} onChange={function(e){setItem(i,"qty",parseInt(e.target.value)||1);}}/>
+                            <input type="number" style={sI} placeholder="Precio Q" value={it.price||""} onChange={function(e){setItem(i,"price",parseFloat(e.target.value)||0);}}/>
+                            {form.items.length>1&&<span style={{cursor:"pointer",color:"#E24B4A",fontSize:20,textAlign:"center"}} onClick={function(){delItem(i);}}>×</span>}
                           </div>
                       );
                     })}
-                  </div>
-                  <p style={{fontSize:11,color:"#888",margin:"6px 0 0"}}>
-                    {form.itemCondition==="bueno"?"✓ Volverá al inventario disponible":"⚠ Irá a Piezas Defectuosas (no al inventario)"}
-                  </p>
-                </div>
-                <div>
-                  <label style={sL}>💵 Reembolso al cliente</label>
-                  <select style={Object.assign({},sI,{marginBottom:8})} value={form.refundMethod} onChange={function(e){setF("refundMethod",e.target.value);}}>
-                    <option>Efectivo</option><option>Tarjeta</option><option>Crédito en cuenta</option><option>Sin reembolso</option>
-                  </select>
-                  {form.refundMethod!=="Sin reembolso"&&(
-                      <div>
-                        <label style={sL}>Monto a reembolsar (Q)</label>
-                        <input type="number" style={sI} value={form.refundAmount} placeholder={"Total artículos: "+itemsTotal.toFixed(2)} onChange={function(e){setF("refundAmount",e.target.value);}}/>
-                        <p style={{fontSize:11,color:"#888",margin:"4px 0 0"}}>Dejá vacío para reembolsar el total ({Q(itemsTotal)})</p>
-                      </div>
-                  )}
-                  {form.refundMethod==="Sin reembolso"&&<div style={{background:"#f5f4f0",borderRadius:6,padding:"8px 10px",fontSize:12,color:"#666"}}>No se devolverá dinero al cliente</div>}
-                </div>
-              </div>
+                    <button style={Object.assign({},mB("gray"),{padding:"5px 12px",fontSize:12,marginBottom:16})} onClick={addItem}>+ Agregar fila</button>
 
-              <button style={Object.assign({},mB("blue"),{padding:"10px 24px",fontSize:14})} onClick={doReturn}>✓ Registrar devolución</button>
+                    {itemsTotal>0&&<div style={{background:"#f5f4f0",borderRadius:8,padding:"8px 14px",marginBottom:14,fontSize:13}}>Valor total de artículos: <b>{Q(itemsTotal)}</b></div>}
+
+                    <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:12,marginBottom:14}}>
+                      <div>
+                        <label style={sL}>💰 Estado del artículo devuelto</label>
+                        <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:8}}>
+                          {[["bueno","✅ Buen estado"],["defectuoso","⚠️ Defectuoso"]].map(function(pair){
+                            var active=form.itemCondition===pair[0];
+                            return <div key={pair[0]} onClick={function(){setF("itemCondition",pair[0]);}} style={{padding:"10px 12px",borderRadius:8,cursor:"pointer",border:"2px solid "+(active?TEAL:"rgba(0,0,0,0.15)"),background:active?"#E1F5EE":"#fff",fontSize:13,fontWeight:active?600:400,color:active?"#085041":"#444",textAlign:"center"}}>{pair[1]}</div>;
+                          })}
+                        </div>
+                        <p style={{fontSize:11,color:"#888",margin:"6px 0 0"}}>{form.itemCondition==="bueno"?"✓ Volverá al inventario":"⚠ Irá a Piezas Defectuosas"}</p>
+                      </div>
+                      <div>
+                        <label style={sL}>💵 Reembolso al cliente</label>
+                        <select style={Object.assign({},sI,{marginBottom:8})} value={form.refundMethod} onChange={function(e){setF("refundMethod",e.target.value);}}>
+                          <option>Efectivo</option><option>Tarjeta</option><option>Crédito en cuenta</option><option>Sin reembolso</option>
+                        </select>
+                        {form.refundMethod!=="Sin reembolso"&&(
+                            <div>
+                              <label style={sL}>Monto a reembolsar (Q)</label>
+                              <input type="number" style={sI} value={form.refundAmount} placeholder={"Total: "+itemsTotal.toFixed(2)} onChange={function(e){setF("refundAmount",e.target.value);}}/>
+                            </div>
+                        )}
+                        {form.refundMethod==="Sin reembolso"&&<div style={{background:"#f5f4f0",borderRadius:6,padding:"8px 10px",fontSize:12,color:"#666"}}>No se devolverá dinero</div>}
+                      </div>
+                    </div>
+                    <button style={Object.assign({},mB("blue"),{padding:"10px 24px",fontSize:14})} onClick={doReturn}>✓ Registrar devolución</button>
+                  </div>
+              )}
             </div>
         )}
 
         <div style={{display:"grid",gridTemplateColumns:"repeat(3,1fr)",gap:14,marginBottom:20}}>
-          <MetricBox label="Total devoluciones"  value={returns.length}    color="#7F77DD"/>
-          <MetricBox label="Total reembolsado"   value={Q(totalReembolsado)} color="#E24B4A"/>
-          <MetricBox label="Sin reembolso"       value={totalPendReemb}    color="#666"/>
+          <MetricBox label="Total devoluciones"  value={returns.length}       color="#7F77DD"/>
+          <MetricBox label="Total reembolsado"   value={Q(totalReembolsado)}  color="#E24B4A"/>
+          <MetricBox label="Sin reembolso"       value={totalPendReemb}       color="#666"/>
         </div>
 
         <div style={sC}>
@@ -1449,7 +1613,7 @@ function ProductsScreen(props) {
                     <td style={sTD}>
                       <div style={{display:"flex",gap:6}}>
                         <button style={Object.assign({},mB("blue"),{padding:"4px 10px",fontSize:12})} onClick={function(){setEditProd(Object.assign({},p));}}>✏</button>
-                        <button style={Object.assign({},mB("red"),{padding:"4px 10px",fontSize:12})} onClick={function(){deleteProduct(p.id);}}>🗑</button>
+                        <button style={Object.assign({},mB("red"),{padding:"4px 10px",fontSize:12})} onClick={function(){if(window.confirm('¿Eliminar "'+p.name+'"? Esta acción no se puede deshacer.')){deleteProduct(p.id);}}}>🗑</button>
                       </div>
                     </td>
                   </tr>
@@ -1753,12 +1917,13 @@ function BackupScreen(props) {
       <div>
         <p style={H1}>💾 Respaldo y Exportación</p>
         {bm&&<div style={{background:bm.bg,border:"1px solid "+bm.border,borderRadius:8,padding:"10px 16px",marginBottom:20,color:bm.color,fontSize:14,fontWeight:500}}>{bm.text}</div>}
-        <div style={{display:"grid",gridTemplateColumns:"repeat(5,1fr)",gap:14,marginBottom:24}}>
-          <MetricBox label="Productos"   value={products.length}   color={TEAL}/>
-          <MetricBox label="Ventas"      value={sales.length}      color="#378ADD"/>
-          <MetricBox label="Cuentas"     value={accounts.length}   color="#7F77DD"/>
-          <MetricBox label="Defectuosas" value={defectives.length} color="#E24B4A"/>
-          <MetricBox label="Tamaño data" value={sizeKB+" KB"}      color="#666"/>
+        <div style={{display:"grid",gridTemplateColumns:"repeat(6,1fr)",gap:14,marginBottom:24}}>
+          <MetricBox label="Productos"    value={products.length}                  color={TEAL}/>
+          <MetricBox label="Clientes"     value={props.clients?props.clients.length:0}  color="#378ADD"/>
+          <MetricBox label="Ventas"       value={sales.length}                     color="#7F77DD"/>
+          <MetricBox label="Reparaciones" value={props.repairs?props.repairs.length:0}  color="#E65100"/>
+          <MetricBox label="Defectuosas"  value={defectives.length}                color="#E24B4A"/>
+          <MetricBox label="Tamaño data"  value={sizeKB+" KB"}                    color="#666"/>
         </div>
         <div style={Object.assign({},sC,{marginBottom:20,borderLeft:"4px solid "+TEAL})}>
           <p style={{fontWeight:700,fontSize:16,margin:"0 0 6px"}}>📊 Exportar a Excel (.xlsx)</p>
@@ -2384,6 +2549,31 @@ function App(props) {
   function updateRepairStatus(id, status){
     setRepairs(function(p){return p.map(function(r){return r.id===id?Object.assign({},r,{status:status,updatedAt:new Date().toISOString()}):r;});});
   }
+  function cobrarReparacion(rep){
+    // Pre-carga el POS con los datos de la reparación
+    setClientName(rep.clientName);
+    setSelectedClientId(rep.clientId||null);
+    setSaleNote("Reparación "+rep.repCode+" — "+rep.brand+" "+rep.model);
+    // Si tiene repuestos, los agrega como items del carrito
+    if(rep.parts&&rep.parts.length>0){
+      var cartItems=rep.parts.map(function(p){
+        var prod=products.find(function(x){return x.code===p.code;});
+        return {id:prod?prod.id:gid(),code:p.code,name:p.name,price:p.price,qty:p.qty,shelf:prod?prod.shelf:"",unit:"uni",maxStock:prod?prod.stock:999};
+      });
+      // Si hay costo estimado mayor a los repuestos, agrega mano de obra
+      var costoRepuestos=rep.parts.reduce(function(s,p){return s+p.price*p.qty;},0);
+      var costo=parseFloat(rep.estimatedCost)||0;
+      if(costo>costoRepuestos){
+        cartItems.push({id:gid(),code:"MO001",name:"Mano de obra — "+rep.brand+" "+rep.model,price:costo-costoRepuestos,qty:1,shelf:"",unit:"serv",maxStock:999});
+      }
+      setCart(cartItems);
+    } else if(rep.estimatedCost>0){
+      // Solo mano de obra
+      setCart([{id:gid(),code:"MO001",name:"Reparación — "+rep.brand+" "+rep.model,price:parseFloat(rep.estimatedCost),qty:1,shelf:"",unit:"serv",maxStock:999}]);
+    }
+    setView("pos");
+    showFlash("✓ Reparación "+rep.repCode+" cargada en el POS","ok");
+  }
 
   function saveClient(obj, isEdit){
     if(isEdit){
@@ -2472,20 +2662,20 @@ function App(props) {
 
         <Sidebar view={view} setView={setView} cartCount={cart.length} pendingCount={pendingAccs.length} products={products} sales={sales} session={session} onLogout={onLogout} isOnline={isOnline}/>
         <div style={{flex:1,padding:"24px 28px",overflowY:"auto",minWidth:0}}>
-          {view==="dashboard"&&canAccess(session.role,"dashboard")&&<DashboardScreen sales={sales} todaySales={todaySales} pendingAccs={pendingAccs} totalPend={totalPend} products={products} top5={top5} setSelectedSale={setSelSale} setView={setView} accounts={accounts} returns={returns}/>}
+          {view==="dashboard"&&canAccess(session.role,"dashboard")&&<DashboardScreen sales={sales} todaySales={todaySales} pendingAccs={pendingAccs} totalPend={totalPend} products={products} top5={top5} setSelectedSale={setSelSale} setView={setView} accounts={accounts} returns={returns} repairs={repairs}/>}
           {view==="pos"      &&canAccess(session.role,"pos")&&<POSScreen products={products} filteredPOS={filteredPOS} cart={cart} posQ={posQ} setPosQ={setPosQ} payMethod={payMethod} setPayMethod={setPayMethod} payType={payType} setPayType={setPayType} cashIn={cashIn} setCashIn={setCashIn} initialPay={initialPay} setInitialPay={setInitialPay} clientName={clientName} setClientName={setClientName} selectedClientId={selectedClientId} setSelectedClientId={setSelectedClientId} saleNote={saleNote} setSaleNote={setSaleNote} cartTotal={cartTotal} vuelto={vuelto} initPaidVal={initPaidVal} addToCart={addToCart} changeQty={changeQty} removeFromCart={removeFromCart} applyDiscount={applyDiscount} checkout={checkout} resetPOS={resetPOS} flash={flash} clients={clients} accounts={accounts}/>}
           {view==="caja"     &&canAccess(session.role,"caja")&&<CajaScreen sales={sales} accounts={accounts} returns={returns}/>}
           {view==="accounts" &&canAccess(session.role,"accounts")&&<AccountsScreen accounts={accounts} pendingAccs={pendingAccs} totalPend={totalPend} addPayment={addPayment} showFlash={showFlash}/>}
-          {view==="returns"  &&canAccess(session.role,"returns")&&<ReturnsScreen returns={returns} products={products} onProcess={processReturn} showFlash={showFlash}/>}
+          {view==="returns"  &&canAccess(session.role,"returns")&&<ReturnsScreen returns={returns} products={products} onProcess={processReturn} showFlash={showFlash} clients={clients} sales={sales}/>}
           {view==="defective"&&canAccess(session.role,"defective")&&<DefectiveScreen defectives={defectives} onUpdateStatus={updateDefectiveStatus} onReingress={reingresarDefective}/>}
           {view==="products" &&canAccess(session.role,"products")&&<ProductsScreen products={products} saveProduct={saveProduct} deleteProduct={deleteProduct}/>}
           {view==="inventory"&&canAccess(session.role,"inventory")&&<InventoryScreen products={products}/>}
           {view==="history"  &&canAccess(session.role,"history")&&<HistoryScreen sales={sales} selectedSale={selSale} setSelectedSale={setSelSale}/>}
           {view==="cuadres"  &&canAccess(session.role,"cuadres")&&<CuadresScreen sales={sales} accounts={accounts} returns={returns} products={products} repairs={repairs} session={session}/>}
-          {view==="backup"   &&canAccess(session.role,"backup")&&<BackupScreen products={products} sales={sales} accounts={accounts} returns={returns} defectives={defectives} onExportJSON={exportJSON} onExportExcel={exportExcel} onImport={importData}/>}
+          {view==="backup"   &&canAccess(session.role,"backup")&&<BackupScreen products={products} sales={sales} accounts={accounts} returns={returns} defectives={defectives} clients={clients} repairs={repairs} onExportJSON={exportJSON} onExportExcel={exportExcel} onImport={importData}/>}
           {view==="users"    &&canAccess(session.role,"users")&&<UsersScreen session={session} showFlash={showFlash}/>}
           {view==="clients"  &&canAccess(session.role,"clients")&&<ClientsScreen clients={clients} sales={sales} accounts={accounts} returns={returns} saveClient={saveClient} session={session} showFlash={showFlash}/>}
-          {view==="repairs"  &&canAccess(session.role,"repairs")&&<RepairsScreen repairs={repairs} clients={clients} products={products} saveRepair={saveRepair} updateRepairStatus={updateRepairStatus} session={session} showFlash={showFlash}/>}
+          {view==="repairs"  &&canAccess(session.role,"repairs")&&<RepairsScreen repairs={repairs} clients={clients} products={products} saveRepair={saveRepair} updateRepairStatus={updateRepairStatus} onCobrar={cobrarReparacion} session={session} showFlash={showFlash}/>}
         </div>
       </div>
   );
@@ -2558,6 +2748,7 @@ function RepairsScreen(props){
   var repairs=props.repairs; var clients=props.clients||[]; var products=props.products||[];
   var saveRepair=props.saveRepair; var updateRepairStatus=props.updateRepairStatus;
   var session=props.session||{}; var showFlash=props.showFlash;
+  var onCobrar=props.onCobrar||function(){};
 
   var _view=useState("list"); var repView=_view[0]; var setRepView=_view[1];
   var _sel=useState(null); var selRep=_sel[0]; var setSelRep=_sel[1];
@@ -2662,6 +2853,7 @@ function RepairsScreen(props){
             {rep.status!=="entregado"&&<button style={mB("blue")} onClick={function(){updateRepairStatus(rep.id,nextStatus[rep.status]);showFlash("✓ Estado actualizado","ok");}}>
               {nextLabel[rep.status]}
             </button>}
+            {(rep.status==="listo"||rep.status==="entregado")&&<button style={mB("teal")} onClick={function(){onCobrar(rep);setSelRep(null);}}>💰 Cobrar reparación</button>}
           </div>
           <div style={sC}>
             <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start",marginBottom:20}}>
@@ -2954,6 +3146,7 @@ function CuadresScreen(props){
   function getRangeLabel(){
     if(rango==="hoy") return "Hoy — "+now.toLocaleDateString("es-GT",{day:"2-digit",month:"long",year:"numeric"});
     if(rango==="semana") return "Esta semana";
+    if(rango==="quincenal") return "Últimos 15 días";
     if(rango==="mes") return now.toLocaleDateString("es-GT",{month:"long",year:"numeric"});
     if(rango==="mes_ant"){
       var d=new Date(now.getFullYear(),now.getMonth()-1,1);
@@ -2969,6 +3162,10 @@ function CuadresScreen(props){
     if(rango==="semana"){
       var wStart=new Date(now); wStart.setDate(now.getDate()-now.getDay());
       wStart.setHours(0,0,0,0); return d>=wStart&&d<=now;
+    }
+    if(rango==="quincenal"){
+      var q15=new Date(now); q15.setDate(now.getDate()-15); q15.setHours(0,0,0,0);
+      return d>=q15&&d<=now;
     }
     if(rango==="mes") return d.getMonth()===now.getMonth()&&d.getFullYear()===now.getFullYear();
     if(rango==="mes_ant"){
@@ -3120,7 +3317,7 @@ function CuadresScreen(props){
     w.onload=function(){w.print();};
   }
 
-  var rangos=[["hoy","Hoy"],["semana","Esta semana"],["mes","Este mes"],["mes_ant","Mes anterior"],["custom","Personalizado"]];
+  var rangos=[["hoy","Hoy"],["semana","Esta semana"],["quincenal","Últimos 15 días"],["mes","Este mes"],["mes_ant","Mes anterior"],["custom","Personalizado"]];
 
   return (
       <div>
