@@ -1509,10 +1509,144 @@ function InventoryScreen(props) {
 /* ── Historial ── */
 function HistoryScreen(props) {
   var sales=props.sales; var selectedSale=props.selectedSale; var setSelectedSale=props.setSelectedSale;
+
+  function printVoucher(sale){
+    var itemsHTML=sale.items.map(function(it){
+      var hasDisc=it.originalPrice&&it.price<it.originalPrice;
+      return '<tr>'+
+          '<td style="padding:7px 10px;border-bottom:1px solid #eee;font-size:12px;font-weight:600;">'+it.name+'<br><span style="font-family:monospace;font-size:10px;color:#888;">SKU: '+it.code+' &nbsp;·&nbsp; Estant.: '+(it.shelf||'—')+'</span>'+
+          (hasDisc?'<br><span style="font-size:10px;color:#E65100;">Descuento aplicado por: '+it.discountBy+'</span>':'')+'</td>'+
+          '<td style="padding:7px 10px;border-bottom:1px solid #eee;text-align:center;font-size:12px;">'+it.qty+'</td>'+
+          '<td style="padding:7px 10px;border-bottom:1px solid #eee;text-align:right;font-size:12px;">'+
+          (hasDisc?'<span style="text-decoration:line-through;color:#bbb;font-size:10px;">Q '+Number(it.originalPrice).toFixed(2)+'</span><br>':'')+
+          '<span style="color:'+(hasDisc?'#E65100':'#333')+';">Q '+Number(it.price).toFixed(2)+'</span></td>'+
+          '<td style="padding:7px 10px;border-bottom:1px solid #eee;text-align:right;font-size:12px;font-weight:700;">Q '+Number(it.price*it.qty).toFixed(2)+'</td>'+
+          '</tr>';
+    }).join("");
+
+    var subtotal=sale.items.reduce(function(s,it){return s+(it.originalPrice||it.price)*it.qty;},0);
+    var totalDesc=subtotal-sale.total;
+    var ventaNum=sale.id.toUpperCase().slice(-8);
+    var fecha=new Date(sale.date).toLocaleDateString("es-GT",{day:"2-digit",month:"long",year:"numeric"});
+    var hora=new Date(sale.date).toLocaleTimeString("es-GT",{hour:"2-digit",minute:"2-digit"});
+
+    var html='<!DOCTYPE html><html><head><meta charset="UTF-8"><title>Comprobante '+ventaNum+'</title>'+
+        '<style>'+
+        '*{margin:0;padding:0;box-sizing:border-box;}'+
+        'body{font-family:Arial,Helvetica,sans-serif;font-size:12px;color:#222;background:#fff;max-width:700px;margin:0 auto;padding:24px;}'+
+        '.header{display:flex;justify-content:space-between;align-items:flex-start;border-bottom:3px solid #1D9E75;padding-bottom:16px;margin-bottom:20px;}'+
+        '.brand h1{font-size:22px;font-weight:900;color:#1a2535;letter-spacing:-0.5px;}'+
+        '.brand p{font-size:10px;color:#1D9E75;font-weight:700;letter-spacing:2px;margin-top:2px;}'+
+        '.brand .sub{font-size:10px;color:#999;font-weight:400;letter-spacing:0;margin-top:4px;}'+
+        '.venta-num{text-align:right;}'+
+        '.venta-num .label{font-size:10px;color:#999;text-transform:uppercase;letter-spacing:1px;}'+
+        '.venta-num .num{font-size:22px;font-weight:900;color:#1D9E75;margin-top:2px;}'+
+        '.info-grid{display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-bottom:20px;padding:14px;background:#f8f9fa;border-radius:8px;border-left:4px solid #1D9E75;}'+
+        '.info-block .label{font-size:10px;color:#999;text-transform:uppercase;letter-spacing:0.8px;margin-bottom:4px;}'+
+        '.info-block .val{font-size:13px;font-weight:700;color:#222;}'+
+        '.info-block .val-sub{font-size:11px;color:#666;margin-top:1px;}'+
+        'table{width:100%;border-collapse:collapse;margin-bottom:16px;}'+
+        'thead tr{background:#1a2535;}'+
+        'thead th{padding:9px 10px;text-align:left;color:#fff;font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:0.5px;}'+
+        'thead th:nth-child(2),thead th:nth-child(3),thead th:nth-child(4){text-align:center;}'+
+        'thead th:last-child{text-align:right;}'+
+        'tbody tr:nth-child(even){background:#f9f9f9;}'+
+        '.totals{display:flex;justify-content:flex-end;margin-bottom:20px;}'+
+        '.totals-box{width:260px;border:1px solid #eee;border-radius:8px;overflow:hidden;}'+
+        '.totals-row{display:flex;justify-content:space-between;padding:8px 14px;font-size:12px;border-bottom:1px solid #eee;}'+
+        '.totals-row:last-child{background:#1D9E75;color:#fff;font-weight:700;font-size:14px;border-bottom:none;}'+
+        '.totals-row .disc{color:#E65100;}'+
+        '.nota-box{background:#FFFDE7;border:1px solid #FFD54F;border-radius:6px;padding:10px 14px;margin-bottom:20px;font-size:12px;}'+
+        '.nota-box strong{color:#F57F17;}'+
+        '.footer{border-top:2px dashed #ccc;padding-top:16px;display:flex;justify-content:space-between;align-items:center;}'+
+        '.footer-left{font-size:11px;color:#999;line-height:1.8;}'+
+        '.footer-right{text-align:right;font-size:11px;color:#999;line-height:1.8;}'+
+        '.footer strong{color:#1D9E75;}'+
+        '.gracias{text-align:center;margin:20px 0 0;font-size:13px;color:#1D9E75;font-weight:700;letter-spacing:1px;}'+
+        '@media print{body{padding:12px;}button{display:none!important;}}'+
+        '</style></head><body>'+
+
+        '<div class="header">'+
+        '<div class="brand">'+
+        '<h1>MUNDO CEL DIAZ</h1>'+
+        '<p>SISTEMA DE GESTIÓN</p>'+
+        '<p class="sub">Reparación y Venta de Celulares · Guatemala</p>'+
+        '</div>'+
+        '<div class="venta-num">'+
+        '<div class="label">Comprobante de Venta</div>'+
+        '<div class="num"># '+ventaNum+'</div>'+
+        '</div>'+
+        '</div>'+
+
+        '<div class="info-grid">'+
+        '<div class="info-block">'+
+        '<div class="label">Cliente</div>'+
+        '<div class="val">'+sale.client+'</div>'+
+        (sale.clientId?'<div class="val-sub">Código: '+sale.clientId.slice(0,8).toUpperCase()+'</div>':'')+
+        '</div>'+
+        '<div class="info-block">'+
+        '<div class="label">Fecha y Hora</div>'+
+        '<div class="val">'+fecha+'</div>'+
+        '<div class="val-sub">'+hora+' hrs</div>'+
+        '</div>'+
+        '<div class="info-block">'+
+        '<div class="label">Método de Pago</div>'+
+        '<div class="val">'+sale.method+'</div>'+
+        '</div>'+
+        '<div class="info-block">'+
+        '<div class="label">Atendido por</div>'+
+        '<div class="val">'+(sale.registradoPor?sale.registradoPor.name:'—')+'</div>'+
+        (sale.registradoPor?'<div class="val-sub">'+(sale.registradoPor.role==='admin'?'Administrador':sale.registradoPor.role==='cajero'?'Cajero':'Auditor')+'</div>':'')+
+        '</div>'+
+        '</div>'+
+
+        (sale.nota?'<div class="nota-box"><strong>📝 Nota:</strong> '+sale.nota+'</div>':'')+
+
+        '<table>'+
+        '<thead><tr>'+
+        '<th>Descripción / Producto</th>'+
+        '<th style="text-align:center;width:60px;">Cant.</th>'+
+        '<th style="text-align:right;width:100px;">Precio Unit.</th>'+
+        '<th style="text-align:right;width:100px;">Subtotal</th>'+
+        '</tr></thead>'+
+        '<tbody>'+itemsHTML+'</tbody>'+
+        '</table>'+
+
+        '<div class="totals"><div class="totals-box">'+
+        (totalDesc>0?'<div class="totals-row"><span>Precio lista:</span><span>Q '+subtotal.toFixed(2)+'</span></div>'+
+            '<div class="totals-row"><span class="disc">Descuentos:</span><span class="disc">- Q '+totalDesc.toFixed(2)+'</span></div>':'')+
+        '<div class="totals-row"><span>TOTAL:</span><span>Q '+Number(sale.total).toFixed(2)+'</span></div>'+
+        '</div></div>'+
+
+        '<div class="footer">'+
+        '<div class="footer-left">'+
+        '<strong>Mundo Cel Diaz</strong><br>'+
+        'Guatemala, C.A.<br>'+
+        'Sistema de Gestión v2.1'+
+        '</div>'+
+        '<div class="footer-right">'+
+        'Cantidad de artículos: <strong>'+sale.items.reduce(function(s,i){return s+i.qty;},0)+'</strong><br>'+
+        'Líneas de producto: <strong>'+sale.items.length+'</strong><br>'+
+        'Ref: '+sale.id.slice(0,12).toUpperCase()+
+        '</div>'+
+        '</div>'+
+        '<p class="gracias">¡Gracias por su preferencia!</p>'+
+
+        '</body></html>';
+
+    var w=window.open("","_blank","width=800,height=700");
+    w.document.write(html);
+    w.document.close();
+    w.onload=function(){w.print();};
+  }
+
   if(selectedSale){
     return (
         <div>
-          <button style={Object.assign({},mB("gray"),{marginBottom:16})} onClick={function(){setSelectedSale(null);}}>← Volver</button>
+          <div style={{display:"flex",gap:10,marginBottom:16}}>
+            <button style={mB("gray")} onClick={function(){setSelectedSale(null);}}>← Volver</button>
+            <button style={mB("teal")} onClick={function(){printVoucher(selectedSale);}}>🖨 Imprimir / PDF</button>
+          </div>
           <div style={sC}>
             <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start",marginBottom:20}}>
               <div>
