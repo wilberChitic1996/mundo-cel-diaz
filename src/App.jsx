@@ -801,6 +801,7 @@ function POSScreen(props) {
   var initialPay=props.initialPay; var setInitialPay=props.setInitialPay;
   var clientName=props.clientName; var setClientName=props.setClientName;
   var selectedClientId=props.selectedClientId; var setSelectedClientId=props.setSelectedClientId;
+  var saleNote=props.saleNote||""; var setSaleNote=props.setSaleNote||function(){};
   var cartTotal=props.cartTotal; var vuelto=props.vuelto; var initPaidVal=props.initPaidVal;
   var addToCart=props.addToCart; var changeQty=props.changeQty; var removeFromCart=props.removeFromCart;
   var checkout=props.checkout; var resetPOS=props.resetPOS; var flash=props.flash;
@@ -1033,6 +1034,10 @@ function POSScreen(props) {
                     {vuelto!==null&&<div style={{marginTop:5,fontSize:13,fontWeight:600,color:vuelto>=0?TEAL:"#E24B4A"}}>{vuelto>=0?"✓ Vuelto: "+Q(vuelto):"✗ Faltan: "+Q(Math.abs(vuelto))}</div>}
                   </div>
               )}
+              <div style={{marginBottom:10}}>
+                <label style={sL}>📝 Nota / descripción (opcional)</label>
+                <input style={sI} value={saleNote} placeholder="Ej: Reparación pantalla, garantía 30 días..." onChange={function(e){setSaleNote(e.target.value);}}/>
+              </div>
               <button style={Object.assign({},mB(payType==="pendiente"?"purple":payType==="parcial"?"blue":"teal"),{width:"100%",padding:"12px",fontSize:15,opacity:cart.length===0?0.5:1})} onClick={checkout}>
                 {payType==="pendiente"?"⏳ Dejar Pendiente":payType==="parcial"?"💰 Registrar Abono":"✓ Cobrar Venta"}
               </button>
@@ -1514,6 +1519,7 @@ function HistoryScreen(props) {
                 <p style={{fontWeight:600,fontSize:16,margin:"0 0 4px"}}>Detalle de Venta</p>
                 <p style={{fontSize:13,color:"#666",margin:"0 0 2px"}}>{fmtD(selectedSale.date)} {fmtT(selectedSale.date)}</p>
                 <p style={{fontSize:13,margin:"2px 0"}}>👤 <b>{selectedSale.client}</b></p>
+                {selectedSale.nota&&<p style={{fontSize:13,color:"#666",margin:"4px 0 0"}}>📝 {selectedSale.nota}</p>}
                 {selectedSale.registradoPor&&<p style={{fontSize:12,color:"#999",margin:"4px 0 0"}}>Registrado por: <b style={{color:"#666"}}>{selectedSale.registradoPor.name}</b> <span style={mBg("gray")}>{ROLE_LABEL[selectedSale.registradoPor.role]||selectedSale.registradoPor.role}</span></p>}
               </div>
               <div style={{textAlign:"right"}}>
@@ -2006,6 +2012,7 @@ function App(props) {
   var _ip=useState(""); var initialPay=_ip[0]; var setInitialPay=_ip[1];
   var _cn=useState(""); var clientName=_cn[0]; var setClientName=_cn[1];
   var _sci=useState(null); var selectedClientId=_sci[0]; var setSelectedClientId=_sci[1];
+  var _sn=useState(""); var saleNote=_sn[0]; var setSaleNote=_sn[1];
 
   function showFlash(msg,type){
     setFlash({msg:msg,type:type||"ok"});
@@ -2048,7 +2055,7 @@ function App(props) {
   var vuelto=payMethod==="Efectivo"&&payType==="completo"&&cashIn?cashVal-cartTotal:null;
   var initPaidVal=parseFloat(initialPay)||0;
 
-  function resetPOS(){ setCart([]);setCashIn("");setClientName("");setInitialPay("");setPayType("completo");setPayMethod("Efectivo");setSelectedClientId(null); }
+  function resetPOS(){ setCart([]);setCashIn("");setClientName("");setInitialPay("");setPayType("completo");setPayMethod("Efectivo");setSelectedClientId(null);setSaleNote(""); }
 
   async function checkout(){
     if(!cart.length)return;
@@ -2056,7 +2063,7 @@ function App(props) {
     var client=clientName.trim();
     var items=cart.map(function(i){return {id:i.id,code:i.code,name:i.name,price:i.price,qty:i.qty,shelf:i.shelf,originalPrice:i.originalPrice||null,discountBy:i.discountBy||null,discountByRole:i.discountByRole||null,discountAt:i.discountAt||null};});
     var registradoPor={userId:session.userId,name:session.name,role:session.role};
-    var base={id:gid(),date:new Date().toISOString(),client:client,clientId:selectedClientId||null,items:items,total:cartTotal,method:payMethod,registradoPor:registradoPor};
+    var base={id:gid(),date:new Date().toISOString(),client:client,clientId:selectedClientId||null,items:items,total:cartTotal,method:payMethod,registradoPor:registradoPor,nota:saleNote.trim()||null};
     function deduct(){ setProducts(function(p){return p.map(function(x){var ci=cart.find(function(i){return i.id===x.id;});return ci&&x.unit!=="serv"?Object.assign({},x,{stock:x.stock-ci.qty}):x;}); }); }
     if(payType==="completo"){
       if(isOnline){
@@ -2317,7 +2324,7 @@ function App(props) {
         <Sidebar view={view} setView={setView} cartCount={cart.length} pendingCount={pendingAccs.length} products={products} sales={sales} session={session} onLogout={onLogout} isOnline={isOnline}/>
         <div style={{flex:1,padding:"24px 28px",overflowY:"auto",minWidth:0}}>
           {view==="dashboard"&&canAccess(session.role,"dashboard")&&<DashboardScreen sales={sales} todaySales={todaySales} pendingAccs={pendingAccs} totalPend={totalPend} products={products} top5={top5} setSelectedSale={setSelSale} setView={setView} accounts={accounts} returns={returns}/>}
-          {view==="pos"      &&canAccess(session.role,"pos")&&<POSScreen products={products} filteredPOS={filteredPOS} cart={cart} posQ={posQ} setPosQ={setPosQ} payMethod={payMethod} setPayMethod={setPayMethod} payType={payType} setPayType={setPayType} cashIn={cashIn} setCashIn={setCashIn} initialPay={initialPay} setInitialPay={setInitialPay} clientName={clientName} setClientName={setClientName} selectedClientId={selectedClientId} setSelectedClientId={setSelectedClientId} cartTotal={cartTotal} vuelto={vuelto} initPaidVal={initPaidVal} addToCart={addToCart} changeQty={changeQty} removeFromCart={removeFromCart} applyDiscount={applyDiscount} checkout={checkout} resetPOS={resetPOS} flash={flash} clients={clients} accounts={accounts}/>}
+          {view==="pos"      &&canAccess(session.role,"pos")&&<POSScreen products={products} filteredPOS={filteredPOS} cart={cart} posQ={posQ} setPosQ={setPosQ} payMethod={payMethod} setPayMethod={setPayMethod} payType={payType} setPayType={setPayType} cashIn={cashIn} setCashIn={setCashIn} initialPay={initialPay} setInitialPay={setInitialPay} clientName={clientName} setClientName={setClientName} selectedClientId={selectedClientId} setSelectedClientId={setSelectedClientId} saleNote={saleNote} setSaleNote={setSaleNote} cartTotal={cartTotal} vuelto={vuelto} initPaidVal={initPaidVal} addToCart={addToCart} changeQty={changeQty} removeFromCart={removeFromCart} applyDiscount={applyDiscount} checkout={checkout} resetPOS={resetPOS} flash={flash} clients={clients} accounts={accounts}/>}
           {view==="caja"     &&canAccess(session.role,"caja")&&<CajaScreen sales={sales} accounts={accounts} returns={returns}/>}
           {view==="accounts" &&canAccess(session.role,"accounts")&&<AccountsScreen accounts={accounts} pendingAccs={pendingAccs} totalPend={totalPend} addPayment={addPayment} showFlash={showFlash}/>}
           {view==="returns"  &&canAccess(session.role,"returns")&&<ReturnsScreen returns={returns} products={products} onProcess={processReturn} showFlash={showFlash}/>}
