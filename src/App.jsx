@@ -1394,7 +1394,7 @@ function App(props) {
   useEffect(function(){ if(loaded&&!isOnline) db.save(RK,returns);     },[returns,loaded,isOnline]);
   useEffect(function(){ if(loaded&&!isOnline) db.save(DFK,defectives); },[defectives,loaded,isOnline]);
 
-  var _v=useState("pos"); var view=_v[0]; var setView=_v[1];
+  var _v=useState(function(){ return canAccess(session.role,"pos")?"pos":"dashboard"; }); var view=_v[0]; var setView=_v[1];
   var _fl=useState({msg:"",type:"ok"}); var flash=_fl[0]; var setFlash=_fl[1];
   var _ss=useState(null); var selSale=_ss[0]; var setSelSale=_ss[1];
 
@@ -1663,22 +1663,22 @@ function App(props) {
   var top5=Object.keys(pqs).map(function(k){return [k,pqs[k]];}).sort(function(a,b){return b[1]-a[1];}).slice(0,5);
 
   return (
-    <div style={{display:"flex",minHeight:"100vh",background:"#eceae4"}}>
-      <Sidebar view={view} setView={setView} cartLen={cart.length} pendingLen={pendingAccs.length} products={products} sales={sales} session={session} onLogout={onLogout} isOnline={isOnline}/>
-      <div style={{flex:1,padding:"24px 28px",overflowY:"auto",minWidth:0}}>
-        {view==="dashboard"&&<DashboardScreen sales={sales} todaySales={todaySales} pendingAccs={pendingAccs} totalPend={totalPend} products={products} top5={top5} setSelectedSale={setSelSale} setView={setView} accounts={accounts} returns={returns}/>}
-        {view==="pos"      &&<POSScreen products={products} filteredPOS={filteredPOS} cart={cart} posQ={posQ} setPosQ={setPosQ} payMethod={payMethod} setPayMethod={setPayMethod} payType={payType} setPayType={setPayType} cashIn={cashIn} setCashIn={setCashIn} initialPay={initialPay} setInitialPay={setInitialPay} clientName={clientName} setClientName={setClientName} cartTotal={cartTotal} vuelto={vuelto} initPaidVal={initPaidVal} addToCart={addToCart} changeQty={changeQty} removeFromCart={removeFromCart} checkout={checkout} resetPOS={resetPOS} flash={flash}/>}
-        {view==="caja"     &&<CajaScreen sales={sales} accounts={accounts} returns={returns}/>}
-        {view==="accounts" &&<AccountsScreen accounts={accounts} pendingAccs={pendingAccs} totalPend={totalPend} addPayment={addPayment} showFlash={showFlash}/>}
-        {view==="returns"  &&<ReturnsScreen returns={returns} products={products} onProcess={processReturn} showFlash={showFlash}/>}
-        {view==="defective"&&<DefectiveScreen defectives={defectives} onUpdateStatus={updateDefectiveStatus} onReingress={reingresarDefective}/>}
-        {view==="products" &&<ProductsScreen products={products} saveProduct={saveProduct} deleteProduct={deleteProduct}/>}
-        {view==="inventory"&&<InventoryScreen products={products}/>}
-        {view==="history"  &&<HistoryScreen sales={sales} selectedSale={selSale} setSelectedSale={setSelSale}/>}
-        {view==="backup"   &&<BackupScreen products={products} sales={sales} accounts={accounts} returns={returns} defectives={defectives} onExportJSON={exportJSON} onExportExcel={exportExcel} onImport={importData}/>}
-        {view==="users"    &&canAccess(session.role,"users")&&<UsersScreen session={session} showFlash={showFlash}/>}
+      <div style={{display:"flex",minHeight:"100vh",background:"#eceae4"}}>
+        <Sidebar view={view} setView={setView} cartCount={cart.length} pendingCount={pendingAccs.length} products={products} sales={sales} session={session} onLogout={onLogout} isOnline={isOnline}/>
+        <div style={{flex:1,padding:"24px 28px",overflowY:"auto",minWidth:0}}>
+          {view==="dashboard"&&canAccess(session.role,"dashboard")&&<DashboardScreen sales={sales} todaySales={todaySales} pendingAccs={pendingAccs} totalPend={totalPend} products={products} top5={top5} setSelectedSale={setSelSale} setView={setView} accounts={accounts} returns={returns}/>}
+          {view==="pos"      &&canAccess(session.role,"pos")&&<POSScreen products={products} filteredPOS={filteredPOS} cart={cart} posQ={posQ} setPosQ={setPosQ} payMethod={payMethod} setPayMethod={setPayMethod} payType={payType} setPayType={setPayType} cashIn={cashIn} setCashIn={setCashIn} initialPay={initialPay} setInitialPay={setInitialPay} clientName={clientName} setClientName={setClientName} cartTotal={cartTotal} vuelto={vuelto} initPaidVal={initPaidVal} addToCart={addToCart} changeQty={changeQty} removeFromCart={removeFromCart} checkout={checkout} resetPOS={resetPOS} flash={flash}/>}
+          {view==="caja"     &&canAccess(session.role,"caja")&&<CajaScreen sales={sales} accounts={accounts} returns={returns}/>}
+          {view==="accounts" &&canAccess(session.role,"accounts")&&<AccountsScreen accounts={accounts} pendingAccs={pendingAccs} totalPend={totalPend} addPayment={addPayment} showFlash={showFlash}/>}
+          {view==="returns"  &&canAccess(session.role,"returns")&&<ReturnsScreen returns={returns} products={products} onProcess={processReturn} showFlash={showFlash}/>}
+          {view==="defective"&&canAccess(session.role,"defective")&&<DefectiveScreen defectives={defectives} onUpdateStatus={updateDefectiveStatus} onReingress={reingresarDefective}/>}
+          {view==="products" &&canAccess(session.role,"products")&&<ProductsScreen products={products} saveProduct={saveProduct} deleteProduct={deleteProduct}/>}
+          {view==="inventory"&&canAccess(session.role,"inventory")&&<InventoryScreen products={products}/>}
+          {view==="history"  &&canAccess(session.role,"history")&&<HistoryScreen sales={sales} selectedSale={selSale} setSelectedSale={setSelSale}/>}
+          {view==="backup"   &&canAccess(session.role,"backup")&&<BackupScreen products={products} sales={sales} accounts={accounts} returns={returns} defectives={defectives} onExportJSON={exportJSON} onExportExcel={exportExcel} onImport={importData}/>}
+          {view==="users"    &&canAccess(session.role,"users")&&<UsersScreen session={session} showFlash={showFlash}/>}
+        </div>
       </div>
-    </div>
   );
 }
 
