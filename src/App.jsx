@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import * as XLSX from 'xlsx';
 import { db } from './utils/db.js';
-import { authAPI, productsAPI, salesAPI, accountsAPI, returnsAPI, defectivesAPI, usersAPI, checkAPI } from './utils/api.js';
+import { authAPI, productsAPI, salesAPI, accountsAPI, returnsAPI, defectivesAPI, usersAPI, checkAPI, clientsAPI, repairsAPI } from './utils/api.js';
 
 const TEAL = "#1D9E75";
 const NAVY = "#1a2535";
@@ -157,8 +157,8 @@ function LoginScreen(props) {
     var updated=(users||[]).map(function(u){return u.id===user.id?Object.assign({},u,{lastLogin:new Date().toISOString()}):u;});
     await db.save(UK,updated);
     try {
-      var apiResult = await authAPI.login(email.trim(),pass);
-      if(apiResult) sessionStorage.setItem('mnpos-api-session', 'true');
+      await authAPI.login(email.trim(),pass);
+      // authAPI.login ya guarda la sesión con token via saveLocalSession
     } catch(e){}
     setLoading(false);
     onLogin(createSession(user));
@@ -657,13 +657,13 @@ function DashboardScreen(props) {
 
         {/* Alertas críticas arriba */}
         {(repsVencidas.length>0||stockCero.length>0)&&(
-            <div style={{background:"#FCEBEB",border:"1px solid #F09595",borderRadius:10,padding:"12px 16px",marginBottom:16}}>
-              <p style={{fontWeight:700,fontSize:13,color:"#791F1F",margin:"0 0 8px"}}>⚠ Atención requerida</p>
-              <div style={{display:"flex",gap:20,flexWrap:"wrap"}}>
-                {repsVencidas.length>0&&<span style={{fontSize:13,color:"#791F1F",cursor:"pointer"}} onClick={function(){setView("repairs");}}>🔧 {repsVencidas.length} reparación{repsVencidas.length>1?"es":""} vencida{repsVencidas.length>1?"s":""} sin entregar →</span>}
-                {stockCero.length>0&&<span style={{fontSize:13,color:"#791F1F",cursor:"pointer"}} onClick={function(){setView("products");}}>📦 {stockCero.length} producto{stockCero.length>1?"s":""} sin stock →</span>}
-              </div>
+          <div style={{background:"#FCEBEB",border:"1px solid #F09595",borderRadius:10,padding:"12px 16px",marginBottom:16}}>
+            <p style={{fontWeight:700,fontSize:13,color:"#791F1F",margin:"0 0 8px"}}>⚠ Atención requerida</p>
+            <div style={{display:"flex",gap:20,flexWrap:"wrap"}}>
+              {repsVencidas.length>0&&<span style={{fontSize:13,color:"#791F1F",cursor:"pointer"}} onClick={function(){setView("repairs");}}>🔧 {repsVencidas.length} reparación{repsVencidas.length>1?"es":""} vencida{repsVencidas.length>1?"s":""} sin entregar →</span>}
+              {stockCero.length>0&&<span style={{fontSize:13,color:"#791F1F",cursor:"pointer"}} onClick={function(){setView("products");}}>📦 {stockCero.length} producto{stockCero.length>1?"s":""} sin stock →</span>}
             </div>
+          </div>
         )}
 
         <div style={{display:"grid",gridTemplateColumns:"repeat(4,1fr)",gap:14,marginBottom:16}}>
@@ -967,30 +967,30 @@ function POSScreen(props) {
                           </div>
                           {/* Botón de descuento */}
                           {!isEditingDiscount?(
-                              <div style={{marginTop:6,textAlign:"right"}}>
+                            <div style={{marginTop:6,textAlign:"right"}}>
                               <span onClick={function(){setDiscountItemId(item.id);setDiscountVal(item.price.toFixed(2));}} style={{fontSize:10,color:"#E65100",cursor:"pointer",textDecoration:"underline"}}>
                                 {hasDiscount?"Editar descuento":"% Aplicar descuento"}
                               </span>
-                              </div>
+                            </div>
                           ):(
-                              <div style={{marginTop:8,display:"flex",gap:6,alignItems:"center"}}>
-                                <div style={{flex:1}}>
-                                  <div style={{fontSize:10,color:"#666",marginBottom:2}}>Precio c/descuento (precio lista: {Q(item.originalPrice||item.price)})</div>
-                                  <input
-                                      type="number"
-                                      style={Object.assign({},sI,{padding:"5px 8px",fontSize:12})}
-                                      value={discountVal}
-                                      placeholder="Nuevo precio Q"
-                                      onChange={function(e){setDiscountVal(e.target.value);}}
-                                      onKeyDown={function(e){if(e.key==="Enter")applyDiscount(item.id);if(e.key==="Escape"){setDiscountItemId(null);setDiscountVal("");}}}
-                                      autoFocus
-                                  />
-                                </div>
-                                <div style={{display:"flex",gap:4,marginTop:14}}>
-                                  <button style={Object.assign({},mB("teal"),{padding:"4px 8px",fontSize:11})} onClick={function(){applyDiscount(item.id);}}>✓</button>
-                                  <button style={Object.assign({},mB("gray"),{padding:"4px 8px",fontSize:11})} onClick={function(){setDiscountItemId(null);setDiscountVal("");}}>✕</button>
-                                </div>
+                            <div style={{marginTop:8,display:"flex",gap:6,alignItems:"center"}}>
+                              <div style={{flex:1}}>
+                                <div style={{fontSize:10,color:"#666",marginBottom:2}}>Precio c/descuento (precio lista: {Q(item.originalPrice||item.price)})</div>
+                                <input
+                                  type="number"
+                                  style={Object.assign({},sI,{padding:"5px 8px",fontSize:12})}
+                                  value={discountVal}
+                                  placeholder="Nuevo precio Q"
+                                  onChange={function(e){setDiscountVal(e.target.value);}}
+                                  onKeyDown={function(e){if(e.key==="Enter")applyDiscount(item.id);if(e.key==="Escape"){setDiscountItemId(null);setDiscountVal("");}}}
+                                  autoFocus
+                                />
                               </div>
+                              <div style={{display:"flex",gap:4,marginTop:14}}>
+                                <button style={Object.assign({},mB("teal"),{padding:"4px 8px",fontSize:11})} onClick={function(){applyDiscount(item.id);}}>✓</button>
+                                <button style={Object.assign({},mB("gray"),{padding:"4px 8px",fontSize:11})} onClick={function(){setDiscountItemId(null);setDiscountVal("");}}>✕</button>
+                              </div>
+                            </div>
                           )}
                         </div>
                     );
@@ -1006,52 +1006,52 @@ function POSScreen(props) {
 
                 {/* Cliente ya seleccionado */}
                 {selCli?(
-                    <div>
-                      <div style={{display:"flex",alignItems:"center",gap:8,padding:"8px 12px",borderRadius:8,border:"1.5px solid "+TEAL,background:"#E1F5EE"}}>
-                        <div style={{flex:1}}>
-                          <div style={{fontSize:13,fontWeight:600,color:"#085041"}}>{selCli.name}</div>
-                          <div style={{fontSize:11,color:"#0F6E56",fontFamily:"monospace"}}>{selCli.cliCode}{selCli.dpi?" · DPI: "+selCli.dpi:""}</div>
-                        </div>
-                        <span onClick={clearClient} style={{cursor:"pointer",color:"#E24B4A",fontSize:16,fontWeight:700,padding:"2px 6px"}}>×</span>
+                  <div>
+                    <div style={{display:"flex",alignItems:"center",gap:8,padding:"8px 12px",borderRadius:8,border:"1.5px solid "+TEAL,background:"#E1F5EE"}}>
+                      <div style={{flex:1}}>
+                        <div style={{fontSize:13,fontWeight:600,color:"#085041"}}>{selCli.name}</div>
+                        <div style={{fontSize:11,color:"#0F6E56",fontFamily:"monospace"}}>{selCli.cliCode}{selCli.dpi?" · DPI: "+selCli.dpi:""}</div>
                       </div>
-                      {deudaCliente>0&&(
-                          <div style={{background:"#FCEBEB",border:"1px solid #F09595",borderRadius:6,padding:"6px 10px",marginTop:6,fontSize:12,color:"#791F1F"}}>
-                            ⚠ Este cliente tiene <b>{Q(deudaCliente)}</b> pendiente de pago
-                          </div>
-                      )}
+                      <span onClick={clearClient} style={{cursor:"pointer",color:"#E24B4A",fontSize:16,fontWeight:700,padding:"2px 6px"}}>×</span>
                     </div>
+                    {deudaCliente>0&&(
+                      <div style={{background:"#FCEBEB",border:"1px solid #F09595",borderRadius:6,padding:"6px 10px",marginTop:6,fontSize:12,color:"#791F1F"}}>
+                        ⚠ Este cliente tiene <b>{Q(deudaCliente)}</b> pendiente de pago
+                      </div>
+                    )}
+                  </div>
                 ):(
-                    <div style={{position:"relative"}}>
-                      <input
-                          style={sI}
-                          value={cliQ||clientName}
-                          placeholder="Buscar cliente por nombre, DPI o código..."
-                          onChange={function(e){handleCliInput(e.target.value);}}
-                          onFocus={function(){setShowDrop(true);}}
-                          onBlur={function(){setTimeout(function(){setShowDrop(false);},200);}}
-                      />
-                      {showDrop&&(cliQ.trim().length>0)&&(
-                          <div style={{position:"absolute",top:"100%",left:0,right:0,background:"#fff",border:"1px solid rgba(0,0,0,0.15)",borderRadius:8,boxShadow:"0 4px 16px rgba(0,0,0,0.1)",zIndex:100,maxHeight:200,overflowY:"auto",marginTop:2}}>
-                            {cliResults.map(function(c){
-                              var deuda=accounts.filter(function(a){return (a.clientId===c.id||(a.client===c.name&&!a.clientId))&&a.status!=="pagado";}).reduce(function(s,a){return s+a.balance;},0);
-                              return (
-                                  <div key={c.id} onMouseDown={function(){selectClient(c);}} style={{padding:"10px 14px",cursor:"pointer",borderBottom:"1px solid rgba(0,0,0,0.06)",display:"flex",justifyContent:"space-between",alignItems:"center"}}>
-                                    <div>
-                                      <div style={{fontSize:13,fontWeight:600}}>{c.name}</div>
-                                      <div style={{fontSize:11,color:"#999",fontFamily:"monospace"}}>{c.cliCode}{c.dpi?" · "+c.dpi:""}{c.phone?" · "+c.phone:""}</div>
-                                    </div>
-                                    {deuda>0&&<span style={mBg("red")}>{Q(deuda)}</span>}
-                                  </div>
-                              );
-                            })}
-                            {cliResults.length===0&&(
-                                <div style={{padding:"10px 14px",fontSize:13,color:"#999"}}>
-                                  No se encontró "{cliQ}" — se registrará como cliente ocasional
-                                </div>
-                            )}
+                  <div style={{position:"relative"}}>
+                    <input
+                      style={sI}
+                      value={cliQ||clientName}
+                      placeholder="Buscar cliente por nombre, DPI o código..."
+                      onChange={function(e){handleCliInput(e.target.value);}}
+                      onFocus={function(){setShowDrop(true);}}
+                      onBlur={function(){setTimeout(function(){setShowDrop(false);},200);}}
+                    />
+                    {showDrop&&(cliQ.trim().length>0)&&(
+                      <div style={{position:"absolute",top:"100%",left:0,right:0,background:"#fff",border:"1px solid rgba(0,0,0,0.15)",borderRadius:8,boxShadow:"0 4px 16px rgba(0,0,0,0.1)",zIndex:100,maxHeight:200,overflowY:"auto",marginTop:2}}>
+                        {cliResults.map(function(c){
+                          var deuda=accounts.filter(function(a){return (a.clientId===c.id||(a.client===c.name&&!a.clientId))&&a.status!=="pagado";}).reduce(function(s,a){return s+a.balance;},0);
+                          return (
+                            <div key={c.id} onMouseDown={function(){selectClient(c);}} style={{padding:"10px 14px",cursor:"pointer",borderBottom:"1px solid rgba(0,0,0,0.06)",display:"flex",justifyContent:"space-between",alignItems:"center"}}>
+                              <div>
+                                <div style={{fontSize:13,fontWeight:600}}>{c.name}</div>
+                                <div style={{fontSize:11,color:"#999",fontFamily:"monospace"}}>{c.cliCode}{c.dpi?" · "+c.dpi:""}{c.phone?" · "+c.phone:""}</div>
+                              </div>
+                              {deuda>0&&<span style={mBg("red")}>{Q(deuda)}</span>}
+                            </div>
+                          );
+                        })}
+                        {cliResults.length===0&&(
+                          <div style={{padding:"10px 14px",fontSize:13,color:"#999"}}>
+                            No se encontró "{cliQ}" — se registrará como cliente ocasional
                           </div>
-                      )}
-                    </div>
+                        )}
+                      </div>
+                    )}
+                  </div>
                 )}
               </div>
               <div style={{marginBottom:10}}>
@@ -1305,183 +1305,183 @@ function ReturnsScreen(props) {
   var totalPendReemb=returns.filter(function(r){return r.refundMethod==="Sin reembolso"||r.refundAmount===0;}).length;
 
   return (
-      <div>
-        <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:20}}>
-          <p style={H1}>🔄 Devoluciones</p>
-          <button style={mB(show?"red":"teal")} onClick={function(){if(show){resetFlow();}else{setShow(true);}}}>
-            {show?"✕ Cancelar":"+ Nueva devolución"}
-          </button>
-        </div>
+    <div>
+      <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:20}}>
+        <p style={H1}>🔄 Devoluciones</p>
+        <button style={mB(show?"red":"teal")} onClick={function(){if(show){resetFlow();}else{setShow(true);}}}>
+          {show?"✕ Cancelar":"+ Nueva devolución"}
+        </button>
+      </div>
 
-        {show&&(
-            <div style={Object.assign({},sC,{marginBottom:16,borderColor:"#378ADD",borderWidth:"1.5px"})}>
-              <p style={{fontWeight:700,margin:"0 0 16px",fontSize:15}}>🔄 Registrar devolución</p>
+      {show&&(
+        <div style={Object.assign({},sC,{marginBottom:16,borderColor:"#378ADD",borderWidth:"1.5px"})}>
+          <p style={{fontWeight:700,margin:"0 0 16px",fontSize:15}}>🔄 Registrar devolución</p>
 
-              {/* PASO 1: Buscar cliente */}
-              {step==="search"&&(
-                  <div>
-                    <p style={{fontSize:13,color:"#555",margin:"0 0 12px"}}>Paso 1 — Buscá al cliente por nombre, DPI o código</p>
-                    <div style={{position:"relative",marginBottom:16}}>
-                      <input style={sI} value={cliQ} placeholder="Nombre, DPI o código CLI..."
-                             onChange={function(e){setCliQ(e.target.value);setShowDrop(true);}}
-                             onFocus={function(){setShowDrop(true);}}
-                             onBlur={function(){setTimeout(function(){setShowDrop(false);},200);}}
-                      />
-                      {showDrop&&cliQ.trim().length>0&&(
-                          <div style={{position:"absolute",top:"100%",left:0,right:0,background:"#fff",border:"1px solid rgba(0,0,0,0.15)",borderRadius:8,boxShadow:"0 4px 12px rgba(0,0,0,0.1)",zIndex:100,marginTop:2}}>
-                            {cliResults.map(function(c){return (
-                                <div key={c.id} onMouseDown={function(){pickClient(c);}} style={{padding:"10px 14px",cursor:"pointer",borderBottom:"1px solid #f0f0f0",display:"flex",justifyContent:"space-between"}}>
-                                  <div><b style={{fontSize:13}}>{c.name}</b> <span style={{fontSize:11,color:"#999",fontFamily:"monospace"}}>{c.cliCode}{c.dpi?" · DPI: "+c.dpi:""}</span></div>
-                                </div>
-                            );})}
-                            {cliResults.length===0&&<div style={{padding:"10px 14px",fontSize:12,color:"#999"}}>Sin resultados — podés continuar sin vincular cliente</div>}
-                          </div>
-                      )}
-                    </div>
-                    <div style={{display:"flex",gap:10}}>
-                      <button style={mB("blue")} onClick={function(){
-                        if(!cliQ.trim()){setErr("Ingresá el nombre del cliente");return;}
-                        setForm(function(f){return Object.assign({},f,{client:cliQ.trim()});});
-                        setStep("form");
-                      }}>Continuar sin vincular →</button>
-                    </div>
-                    {err&&<p style={{color:"#E24B4A",fontSize:13,marginTop:10}}>⚠ {err}</p>}
-                  </div>
-              )}
-
-              {/* PASO 2: Elegir venta a devolver */}
-              {step==="sale"&&selCli&&(
-                  <div>
-                    <div style={{background:"#E1F5EE",borderRadius:8,padding:"10px 14px",marginBottom:16,display:"flex",justifyContent:"space-between",alignItems:"center"}}>
-                      <div>
-                        <span style={{fontWeight:700,color:"#085041"}}>{selCli.name}</span>
-                        <span style={{fontSize:11,color:"#0F6E56",marginLeft:8,fontFamily:"monospace"}}>{selCli.cliCode}{selCli.dpi?" · DPI: "+selCli.dpi:""}</span>
+          {/* PASO 1: Buscar cliente */}
+          {step==="search"&&(
+            <div>
+              <p style={{fontSize:13,color:"#555",margin:"0 0 12px"}}>Paso 1 — Buscá al cliente por nombre, DPI o código</p>
+              <div style={{position:"relative",marginBottom:16}}>
+                <input style={sI} value={cliQ} placeholder="Nombre, DPI o código CLI..."
+                  onChange={function(e){setCliQ(e.target.value);setShowDrop(true);}}
+                  onFocus={function(){setShowDrop(true);}}
+                  onBlur={function(){setTimeout(function(){setShowDrop(false);},200);}}
+                />
+                {showDrop&&cliQ.trim().length>0&&(
+                  <div style={{position:"absolute",top:"100%",left:0,right:0,background:"#fff",border:"1px solid rgba(0,0,0,0.15)",borderRadius:8,boxShadow:"0 4px 12px rgba(0,0,0,0.1)",zIndex:100,marginTop:2}}>
+                    {cliResults.map(function(c){return (
+                      <div key={c.id} onMouseDown={function(){pickClient(c);}} style={{padding:"10px 14px",cursor:"pointer",borderBottom:"1px solid #f0f0f0",display:"flex",justifyContent:"space-between"}}>
+                        <div><b style={{fontSize:13}}>{c.name}</b> <span style={{fontSize:11,color:"#999",fontFamily:"monospace"}}>{c.cliCode}{c.dpi?" · DPI: "+c.dpi:""}</span></div>
                       </div>
-                      <span onClick={function(){setSelCli(null);setCliQ("");setStep("search");}} style={{cursor:"pointer",color:"#E24B4A",fontWeight:700}}>× Cambiar</span>
-                    </div>
-                    <p style={{fontSize:13,color:"#555",margin:"0 0 12px"}}>Paso 2 — Seleccioná la venta a devolver (o saltá este paso)</p>
-                    {cliSales.length===0?(
-                        <div style={{background:"#f5f4f0",borderRadius:8,padding:"12px 14px",marginBottom:12,fontSize:13,color:"#666"}}>Sin ventas registradas para este cliente</div>
-                    ):(
-                        <div style={{maxHeight:240,overflowY:"auto",marginBottom:12}}>
-                          <table style={{width:"100%",borderCollapse:"collapse"}}>
-                            <thead><tr>{["Fecha","Artículos","Total","Método",""].map(function(h){return <th key={h} style={sTH}>{h}</th>;})}</tr></thead>
-                            <tbody>
-                            {cliSales.map(function(s){return (
-                                <tr key={s.id} style={{cursor:"pointer"}} onClick={function(){pickSale(s);}}>
-                                  <td style={sTD}>{fmtD(s.date)} {fmtT(s.date)}</td>
-                                  <td style={Object.assign({},sTD,{color:"#666"})}>{s.items.length} art.</td>
-                                  <td style={Object.assign({},sTD,{fontWeight:700,color:TEAL})}>{Q(s.total)}</td>
-                                  <td style={sTD}><span style={mBg("teal")}>{s.method}</span></td>
-                                  <td style={Object.assign({},sTD,{color:TEAL,fontSize:12})}>Seleccionar →</td>
-                                </tr>
-                            );})}
-                            </tbody>
-                          </table>
-                        </div>
-                    )}
-                    <button style={Object.assign({},mB("gray"),{fontSize:12})} onClick={function(){setStep("form");}}>Continuar sin elegir venta específica →</button>
+                    );})}
+                    {cliResults.length===0&&<div style={{padding:"10px 14px",fontSize:12,color:"#999"}}>Sin resultados — podés continuar sin vincular cliente</div>}
                   </div>
-              )}
-
-              {/* PASO 3: Formulario de devolución */}
-              {step==="form"&&(
-                  <div>
-                    {selCli&&(
-                        <div style={{background:"#E1F5EE",borderRadius:8,padding:"8px 14px",marginBottom:12,display:"flex",justifyContent:"space-between",alignItems:"center"}}>
-                          <span style={{fontWeight:600,color:"#085041",fontSize:13}}>{selCli.name} {selCli.cliCode&&<span style={{fontFamily:"monospace",fontWeight:400,color:"#0F6E56"}}>{selCli.cliCode}</span>}</span>
-                          {selSale&&<span style={{fontSize:12,color:"#0F6E56"}}>Venta: {fmtD(selSale.date)} — {Q(selSale.total)}</span>}
-                        </div>
-                    )}
-                    {!selCli&&<div style={{marginBottom:12}}>
-                      <label style={sL}>👤 Cliente</label>
-                      <input style={sI} value={form.client} placeholder="Nombre del cliente" onChange={function(e){setF("client",e.target.value);}}/>
-                    </div>}
-
-                    {err&&<p style={{color:"#E24B4A",fontSize:13,margin:"0 0 10px"}}>⚠ {err}</p>}
-
-                    <div style={{marginBottom:12}}>
-                      <label style={sL}>📋 Motivo de devolución</label>
-                      <input style={sI} value={form.reason} placeholder="Ej: Pantalla defectuosa" onChange={function(e){setErr("");setF("reason",e.target.value);}}/>
-                    </div>
-
-                    <p style={{fontWeight:500,margin:"0 0 8px",fontSize:13,color:"#666"}}>Productos a devolver</p>
-                    {form.items.map(function(it,i){
-                      return (
-                          <div key={i} style={{display:"grid",gridTemplateColumns:"110px 1fr 80px 100px 28px",gap:8,marginBottom:8,alignItems:"center"}}>
-                            <input style={sI} placeholder="Código" value={it.code} onChange={function(e){fillCode(i,e.target.value);}}/>
-                            <input style={sI} placeholder="Nombre del producto" value={it.name} onChange={function(e){setErr("");setItem(i,"name",e.target.value);}}/>
-                            <input type="number" style={sI} placeholder="Cant." value={it.qty} min={1} onChange={function(e){setItem(i,"qty",parseInt(e.target.value)||1);}}/>
-                            <input type="number" style={sI} placeholder="Precio Q" value={it.price||""} onChange={function(e){setItem(i,"price",parseFloat(e.target.value)||0);}}/>
-                            {form.items.length>1&&<span style={{cursor:"pointer",color:"#E24B4A",fontSize:20,textAlign:"center"}} onClick={function(){delItem(i);}}>×</span>}
-                          </div>
-                      );
-                    })}
-                    <button style={Object.assign({},mB("gray"),{padding:"5px 12px",fontSize:12,marginBottom:16})} onClick={addItem}>+ Agregar fila</button>
-
-                    {itemsTotal>0&&<div style={{background:"#f5f4f0",borderRadius:8,padding:"8px 14px",marginBottom:14,fontSize:13}}>Valor total de artículos: <b>{Q(itemsTotal)}</b></div>}
-
-                    <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:12,marginBottom:14}}>
-                      <div>
-                        <label style={sL}>💰 Estado del artículo devuelto</label>
-                        <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:8}}>
-                          {[["bueno","✅ Buen estado"],["defectuoso","⚠️ Defectuoso"]].map(function(pair){
-                            var active=form.itemCondition===pair[0];
-                            return <div key={pair[0]} onClick={function(){setF("itemCondition",pair[0]);}} style={{padding:"10px 12px",borderRadius:8,cursor:"pointer",border:"2px solid "+(active?TEAL:"rgba(0,0,0,0.15)"),background:active?"#E1F5EE":"#fff",fontSize:13,fontWeight:active?600:400,color:active?"#085041":"#444",textAlign:"center"}}>{pair[1]}</div>;
-                          })}
-                        </div>
-                        <p style={{fontSize:11,color:"#888",margin:"6px 0 0"}}>{form.itemCondition==="bueno"?"✓ Volverá al inventario":"⚠ Irá a Piezas Defectuosas"}</p>
-                      </div>
-                      <div>
-                        <label style={sL}>💵 Reembolso al cliente</label>
-                        <select style={Object.assign({},sI,{marginBottom:8})} value={form.refundMethod} onChange={function(e){setF("refundMethod",e.target.value);}}>
-                          <option>Efectivo</option><option>Tarjeta</option><option>Crédito en cuenta</option><option>Sin reembolso</option>
-                        </select>
-                        {form.refundMethod!=="Sin reembolso"&&(
-                            <div>
-                              <label style={sL}>Monto a reembolsar (Q)</label>
-                              <input type="number" style={sI} value={form.refundAmount} placeholder={"Total: "+itemsTotal.toFixed(2)} onChange={function(e){setF("refundAmount",e.target.value);}}/>
-                            </div>
-                        )}
-                        {form.refundMethod==="Sin reembolso"&&<div style={{background:"#f5f4f0",borderRadius:6,padding:"8px 10px",fontSize:12,color:"#666"}}>No se devolverá dinero</div>}
-                      </div>
-                    </div>
-                    <button style={Object.assign({},mB("blue"),{padding:"10px 24px",fontSize:14})} onClick={doReturn}>✓ Registrar devolución</button>
-                  </div>
-              )}
+                )}
+              </div>
+              <div style={{display:"flex",gap:10}}>
+                <button style={mB("blue")} onClick={function(){
+                  if(!cliQ.trim()){setErr("Ingresá el nombre del cliente");return;}
+                  setForm(function(f){return Object.assign({},f,{client:cliQ.trim()});});
+                  setStep("form");
+                }}>Continuar sin vincular →</button>
+              </div>
+              {err&&<p style={{color:"#E24B4A",fontSize:13,marginTop:10}}>⚠ {err}</p>}
             </div>
-        )}
+          )}
 
-        <div style={{display:"grid",gridTemplateColumns:"repeat(3,1fr)",gap:14,marginBottom:20}}>
-          <MetricBox label="Total devoluciones"  value={returns.length}       color="#7F77DD"/>
-          <MetricBox label="Total reembolsado"   value={Q(totalReembolsado)}  color="#E24B4A"/>
-          <MetricBox label="Sin reembolso"       value={totalPendReemb}       color="#666"/>
-        </div>
+          {/* PASO 2: Elegir venta a devolver */}
+          {step==="sale"&&selCli&&(
+            <div>
+              <div style={{background:"#E1F5EE",borderRadius:8,padding:"10px 14px",marginBottom:16,display:"flex",justifyContent:"space-between",alignItems:"center"}}>
+                <div>
+                  <span style={{fontWeight:700,color:"#085041"}}>{selCli.name}</span>
+                  <span style={{fontSize:11,color:"#0F6E56",marginLeft:8,fontFamily:"monospace"}}>{selCli.cliCode}{selCli.dpi?" · DPI: "+selCli.dpi:""}</span>
+                </div>
+                <span onClick={function(){setSelCli(null);setCliQ("");setStep("search");}} style={{cursor:"pointer",color:"#E24B4A",fontWeight:700}}>× Cambiar</span>
+              </div>
+              <p style={{fontSize:13,color:"#555",margin:"0 0 12px"}}>Paso 2 — Seleccioná la venta a devolver (o saltá este paso)</p>
+              {cliSales.length===0?(
+                <div style={{background:"#f5f4f0",borderRadius:8,padding:"12px 14px",marginBottom:12,fontSize:13,color:"#666"}}>Sin ventas registradas para este cliente</div>
+              ):(
+                <div style={{maxHeight:240,overflowY:"auto",marginBottom:12}}>
+                  <table style={{width:"100%",borderCollapse:"collapse"}}>
+                    <thead><tr>{["Fecha","Artículos","Total","Método",""].map(function(h){return <th key={h} style={sTH}>{h}</th>;})}</tr></thead>
+                    <tbody>
+                      {cliSales.map(function(s){return (
+                        <tr key={s.id} style={{cursor:"pointer"}} onClick={function(){pickSale(s);}}>
+                          <td style={sTD}>{fmtD(s.date)} {fmtT(s.date)}</td>
+                          <td style={Object.assign({},sTD,{color:"#666"})}>{s.items.length} art.</td>
+                          <td style={Object.assign({},sTD,{fontWeight:700,color:TEAL})}>{Q(s.total)}</td>
+                          <td style={sTD}><span style={mBg("teal")}>{s.method}</span></td>
+                          <td style={Object.assign({},sTD,{color:TEAL,fontSize:12})}>Seleccionar →</td>
+                        </tr>
+                      );})}
+                    </tbody>
+                  </table>
+                </div>
+              )}
+              <button style={Object.assign({},mB("gray"),{fontSize:12})} onClick={function(){setStep("form");}}>Continuar sin elegir venta específica →</button>
+            </div>
+          )}
 
-        <div style={sC}>
-          {returns.length===0?<p style={{textAlign:"center",color:"#999",padding:40}}>Sin devoluciones registradas</p>:(
-              <table style={{width:"100%",borderCollapse:"collapse"}}>
-                <thead><tr>{["Fecha","Cliente","Motivo","Estado artículo","Reembolso","Monto reimb.","Valor artícs."].map(function(h){return <th key={h} style={sTH}>{h}</th>;})}</tr></thead>
-                <tbody>
-                {returns.map(function(r){
-                  var cond=r.itemCondition||"bueno";
-                  return (
-                      <tr key={r.id}>
-                        <td style={sTD}>{fmtD(r.date)}</td>
-                        <td style={Object.assign({},sTD,{fontWeight:600})}>{r.client}</td>
-                        <td style={sTD}>{r.reason}</td>
-                        <td style={sTD}><span style={mBg(cond==="bueno"?"green":"amber")}>{cond==="bueno"?"✅ Buen estado":"⚠️ Defectuoso"}</span></td>
-                        <td style={sTD}><span style={mBg("blue")}>{r.refundMethod}</span></td>
-                        <td style={Object.assign({},sTD,{fontWeight:700,color:r.refundAmount>0?"#E24B4A":"#999"})}>{r.refundAmount>0?Q(r.refundAmount):"—"}</td>
-                        <td style={Object.assign({},sTD,{color:"#666"})}>{Q(r.total)}</td>
-                      </tr>
-                  );
-                })}
-                </tbody>
-              </table>
+          {/* PASO 3: Formulario de devolución */}
+          {step==="form"&&(
+            <div>
+              {selCli&&(
+                <div style={{background:"#E1F5EE",borderRadius:8,padding:"8px 14px",marginBottom:12,display:"flex",justifyContent:"space-between",alignItems:"center"}}>
+                  <span style={{fontWeight:600,color:"#085041",fontSize:13}}>{selCli.name} {selCli.cliCode&&<span style={{fontFamily:"monospace",fontWeight:400,color:"#0F6E56"}}>{selCli.cliCode}</span>}</span>
+                  {selSale&&<span style={{fontSize:12,color:"#0F6E56"}}>Venta: {fmtD(selSale.date)} — {Q(selSale.total)}</span>}
+                </div>
+              )}
+              {!selCli&&<div style={{marginBottom:12}}>
+                <label style={sL}>👤 Cliente</label>
+                <input style={sI} value={form.client} placeholder="Nombre del cliente" onChange={function(e){setF("client",e.target.value);}}/>
+              </div>}
+
+              {err&&<p style={{color:"#E24B4A",fontSize:13,margin:"0 0 10px"}}>⚠ {err}</p>}
+
+              <div style={{marginBottom:12}}>
+                <label style={sL}>📋 Motivo de devolución</label>
+                <input style={sI} value={form.reason} placeholder="Ej: Pantalla defectuosa" onChange={function(e){setErr("");setF("reason",e.target.value);}}/>
+              </div>
+
+              <p style={{fontWeight:500,margin:"0 0 8px",fontSize:13,color:"#666"}}>Productos a devolver</p>
+              {form.items.map(function(it,i){
+                return (
+                  <div key={i} style={{display:"grid",gridTemplateColumns:"110px 1fr 80px 100px 28px",gap:8,marginBottom:8,alignItems:"center"}}>
+                    <input style={sI} placeholder="Código" value={it.code} onChange={function(e){fillCode(i,e.target.value);}}/>
+                    <input style={sI} placeholder="Nombre del producto" value={it.name} onChange={function(e){setErr("");setItem(i,"name",e.target.value);}}/>
+                    <input type="number" style={sI} placeholder="Cant." value={it.qty} min={1} onChange={function(e){setItem(i,"qty",parseInt(e.target.value)||1);}}/>
+                    <input type="number" style={sI} placeholder="Precio Q" value={it.price||""} onChange={function(e){setItem(i,"price",parseFloat(e.target.value)||0);}}/>
+                    {form.items.length>1&&<span style={{cursor:"pointer",color:"#E24B4A",fontSize:20,textAlign:"center"}} onClick={function(){delItem(i);}}>×</span>}
+                  </div>
+                );
+              })}
+              <button style={Object.assign({},mB("gray"),{padding:"5px 12px",fontSize:12,marginBottom:16})} onClick={addItem}>+ Agregar fila</button>
+
+              {itemsTotal>0&&<div style={{background:"#f5f4f0",borderRadius:8,padding:"8px 14px",marginBottom:14,fontSize:13}}>Valor total de artículos: <b>{Q(itemsTotal)}</b></div>}
+
+              <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:12,marginBottom:14}}>
+                <div>
+                  <label style={sL}>💰 Estado del artículo devuelto</label>
+                  <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:8}}>
+                    {[["bueno","✅ Buen estado"],["defectuoso","⚠️ Defectuoso"]].map(function(pair){
+                      var active=form.itemCondition===pair[0];
+                      return <div key={pair[0]} onClick={function(){setF("itemCondition",pair[0]);}} style={{padding:"10px 12px",borderRadius:8,cursor:"pointer",border:"2px solid "+(active?TEAL:"rgba(0,0,0,0.15)"),background:active?"#E1F5EE":"#fff",fontSize:13,fontWeight:active?600:400,color:active?"#085041":"#444",textAlign:"center"}}>{pair[1]}</div>;
+                    })}
+                  </div>
+                  <p style={{fontSize:11,color:"#888",margin:"6px 0 0"}}>{form.itemCondition==="bueno"?"✓ Volverá al inventario":"⚠ Irá a Piezas Defectuosas"}</p>
+                </div>
+                <div>
+                  <label style={sL}>💵 Reembolso al cliente</label>
+                  <select style={Object.assign({},sI,{marginBottom:8})} value={form.refundMethod} onChange={function(e){setF("refundMethod",e.target.value);}}>
+                    <option>Efectivo</option><option>Tarjeta</option><option>Crédito en cuenta</option><option>Sin reembolso</option>
+                  </select>
+                  {form.refundMethod!=="Sin reembolso"&&(
+                    <div>
+                      <label style={sL}>Monto a reembolsar (Q)</label>
+                      <input type="number" style={sI} value={form.refundAmount} placeholder={"Total: "+itemsTotal.toFixed(2)} onChange={function(e){setF("refundAmount",e.target.value);}}/>
+                    </div>
+                  )}
+                  {form.refundMethod==="Sin reembolso"&&<div style={{background:"#f5f4f0",borderRadius:6,padding:"8px 10px",fontSize:12,color:"#666"}}>No se devolverá dinero</div>}
+                </div>
+              </div>
+              <button style={Object.assign({},mB("blue"),{padding:"10px 24px",fontSize:14})} onClick={doReturn}>✓ Registrar devolución</button>
+            </div>
           )}
         </div>
+      )}
+
+      <div style={{display:"grid",gridTemplateColumns:"repeat(3,1fr)",gap:14,marginBottom:20}}>
+        <MetricBox label="Total devoluciones"  value={returns.length}       color="#7F77DD"/>
+        <MetricBox label="Total reembolsado"   value={Q(totalReembolsado)}  color="#E24B4A"/>
+        <MetricBox label="Sin reembolso"       value={totalPendReemb}       color="#666"/>
       </div>
+
+      <div style={sC}>
+        {returns.length===0?<p style={{textAlign:"center",color:"#999",padding:40}}>Sin devoluciones registradas</p>:(
+          <table style={{width:"100%",borderCollapse:"collapse"}}>
+            <thead><tr>{["Fecha","Cliente","Motivo","Estado artículo","Reembolso","Monto reimb.","Valor artícs."].map(function(h){return <th key={h} style={sTH}>{h}</th>;})}</tr></thead>
+            <tbody>
+              {returns.map(function(r){
+                var cond=r.itemCondition||"bueno";
+                return (
+                  <tr key={r.id}>
+                    <td style={sTD}>{fmtD(r.date)}</td>
+                    <td style={Object.assign({},sTD,{fontWeight:600})}>{r.client}</td>
+                    <td style={sTD}>{r.reason}</td>
+                    <td style={sTD}><span style={mBg(cond==="bueno"?"green":"amber")}>{cond==="bueno"?"✅ Buen estado":"⚠️ Defectuoso"}</span></td>
+                    <td style={sTD}><span style={mBg("blue")}>{r.refundMethod}</span></td>
+                    <td style={Object.assign({},sTD,{fontWeight:700,color:r.refundAmount>0?"#E24B4A":"#999"})}>{r.refundAmount>0?Q(r.refundAmount):"—"}</td>
+                    <td style={Object.assign({},sTD,{color:"#666"})}>{Q(r.total)}</td>
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
+        )}
+      </div>
+    </div>
   );
 }
 
@@ -1680,14 +1680,14 @@ function HistoryScreen(props) {
     var itemsHTML=sale.items.map(function(it){
       var hasDisc=it.originalPrice&&it.price<it.originalPrice;
       return '<tr>'+
-          '<td style="padding:7px 10px;border-bottom:1px solid #eee;font-size:12px;font-weight:600;">'+it.name+'<br><span style="font-family:monospace;font-size:10px;color:#888;">SKU: '+it.code+' &nbsp;·&nbsp; Estant.: '+(it.shelf||'—')+'</span>'+
-          (hasDisc?'<br><span style="font-size:10px;color:#E65100;">Descuento aplicado por: '+it.discountBy+'</span>':'')+'</td>'+
-          '<td style="padding:7px 10px;border-bottom:1px solid #eee;text-align:center;font-size:12px;">'+it.qty+'</td>'+
-          '<td style="padding:7px 10px;border-bottom:1px solid #eee;text-align:right;font-size:12px;">'+
+        '<td style="padding:7px 10px;border-bottom:1px solid #eee;font-size:12px;font-weight:600;">'+it.name+'<br><span style="font-family:monospace;font-size:10px;color:#888;">SKU: '+it.code+' &nbsp;·&nbsp; Estant.: '+(it.shelf||'—')+'</span>'+
+        (hasDisc?'<br><span style="font-size:10px;color:#E65100;">Descuento aplicado por: '+it.discountBy+'</span>':'')+'</td>'+
+        '<td style="padding:7px 10px;border-bottom:1px solid #eee;text-align:center;font-size:12px;">'+it.qty+'</td>'+
+        '<td style="padding:7px 10px;border-bottom:1px solid #eee;text-align:right;font-size:12px;">'+
           (hasDisc?'<span style="text-decoration:line-through;color:#bbb;font-size:10px;">Q '+Number(it.originalPrice).toFixed(2)+'</span><br>':'')+
           '<span style="color:'+(hasDisc?'#E65100':'#333')+';">Q '+Number(it.price).toFixed(2)+'</span></td>'+
-          '<td style="padding:7px 10px;border-bottom:1px solid #eee;text-align:right;font-size:12px;font-weight:700;">Q '+Number(it.price*it.qty).toFixed(2)+'</td>'+
-          '</tr>';
+        '<td style="padding:7px 10px;border-bottom:1px solid #eee;text-align:right;font-size:12px;font-weight:700;">Q '+Number(it.price*it.qty).toFixed(2)+'</td>'+
+      '</tr>';
     }).join("");
 
     var subtotal=sale.items.reduce(function(s,it){return s+(it.originalPrice||it.price)*it.qty;},0);
@@ -1697,108 +1697,108 @@ function HistoryScreen(props) {
     var hora=new Date(sale.date).toLocaleTimeString("es-GT",{hour:"2-digit",minute:"2-digit"});
 
     var html='<!DOCTYPE html><html><head><meta charset="UTF-8"><title>Comprobante '+ventaNum+'</title>'+
-        '<style>'+
-        '*{margin:0;padding:0;box-sizing:border-box;}'+
-        'body{font-family:Arial,Helvetica,sans-serif;font-size:12px;color:#222;background:#fff;max-width:700px;margin:0 auto;padding:24px;}'+
-        '.header{display:flex;justify-content:space-between;align-items:flex-start;border-bottom:3px solid #1D9E75;padding-bottom:16px;margin-bottom:20px;}'+
-        '.brand h1{font-size:22px;font-weight:900;color:#1a2535;letter-spacing:-0.5px;}'+
-        '.brand p{font-size:10px;color:#1D9E75;font-weight:700;letter-spacing:2px;margin-top:2px;}'+
-        '.brand .sub{font-size:10px;color:#999;font-weight:400;letter-spacing:0;margin-top:4px;}'+
-        '.venta-num{text-align:right;}'+
-        '.venta-num .label{font-size:10px;color:#999;text-transform:uppercase;letter-spacing:1px;}'+
-        '.venta-num .num{font-size:22px;font-weight:900;color:#1D9E75;margin-top:2px;}'+
-        '.info-grid{display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-bottom:20px;padding:14px;background:#f8f9fa;border-radius:8px;border-left:4px solid #1D9E75;}'+
-        '.info-block .label{font-size:10px;color:#999;text-transform:uppercase;letter-spacing:0.8px;margin-bottom:4px;}'+
-        '.info-block .val{font-size:13px;font-weight:700;color:#222;}'+
-        '.info-block .val-sub{font-size:11px;color:#666;margin-top:1px;}'+
-        'table{width:100%;border-collapse:collapse;margin-bottom:16px;}'+
-        'thead tr{background:#1a2535;}'+
-        'thead th{padding:9px 10px;text-align:left;color:#fff;font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:0.5px;}'+
-        'thead th:nth-child(2),thead th:nth-child(3),thead th:nth-child(4){text-align:center;}'+
-        'thead th:last-child{text-align:right;}'+
-        'tbody tr:nth-child(even){background:#f9f9f9;}'+
-        '.totals{display:flex;justify-content:flex-end;margin-bottom:20px;}'+
-        '.totals-box{width:260px;border:1px solid #eee;border-radius:8px;overflow:hidden;}'+
-        '.totals-row{display:flex;justify-content:space-between;padding:8px 14px;font-size:12px;border-bottom:1px solid #eee;}'+
-        '.totals-row:last-child{background:#1D9E75;color:#fff;font-weight:700;font-size:14px;border-bottom:none;}'+
-        '.totals-row .disc{color:#E65100;}'+
-        '.nota-box{background:#FFFDE7;border:1px solid #FFD54F;border-radius:6px;padding:10px 14px;margin-bottom:20px;font-size:12px;}'+
-        '.nota-box strong{color:#F57F17;}'+
-        '.footer{border-top:2px dashed #ccc;padding-top:16px;display:flex;justify-content:space-between;align-items:center;}'+
-        '.footer-left{font-size:11px;color:#999;line-height:1.8;}'+
-        '.footer-right{text-align:right;font-size:11px;color:#999;line-height:1.8;}'+
-        '.footer strong{color:#1D9E75;}'+
-        '.gracias{text-align:center;margin:20px 0 0;font-size:13px;color:#1D9E75;font-weight:700;letter-spacing:1px;}'+
-        '@media print{body{padding:12px;}button{display:none!important;}}'+
-        '</style></head><body>'+
+    '<style>'+
+      '*{margin:0;padding:0;box-sizing:border-box;}'+
+      'body{font-family:Arial,Helvetica,sans-serif;font-size:12px;color:#222;background:#fff;max-width:700px;margin:0 auto;padding:24px;}'+
+      '.header{display:flex;justify-content:space-between;align-items:flex-start;border-bottom:3px solid #1D9E75;padding-bottom:16px;margin-bottom:20px;}'+
+      '.brand h1{font-size:22px;font-weight:900;color:#1a2535;letter-spacing:-0.5px;}'+
+      '.brand p{font-size:10px;color:#1D9E75;font-weight:700;letter-spacing:2px;margin-top:2px;}'+
+      '.brand .sub{font-size:10px;color:#999;font-weight:400;letter-spacing:0;margin-top:4px;}'+
+      '.venta-num{text-align:right;}'+
+      '.venta-num .label{font-size:10px;color:#999;text-transform:uppercase;letter-spacing:1px;}'+
+      '.venta-num .num{font-size:22px;font-weight:900;color:#1D9E75;margin-top:2px;}'+
+      '.info-grid{display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-bottom:20px;padding:14px;background:#f8f9fa;border-radius:8px;border-left:4px solid #1D9E75;}'+
+      '.info-block .label{font-size:10px;color:#999;text-transform:uppercase;letter-spacing:0.8px;margin-bottom:4px;}'+
+      '.info-block .val{font-size:13px;font-weight:700;color:#222;}'+
+      '.info-block .val-sub{font-size:11px;color:#666;margin-top:1px;}'+
+      'table{width:100%;border-collapse:collapse;margin-bottom:16px;}'+
+      'thead tr{background:#1a2535;}'+
+      'thead th{padding:9px 10px;text-align:left;color:#fff;font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:0.5px;}'+
+      'thead th:nth-child(2),thead th:nth-child(3),thead th:nth-child(4){text-align:center;}'+
+      'thead th:last-child{text-align:right;}'+
+      'tbody tr:nth-child(even){background:#f9f9f9;}'+
+      '.totals{display:flex;justify-content:flex-end;margin-bottom:20px;}'+
+      '.totals-box{width:260px;border:1px solid #eee;border-radius:8px;overflow:hidden;}'+
+      '.totals-row{display:flex;justify-content:space-between;padding:8px 14px;font-size:12px;border-bottom:1px solid #eee;}'+
+      '.totals-row:last-child{background:#1D9E75;color:#fff;font-weight:700;font-size:14px;border-bottom:none;}'+
+      '.totals-row .disc{color:#E65100;}'+
+      '.nota-box{background:#FFFDE7;border:1px solid #FFD54F;border-radius:6px;padding:10px 14px;margin-bottom:20px;font-size:12px;}'+
+      '.nota-box strong{color:#F57F17;}'+
+      '.footer{border-top:2px dashed #ccc;padding-top:16px;display:flex;justify-content:space-between;align-items:center;}'+
+      '.footer-left{font-size:11px;color:#999;line-height:1.8;}'+
+      '.footer-right{text-align:right;font-size:11px;color:#999;line-height:1.8;}'+
+      '.footer strong{color:#1D9E75;}'+
+      '.gracias{text-align:center;margin:20px 0 0;font-size:13px;color:#1D9E75;font-weight:700;letter-spacing:1px;}'+
+      '@media print{body{padding:12px;}button{display:none!important;}}'+
+    '</style></head><body>'+
 
-        '<div class="header">'+
-        '<div class="brand">'+
+    '<div class="header">'+
+      '<div class="brand">'+
         '<h1>MUNDO CEL DIAZ</h1>'+
         '<p>SISTEMA DE GESTIÓN</p>'+
         '<p class="sub">Reparación y Venta de Celulares · Guatemala</p>'+
-        '</div>'+
-        '<div class="venta-num">'+
+      '</div>'+
+      '<div class="venta-num">'+
         '<div class="label">Comprobante de Venta</div>'+
         '<div class="num"># '+ventaNum+'</div>'+
-        '</div>'+
-        '</div>'+
+      '</div>'+
+    '</div>'+
 
-        '<div class="info-grid">'+
-        '<div class="info-block">'+
+    '<div class="info-grid">'+
+      '<div class="info-block">'+
         '<div class="label">Cliente</div>'+
         '<div class="val">'+sale.client+'</div>'+
         (sale.clientId?'<div class="val-sub">Código: '+sale.clientId.slice(0,8).toUpperCase()+'</div>':'')+
-        '</div>'+
-        '<div class="info-block">'+
+      '</div>'+
+      '<div class="info-block">'+
         '<div class="label">Fecha y Hora</div>'+
         '<div class="val">'+fecha+'</div>'+
         '<div class="val-sub">'+hora+' hrs</div>'+
-        '</div>'+
-        '<div class="info-block">'+
+      '</div>'+
+      '<div class="info-block">'+
         '<div class="label">Método de Pago</div>'+
         '<div class="val">'+sale.method+'</div>'+
-        '</div>'+
-        '<div class="info-block">'+
+      '</div>'+
+      '<div class="info-block">'+
         '<div class="label">Atendido por</div>'+
         '<div class="val">'+(sale.registradoPor?sale.registradoPor.name:'—')+'</div>'+
         (sale.registradoPor?'<div class="val-sub">'+(sale.registradoPor.role==='admin'?'Administrador':sale.registradoPor.role==='cajero'?'Cajero':'Auditor')+'</div>':'')+
-        '</div>'+
-        '</div>'+
+      '</div>'+
+    '</div>'+
 
-        (sale.nota?'<div class="nota-box"><strong>📝 Nota:</strong> '+sale.nota+'</div>':'')+
+    (sale.nota?'<div class="nota-box"><strong>📝 Nota:</strong> '+sale.nota+'</div>':'')+
 
-        '<table>'+
-        '<thead><tr>'+
+    '<table>'+
+      '<thead><tr>'+
         '<th>Descripción / Producto</th>'+
         '<th style="text-align:center;width:60px;">Cant.</th>'+
         '<th style="text-align:right;width:100px;">Precio Unit.</th>'+
         '<th style="text-align:right;width:100px;">Subtotal</th>'+
-        '</tr></thead>'+
-        '<tbody>'+itemsHTML+'</tbody>'+
-        '</table>'+
+      '</tr></thead>'+
+      '<tbody>'+itemsHTML+'</tbody>'+
+    '</table>'+
 
-        '<div class="totals"><div class="totals-box">'+
-        (totalDesc>0?'<div class="totals-row"><span>Precio lista:</span><span>Q '+subtotal.toFixed(2)+'</span></div>'+
-            '<div class="totals-row"><span class="disc">Descuentos:</span><span class="disc">- Q '+totalDesc.toFixed(2)+'</span></div>':'')+
-        '<div class="totals-row"><span>TOTAL:</span><span>Q '+Number(sale.total).toFixed(2)+'</span></div>'+
-        '</div></div>'+
+    '<div class="totals"><div class="totals-box">'+
+      (totalDesc>0?'<div class="totals-row"><span>Precio lista:</span><span>Q '+subtotal.toFixed(2)+'</span></div>'+
+      '<div class="totals-row"><span class="disc">Descuentos:</span><span class="disc">- Q '+totalDesc.toFixed(2)+'</span></div>':'')+ 
+      '<div class="totals-row"><span>TOTAL:</span><span>Q '+Number(sale.total).toFixed(2)+'</span></div>'+
+    '</div></div>'+
 
-        '<div class="footer">'+
-        '<div class="footer-left">'+
+    '<div class="footer">'+
+      '<div class="footer-left">'+
         '<strong>Mundo Cel Diaz</strong><br>'+
         'Guatemala, C.A.<br>'+
         'Sistema de Gestión v2.1'+
-        '</div>'+
-        '<div class="footer-right">'+
+      '</div>'+
+      '<div class="footer-right">'+
         'Cantidad de artículos: <strong>'+sale.items.reduce(function(s,i){return s+i.qty;},0)+'</strong><br>'+
         'Líneas de producto: <strong>'+sale.items.length+'</strong><br>'+
         'Ref: '+sale.id.slice(0,12).toUpperCase()+
-        '</div>'+
-        '</div>'+
-        '<p class="gracias">¡Gracias por su preferencia!</p>'+
+      '</div>'+
+    '</div>'+
+    '<p class="gracias">¡Gracias por su preferencia!</p>'+
 
-        '</body></html>';
+    '</body></html>';
 
     var w=window.open("","_blank","width=800,height=700");
     w.document.write(html);
@@ -2011,85 +2011,85 @@ function ClientsScreen(props) {
     var ultimaVisita=cliSales.length>0?cliSales.slice().sort(function(a,b){return new Date(b.date)-new Date(a.date);})[0].date:null;
 
     return (
-        <div>
-          <button style={Object.assign({},mB("gray"),{marginBottom:16})} onClick={function(){setSelCli(null);}}>← Volver</button>
-          <div style={Object.assign({},sC,{marginBottom:16})}>
-            <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start",marginBottom:16}}>
-              <div>
-                <div style={{display:"flex",alignItems:"center",gap:10,marginBottom:6}}>
-                  <p style={{fontSize:22,fontWeight:700,margin:0}}>{cli.name}</p>
-                  {esFrecuente&&<span style={mBg("amber")}>⭐ Cliente frecuente</span>}
-                  {totalPendiente>0&&<span style={mBg("red")}>⚠ Deuda: {Q(totalPendiente)}</span>}
-                </div>
-                <div style={{display:"flex",gap:16,fontSize:13,color:"#666",flexWrap:"wrap"}}>
-                  <span style={{fontFamily:"monospace",background:"#f5f4f0",padding:"2px 8px",borderRadius:6,fontWeight:600,color:TEAL}}>{cli.cliCode}</span>
-                  {cli.dpi&&<span>🪪 DPI: {cli.dpi}</span>}
-                  {cli.phone&&<span>📱 {cli.phone}</span>}
-                  {cli.address&&<span>📍 {cli.address}</span>}
-                </div>
+      <div>
+        <button style={Object.assign({},mB("gray"),{marginBottom:16})} onClick={function(){setSelCli(null);}}>← Volver</button>
+        <div style={Object.assign({},sC,{marginBottom:16})}>
+          <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start",marginBottom:16}}>
+            <div>
+              <div style={{display:"flex",alignItems:"center",gap:10,marginBottom:6}}>
+                <p style={{fontSize:22,fontWeight:700,margin:0}}>{cli.name}</p>
+                {esFrecuente&&<span style={mBg("amber")}>⭐ Cliente frecuente</span>}
+                {totalPendiente>0&&<span style={mBg("red")}>⚠ Deuda: {Q(totalPendiente)}</span>}
               </div>
-              <button style={Object.assign({},mB("blue"),{padding:"6px 12px",fontSize:12})} onClick={function(){startEdit(cli);setSelCli(null);}}>✏ Editar</button>
+              <div style={{display:"flex",gap:16,fontSize:13,color:"#666",flexWrap:"wrap"}}>
+                <span style={{fontFamily:"monospace",background:"#f5f4f0",padding:"2px 8px",borderRadius:6,fontWeight:600,color:TEAL}}>{cli.cliCode}</span>
+                {cli.dpi&&<span>🪪 DPI: {cli.dpi}</span>}
+                {cli.phone&&<span>📱 {cli.phone}</span>}
+                {cli.address&&<span>📍 {cli.address}</span>}
+              </div>
             </div>
-            <div style={{display:"grid",gridTemplateColumns:"repeat(4,1fr)",gap:12}}>
-              <MetricBox label="Total compras"     value={cliSales.length}    color={TEAL}/>
-              <MetricBox label="Total comprado"    value={Q(totalComprado)}   color="#378ADD"/>
-              <MetricBox label="Deuda pendiente"   value={Q(totalPendiente)}  color={totalPendiente>0?"#E24B4A":TEAL}/>
-              <MetricBox label="Devoluciones"      value={cliRets.length}     color="#7F77DD"/>
-            </div>
-            {ultimaVisita&&<p style={{fontSize:12,color:"#999",margin:"12px 0 0"}}>Última visita: {fmtD(ultimaVisita)} — Registrado: {fmtD(cli.createdAt)}</p>}
+            <button style={Object.assign({},mB("blue"),{padding:"6px 12px",fontSize:12})} onClick={function(){startEdit(cli);setSelCli(null);}}>✏ Editar</button>
           </div>
-
-          {cliAccs.filter(function(a){return a.status!=="pagado";}).length>0&&(
-              <div style={Object.assign({},sC,{marginBottom:16,borderLeft:"4px solid #E24B4A"})}>
-                <p style={{fontWeight:600,margin:"0 0 10px",fontSize:14,color:"#E24B4A"}}>⚠ Cuentas pendientes</p>
-                {cliAccs.filter(function(a){return a.status!=="pagado";}).map(function(a){
-                  return <div key={a.id} style={{display:"flex",justifyContent:"space-between",padding:"6px 0",borderBottom:"1px solid rgba(0,0,0,0.05)",fontSize:14}}>
-                    <span>{fmtD(a.date)} — {a.items.length} artículos</span>
-                    <span style={{fontWeight:700,color:"#E24B4A"}}>{Q(a.balance)}</span>
-                  </div>;
-                })}
-              </div>
-          )}
-
-          {cliSales.length>0&&(
-              <div style={Object.assign({},sC,{marginBottom:16})}>
-                <p style={{fontWeight:600,margin:"0 0 12px",fontSize:15}}>🛒 Historial de compras</p>
-                <table style={{width:"100%",borderCollapse:"collapse"}}>
-                  <thead><tr>{["Fecha","Artículos","Método","Total","Estado"].map(function(h){return <th key={h} style={sTH}>{h}</th>;})}</tr></thead>
-                  <tbody>{cliSales.slice(0,10).map(function(s){
-                    return <tr key={s.id}>
-                      <td style={sTD}>{fmtD(s.date)}</td>
-                      <td style={Object.assign({},sTD,{color:"#666"})}>{(s.items||[]).length} art.</td>
-                      <td style={sTD}><span style={mBg("teal")}>{s.method}</span></td>
-                      <td style={Object.assign({},sTD,{fontWeight:700,color:TEAL})}>{Q(s.total)}</td>
-                      <td style={sTD}><span style={mBg("green")}>✓ Cobrada</span></td>
-                    </tr>;
-                  })}</tbody>
-                </table>
-              </div>
-          )}
-
-          {cliRets.length>0&&(
-              <div style={sC}>
-                <p style={{fontWeight:600,margin:"0 0 12px",fontSize:15}}>🔄 Devoluciones</p>
-                <table style={{width:"100%",borderCollapse:"collapse"}}>
-                  <thead><tr>{["Fecha","Motivo","Estado artículo","Reembolso"].map(function(h){return <th key={h} style={sTH}>{h}</th>;})}</tr></thead>
-                  <tbody>{cliRets.map(function(r){
-                    return <tr key={r.id}>
-                      <td style={sTD}>{fmtD(r.date)}</td>
-                      <td style={sTD}>{r.reason}</td>
-                      <td style={sTD}><span style={mBg(r.itemCondition==="bueno"?"green":"amber")}>{r.itemCondition==="bueno"?"Buen estado":"Defectuoso"}</span></td>
-                      <td style={Object.assign({},sTD,{fontWeight:600,color:r.refundAmount>0?"#E24B4A":"#999"})}>{r.refundAmount>0?Q(r.refundAmount):"Sin reembolso"}</td>
-                    </tr>;
-                  })}</tbody>
-                </table>
-              </div>
-          )}
-
-          {cliSales.length===0&&cliAccs.length===0&&cliRets.length===0&&(
-              <div style={Object.assign({},sC,{textAlign:"center",padding:48,color:"#999"})}>Sin transacciones registradas aún para este cliente.</div>
-          )}
+          <div style={{display:"grid",gridTemplateColumns:"repeat(4,1fr)",gap:12}}>
+            <MetricBox label="Total compras"     value={cliSales.length}    color={TEAL}/>
+            <MetricBox label="Total comprado"    value={Q(totalComprado)}   color="#378ADD"/>
+            <MetricBox label="Deuda pendiente"   value={Q(totalPendiente)}  color={totalPendiente>0?"#E24B4A":TEAL}/>
+            <MetricBox label="Devoluciones"      value={cliRets.length}     color="#7F77DD"/>
+          </div>
+          {ultimaVisita&&<p style={{fontSize:12,color:"#999",margin:"12px 0 0"}}>Última visita: {fmtD(ultimaVisita)} — Registrado: {fmtD(cli.createdAt)}</p>}
         </div>
+
+        {cliAccs.filter(function(a){return a.status!=="pagado";}).length>0&&(
+          <div style={Object.assign({},sC,{marginBottom:16,borderLeft:"4px solid #E24B4A"})}>
+            <p style={{fontWeight:600,margin:"0 0 10px",fontSize:14,color:"#E24B4A"}}>⚠ Cuentas pendientes</p>
+            {cliAccs.filter(function(a){return a.status!=="pagado";}).map(function(a){
+              return <div key={a.id} style={{display:"flex",justifyContent:"space-between",padding:"6px 0",borderBottom:"1px solid rgba(0,0,0,0.05)",fontSize:14}}>
+                <span>{fmtD(a.date)} — {a.items.length} artículos</span>
+                <span style={{fontWeight:700,color:"#E24B4A"}}>{Q(a.balance)}</span>
+              </div>;
+            })}
+          </div>
+        )}
+
+        {cliSales.length>0&&(
+          <div style={Object.assign({},sC,{marginBottom:16})}>
+            <p style={{fontWeight:600,margin:"0 0 12px",fontSize:15}}>🛒 Historial de compras</p>
+            <table style={{width:"100%",borderCollapse:"collapse"}}>
+              <thead><tr>{["Fecha","Artículos","Método","Total","Estado"].map(function(h){return <th key={h} style={sTH}>{h}</th>;})}</tr></thead>
+              <tbody>{cliSales.slice(0,10).map(function(s){
+                return <tr key={s.id}>
+                  <td style={sTD}>{fmtD(s.date)}</td>
+                  <td style={Object.assign({},sTD,{color:"#666"})}>{(s.items||[]).length} art.</td>
+                  <td style={sTD}><span style={mBg("teal")}>{s.method}</span></td>
+                  <td style={Object.assign({},sTD,{fontWeight:700,color:TEAL})}>{Q(s.total)}</td>
+                  <td style={sTD}><span style={mBg("green")}>✓ Cobrada</span></td>
+                </tr>;
+              })}</tbody>
+            </table>
+          </div>
+        )}
+
+        {cliRets.length>0&&(
+          <div style={sC}>
+            <p style={{fontWeight:600,margin:"0 0 12px",fontSize:15}}>🔄 Devoluciones</p>
+            <table style={{width:"100%",borderCollapse:"collapse"}}>
+              <thead><tr>{["Fecha","Motivo","Estado artículo","Reembolso"].map(function(h){return <th key={h} style={sTH}>{h}</th>;})}</tr></thead>
+              <tbody>{cliRets.map(function(r){
+                return <tr key={r.id}>
+                  <td style={sTD}>{fmtD(r.date)}</td>
+                  <td style={sTD}>{r.reason}</td>
+                  <td style={sTD}><span style={mBg(r.itemCondition==="bueno"?"green":"amber")}>{r.itemCondition==="bueno"?"Buen estado":"Defectuoso"}</span></td>
+                  <td style={Object.assign({},sTD,{fontWeight:600,color:r.refundAmount>0?"#E24B4A":"#999"})}>{r.refundAmount>0?Q(r.refundAmount):"Sin reembolso"}</td>
+                </tr>;
+              })}</tbody>
+            </table>
+          </div>
+        )}
+
+        {cliSales.length===0&&cliAccs.length===0&&cliRets.length===0&&(
+          <div style={Object.assign({},sC,{textAlign:"center",padding:48,color:"#999"})}>Sin transacciones registradas aún para este cliente.</div>
+        )}
+      </div>
     );
   }
 
@@ -2098,80 +2098,80 @@ function ClientsScreen(props) {
   var frecuentes=clients.filter(function(c){var cs=sales.filter(function(s){return s.clientId===c.id||(s.client===c.name&&!s.clientId);});return cs.length>=5||cs.reduce(function(s,x){return s+x.total;},0)>=1000;}).length;
 
   return (
-      <div>
-        <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:20}}>
-          <p style={H1}>👥 Clientes</p>
-          <button style={mB("teal")} onClick={function(){resetForm();setShowForm(true);}}>+ Nuevo cliente</button>
-        </div>
-
-        {showForm&&(
-            <div style={Object.assign({},sC,{marginBottom:16,borderColor:TEAL,borderWidth:"1.5px"})}>
-              <p style={{fontWeight:600,margin:"0 0 14px",fontSize:15}}>{editCli?"✏️ Editar cliente":"➕ Nuevo cliente"}</p>
-              {fErr&&<div style={{background:"#FCEBEB",borderRadius:8,padding:"8px 14px",marginBottom:12,color:"#791F1F",fontSize:13}}>⚠ {fErr}</div>}
-              <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:12,marginBottom:14}}>
-                <div><label style={sL}>Nombre completo *</label><input style={sI} value={fName} placeholder="Nombre del cliente" onChange={function(e){setFErr("");setFName(e.target.value);}}/></div>
-                <div>
-                  <label style={sL}>DPI (13 dígitos, opcional)</label>
-                  <input style={sI} value={fDpi} placeholder="Sin DPI → se asigna ID automático" maxLength={13} onChange={function(e){setFErr("");setFDpi(e.target.value.replace(/\D/g,""));}}/>
-                  {fDpi&&!validarDPI(fDpi)&&<p style={{fontSize:11,color:"#E24B4A",margin:"3px 0 0"}}>⚠ Debe tener 13 dígitos ({fDpi.length}/13)</p>}
-                  {fDpi&&validarDPI(fDpi)&&fDpi.length===13&&<p style={{fontSize:11,color:TEAL,margin:"3px 0 0"}}>✓ DPI válido</p>}
-                </div>
-                <div><label style={sL}>Teléfono</label><input style={sI} value={fTel} placeholder="Ej: 55551234" onChange={function(e){setFTel(e.target.value);}}/></div>
-                <div><label style={sL}>Dirección</label><input style={sI} value={fAddr} placeholder="Opcional" onChange={function(e){setFAddr(e.target.value);}}/></div>
-              </div>
-              {!editCli&&<div style={{background:"#f5f4f0",borderRadius:8,padding:"8px 14px",marginBottom:14,fontSize:12,color:"#666"}}>
-                💡 Si el cliente no tiene DPI, se le asignará un código único automático (CLI-000001, CLI-000002…)
-              </div>}
-              <div style={{display:"flex",gap:10}}>
-                <button style={mB("teal")} onClick={doSave}>{editCli?"Guardar cambios":"Registrar cliente"}</button>
-                <button style={mB("gray")} onClick={resetForm}>Cancelar</button>
-              </div>
-            </div>
-        )}
-
-        <div style={{display:"grid",gridTemplateColumns:"repeat(3,1fr)",gap:14,marginBottom:20}}>
-          <MetricBox label="Total clientes"   value={totalClientes} color={TEAL}/>
-          <MetricBox label="Con deuda activa" value={conDeuda}      color="#E24B4A"/>
-          <MetricBox label="Clientes frecuentes" value={frecuentes} color="#E65100"/>
-        </div>
-
-        <div style={Object.assign({},sC,{marginBottom:14})}>
-          <input style={sI} value={q} placeholder="🔍 Buscar por nombre, DPI, código CLI o teléfono..." onChange={function(e){setQ(e.target.value);}}/>
-        </div>
-
-        <div style={sC}>
-          {filtered.length===0?(
-              <div style={{textAlign:"center",padding:48,color:"#999"}}>
-                {q?"Sin resultados para \""+q+"\""  :"Sin clientes registrados aún"}
-              </div>
-          ):(
-              <table style={{width:"100%",borderCollapse:"collapse"}}>
-                <thead><tr>{["Código","Nombre","DPI","Teléfono","Compras","Deuda",""].map(function(h){return <th key={h} style={sTH}>{h}</th>;})}</tr></thead>
-                <tbody>
-                {filtered.map(function(c){
-                  var cliSalesCount=sales.filter(function(s){return s.clientId===c.id||(s.client===c.name&&!s.clientId);}).length;
-                  var cliDeuda=accounts.filter(function(a){return (a.clientId===c.id||(a.client===c.name&&!a.clientId))&&a.status!=="pagado";}).reduce(function(s,a){return s+a.balance;},0);
-                  var esFrecuente=cliSalesCount>=5||sales.filter(function(s){return s.clientId===c.id||(s.client===c.name&&!s.clientId);}).reduce(function(s,x){return s+x.total;},0)>=1000;
-                  return (
-                      <tr key={c.id} style={{cursor:"pointer"}} onClick={function(){setSelCli(c.id);}}>
-                        <td style={Object.assign({},sTD,{fontFamily:"monospace",fontSize:12,color:TEAL,fontWeight:600})}>{c.cliCode}</td>
-                        <td style={Object.assign({},sTD,{fontWeight:600})}>
-                          {c.name}
-                          {esFrecuente&&<span style={Object.assign({},mBg("amber"),{marginLeft:6})}>⭐</span>}
-                        </td>
-                        <td style={Object.assign({},sTD,{fontFamily:"monospace",fontSize:12})}>{c.dpi||<span style={{color:"#bbb"}}>Sin DPI</span>}</td>
-                        <td style={Object.assign({},sTD,{color:"#666"})}>{c.phone||"—"}</td>
-                        <td style={sTD}>{cliSalesCount} compras</td>
-                        <td style={sTD}>{cliDeuda>0?<span style={mBg("red")}>{Q(cliDeuda)}</span>:<span style={mBg("green")}>✓ Al día</span>}</td>
-                        <td style={Object.assign({},sTD,{color:"#999",fontSize:12})}>Ver →</td>
-                      </tr>
-                  );
-                })}
-                </tbody>
-              </table>
-          )}
-        </div>
+    <div>
+      <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:20}}>
+        <p style={H1}>👥 Clientes</p>
+        <button style={mB("teal")} onClick={function(){resetForm();setShowForm(true);}}>+ Nuevo cliente</button>
       </div>
+
+      {showForm&&(
+        <div style={Object.assign({},sC,{marginBottom:16,borderColor:TEAL,borderWidth:"1.5px"})}>
+          <p style={{fontWeight:600,margin:"0 0 14px",fontSize:15}}>{editCli?"✏️ Editar cliente":"➕ Nuevo cliente"}</p>
+          {fErr&&<div style={{background:"#FCEBEB",borderRadius:8,padding:"8px 14px",marginBottom:12,color:"#791F1F",fontSize:13}}>⚠ {fErr}</div>}
+          <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:12,marginBottom:14}}>
+            <div><label style={sL}>Nombre completo *</label><input style={sI} value={fName} placeholder="Nombre del cliente" onChange={function(e){setFErr("");setFName(e.target.value);}}/></div>
+            <div>
+              <label style={sL}>DPI (13 dígitos, opcional)</label>
+              <input style={sI} value={fDpi} placeholder="Sin DPI → se asigna ID automático" maxLength={13} onChange={function(e){setFErr("");setFDpi(e.target.value.replace(/\D/g,""));}}/>
+              {fDpi&&!validarDPI(fDpi)&&<p style={{fontSize:11,color:"#E24B4A",margin:"3px 0 0"}}>⚠ Debe tener 13 dígitos ({fDpi.length}/13)</p>}
+              {fDpi&&validarDPI(fDpi)&&fDpi.length===13&&<p style={{fontSize:11,color:TEAL,margin:"3px 0 0"}}>✓ DPI válido</p>}
+            </div>
+            <div><label style={sL}>Teléfono</label><input style={sI} value={fTel} placeholder="Ej: 55551234" onChange={function(e){setFTel(e.target.value);}}/></div>
+            <div><label style={sL}>Dirección</label><input style={sI} value={fAddr} placeholder="Opcional" onChange={function(e){setFAddr(e.target.value);}}/></div>
+          </div>
+          {!editCli&&<div style={{background:"#f5f4f0",borderRadius:8,padding:"8px 14px",marginBottom:14,fontSize:12,color:"#666"}}>
+            💡 Si el cliente no tiene DPI, se le asignará un código único automático (CLI-000001, CLI-000002…)
+          </div>}
+          <div style={{display:"flex",gap:10}}>
+            <button style={mB("teal")} onClick={doSave}>{editCli?"Guardar cambios":"Registrar cliente"}</button>
+            <button style={mB("gray")} onClick={resetForm}>Cancelar</button>
+          </div>
+        </div>
+      )}
+
+      <div style={{display:"grid",gridTemplateColumns:"repeat(3,1fr)",gap:14,marginBottom:20}}>
+        <MetricBox label="Total clientes"   value={totalClientes} color={TEAL}/>
+        <MetricBox label="Con deuda activa" value={conDeuda}      color="#E24B4A"/>
+        <MetricBox label="Clientes frecuentes" value={frecuentes} color="#E65100"/>
+      </div>
+
+      <div style={Object.assign({},sC,{marginBottom:14})}>
+        <input style={sI} value={q} placeholder="🔍 Buscar por nombre, DPI, código CLI o teléfono..." onChange={function(e){setQ(e.target.value);}}/>
+      </div>
+
+      <div style={sC}>
+        {filtered.length===0?(
+          <div style={{textAlign:"center",padding:48,color:"#999"}}>
+            {q?"Sin resultados para \""+q+"\""  :"Sin clientes registrados aún"}
+          </div>
+        ):(
+          <table style={{width:"100%",borderCollapse:"collapse"}}>
+            <thead><tr>{["Código","Nombre","DPI","Teléfono","Compras","Deuda",""].map(function(h){return <th key={h} style={sTH}>{h}</th>;})}</tr></thead>
+            <tbody>
+              {filtered.map(function(c){
+                var cliSalesCount=sales.filter(function(s){return s.clientId===c.id||(s.client===c.name&&!s.clientId);}).length;
+                var cliDeuda=accounts.filter(function(a){return (a.clientId===c.id||(a.client===c.name&&!a.clientId))&&a.status!=="pagado";}).reduce(function(s,a){return s+a.balance;},0);
+                var esFrecuente=cliSalesCount>=5||sales.filter(function(s){return s.clientId===c.id||(s.client===c.name&&!s.clientId);}).reduce(function(s,x){return s+x.total;},0)>=1000;
+                return (
+                  <tr key={c.id} style={{cursor:"pointer"}} onClick={function(){setSelCli(c.id);}}>
+                    <td style={Object.assign({},sTD,{fontFamily:"monospace",fontSize:12,color:TEAL,fontWeight:600})}>{c.cliCode}</td>
+                    <td style={Object.assign({},sTD,{fontWeight:600})}>
+                      {c.name}
+                      {esFrecuente&&<span style={Object.assign({},mBg("amber"),{marginLeft:6})}>⭐</span>}
+                    </td>
+                    <td style={Object.assign({},sTD,{fontFamily:"monospace",fontSize:12})}>{c.dpi||<span style={{color:"#bbb"}}>Sin DPI</span>}</td>
+                    <td style={Object.assign({},sTD,{color:"#666"})}>{c.phone||"—"}</td>
+                    <td style={sTD}>{cliSalesCount} compras</td>
+                    <td style={sTD}>{cliDeuda>0?<span style={mBg("red")}>{Q(cliDeuda)}</span>:<span style={mBg("green")}>✓ Al día</span>}</td>
+                    <td style={Object.assign({},sTD,{color:"#999",fontSize:12})}>Ver →</td>
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
+        )}
+      </div>
+    </div>
   );
 }
 
@@ -2198,23 +2198,29 @@ function App(props) {
       if(online && hasApiToken){
         // Modo online: cargar datos desde el API
         try {
-          var [prods, sls, accs, rets, defs] = await Promise.all([
+        var [prods, sls, accs, rets, defs, clis, reps] = await Promise.all([
             productsAPI.getAll(),
             salesAPI.getAll(),
             accountsAPI.getAll(),
             returnsAPI.getAll(),
             defectivesAPI.getAll(),
+            clientsAPI.getAll(),
+            repairsAPI.getAll(),
           ]);
           var normalProds = (prods||[]).map(function(p){return Object.assign({},p,{id:p.id,code:p.code,name:p.name,category:p.category||'',shelf:p.shelf||'',price:Number(p.price),cost:Number(p.cost),stock:Number(p.stock),unit:p.unit||'uni'});});
           var normalSales = (sls||[]).map(function(s){return Object.assign({},s,{items:s.sale_items||[],total:Number(s.total),date:s.created_at});});
           var normalAccs  = (accs||[]).map(function(a){return Object.assign({},a,{items:a.account_items||[],payments:a.account_payments||[],total:Number(a.total),paid:Number(a.paid),balance:Number(a.balance),date:a.created_at});});
           var normalRets  = (rets||[]).map(function(r){return Object.assign({},r,{items:r.return_items||[],refundAmount:Number(r.refund_amount),itemCondition:r.item_condition,refundMethod:r.refund_method,date:r.created_at});});
           var normalDefs  = (defs||[]).map(function(d){return Object.assign({},d,{price:Number(d.price||0)});});
+          var normalClis  = (clis||[]).map(function(c){return Object.assign({},c,{cliCode:c.cli_code,createdAt:c.created_at});});
+          var normalReps  = (reps||[]).map(function(r){return Object.assign({},r,{repCode:r.rep_code,clientId:r.client_id,clientName:r.client_name,clientPhone:r.client_phone,clientCli:r.client_cli,problemDesc:r.problem_desc,techName:r.tech_name,estimatedCost:Number(r.estimated_cost||0),promisedDate:r.promised_date,internalNote:r.internal_note,registradoPor:r.registrado_por||{},parts:r.parts||[],createdAt:r.created_at});});
           setProducts(normalProds.length>0?normalProds:DEMO);
           setSales(normalSales);
           setAccounts(normalAccs);
           setReturns(normalRets);
           setDefectives(normalDefs);
+          setClients(normalClis);
+          setRepairs(normalReps);
         } catch(e) {
           console.warn("Error cargando del API, usando local:", e);
           setIsOnline(false);
@@ -2543,10 +2549,26 @@ function App(props) {
     showFlash("Producto eliminado","ok");
   }
 
-  function saveRepair(rep){
+  async function saveRepair(rep){
+    if(isOnline){
+      try{
+        await repairsAPI.create({id:rep.id,repCode:rep.repCode,clientId:rep.clientId||null,clientName:rep.clientName,clientPhone:rep.clientPhone||null,clientCli:rep.clientCli||null,brand:rep.brand,model:rep.model,imei:rep.imei||null,problemDesc:rep.problemDesc,diagnosis:rep.diagnosis||null,techName:rep.techName||null,estimatedCost:rep.estimatedCost||0,promisedDate:rep.promisedDate||null,internalNote:rep.internalNote||null,status:rep.status||'recibido',registradoPor:rep.registradoPor||{},parts:rep.parts||[],createdAt:rep.createdAt});
+        var fr=await repairsAPI.getAll();
+        setRepairs((fr||[]).map(function(r){return Object.assign({},r,{repCode:r.rep_code,clientId:r.client_id,clientName:r.client_name,clientPhone:r.client_phone,clientCli:r.client_cli,problemDesc:r.problem_desc,techName:r.tech_name,estimatedCost:Number(r.estimated_cost||0),promisedDate:r.promised_date,internalNote:r.internal_note,registradoPor:r.registrado_por||{},parts:r.parts||[],createdAt:r.created_at});}));
+        return;
+      }catch(e){ console.warn('Error API saveRepair:',e); }
+    }
     setRepairs(function(p){return [rep].concat(p);});
   }
-  function updateRepairStatus(id, status){
+  async function updateRepairStatus(id, status){
+    if(isOnline){
+      try{
+        await repairsAPI.updateStatus(id, status);
+        var fr2=await repairsAPI.getAll();
+        setRepairs((fr2||[]).map(function(r){return Object.assign({},r,{repCode:r.rep_code,clientId:r.client_id,clientName:r.client_name,clientPhone:r.client_phone,clientCli:r.client_cli,problemDesc:r.problem_desc,techName:r.tech_name,estimatedCost:Number(r.estimated_cost||0),promisedDate:r.promised_date,internalNote:r.internal_note,registradoPor:r.registrado_por||{},parts:r.parts||[],createdAt:r.created_at});}));
+        return;
+      }catch(e){ console.warn('Error API updateRepairStatus:',e); }
+    }
     setRepairs(function(p){return p.map(function(r){return r.id===id?Object.assign({},r,{status:status,updatedAt:new Date().toISOString()}):r;});});
   }
   function cobrarReparacion(rep){
@@ -2575,12 +2597,18 @@ function App(props) {
     showFlash("✓ Reparación "+rep.repCode+" cargada en el POS","ok");
   }
 
-  function saveClient(obj, isEdit){
-    if(isEdit){
-      setClients(function(p){return p.map(function(c){return c.id===obj.id?obj:c;});});
-    } else {
-      setClients(function(p){return p.concat([obj]);});
+  async function saveClient(obj, isEdit){
+    if(isOnline){
+      try{
+        if(isEdit){ await clientsAPI.update(obj.id,{cliCode:obj.cliCode,name:obj.name,dpi:obj.dpi||null,phone:obj.phone||null,address:obj.address||null,active:obj.active!==false}); }
+        else { await clientsAPI.create({id:obj.id,cliCode:obj.cliCode,name:obj.name,dpi:obj.dpi||null,phone:obj.phone||null,address:obj.address||null,active:true,createdAt:obj.createdAt}); }
+        var fc=await clientsAPI.getAll();
+        setClients((fc||[]).map(function(c){return Object.assign({},c,{cliCode:c.cli_code,createdAt:c.created_at});}));
+        return;
+      }catch(e){ console.warn('Error API saveClient:',e); }
     }
+    if(isEdit){ setClients(function(p){return p.map(function(c){return c.id===obj.id?obj:c;});}); }
+    else { setClients(function(p){return p.concat([obj]);}); }
   }
 
   function exportJSON(){
@@ -2639,25 +2667,25 @@ function App(props) {
 
         {/* ── Modal de inactividad ── */}
         {showWarning&&(
-            <div style={{position:"fixed",top:0,left:0,width:"100%",height:"100%",background:"rgba(0,0,0,0.65)",zIndex:9999,display:"flex",alignItems:"center",justifyContent:"center"}}>
-              <div style={{background:"#fff",borderRadius:16,padding:"36px 40px",maxWidth:400,width:"90%",textAlign:"center",boxShadow:"0 20px 60px rgba(0,0,0,0.3)"}}>
-                <div style={{fontSize:48,marginBottom:12}}>⏱️</div>
-                <p style={{fontSize:20,fontWeight:700,margin:"0 0 8px",color:"#1a1a1a"}}>¿Seguís ahí?</p>
-                <p style={{fontSize:14,color:"#666",margin:"0 0 20px",lineHeight:1.6}}>Tu sesión se cerrará automáticamente por inactividad.</p>
-                <div style={{background:"#f5f4f0",borderRadius:12,padding:"16px",marginBottom:24}}>
-                  <p style={{fontSize:13,color:"#666",margin:"0 0 4px"}}>Cierre de sesión en</p>
-                  <p style={{fontSize:40,fontWeight:800,margin:0,color:countdown<=10?"#E24B4A":TEAL}}>{countdown}s</p>
-                </div>
-                <div style={{display:"flex",gap:12}}>
-                  <button onClick={function(){clearSession();onLogout();}} style={{flex:1,padding:"11px",borderRadius:8,border:"1px solid rgba(0,0,0,0.15)",background:"#fff",color:"#666",fontSize:14,cursor:"pointer",fontWeight:500}}>
-                    Cerrar sesión
-                  </button>
-                  <button onClick={handleContinueSession} style={{flex:2,padding:"11px",borderRadius:8,border:"none",background:TEAL,color:"#fff",fontSize:14,cursor:"pointer",fontWeight:700}}>
-                    ✓ Continuar sesión
-                  </button>
-                </div>
+          <div style={{position:"fixed",top:0,left:0,width:"100%",height:"100%",background:"rgba(0,0,0,0.65)",zIndex:9999,display:"flex",alignItems:"center",justifyContent:"center"}}>
+            <div style={{background:"#fff",borderRadius:16,padding:"36px 40px",maxWidth:400,width:"90%",textAlign:"center",boxShadow:"0 20px 60px rgba(0,0,0,0.3)"}}>
+              <div style={{fontSize:48,marginBottom:12}}>⏱️</div>
+              <p style={{fontSize:20,fontWeight:700,margin:"0 0 8px",color:"#1a1a1a"}}>¿Seguís ahí?</p>
+              <p style={{fontSize:14,color:"#666",margin:"0 0 20px",lineHeight:1.6}}>Tu sesión se cerrará automáticamente por inactividad.</p>
+              <div style={{background:"#f5f4f0",borderRadius:12,padding:"16px",marginBottom:24}}>
+                <p style={{fontSize:13,color:"#666",margin:"0 0 4px"}}>Cierre de sesión en</p>
+                <p style={{fontSize:40,fontWeight:800,margin:0,color:countdown<=10?"#E24B4A":TEAL}}>{countdown}s</p>
+              </div>
+              <div style={{display:"flex",gap:12}}>
+                <button onClick={function(){clearSession();onLogout();}} style={{flex:1,padding:"11px",borderRadius:8,border:"1px solid rgba(0,0,0,0.15)",background:"#fff",color:"#666",fontSize:14,cursor:"pointer",fontWeight:500}}>
+                  Cerrar sesión
+                </button>
+                <button onClick={handleContinueSession} style={{flex:2,padding:"11px",borderRadius:8,border:"none",background:TEAL,color:"#fff",fontSize:14,cursor:"pointer",fontWeight:700}}>
+                  ✓ Continuar sesión
+                </button>
               </div>
             </div>
+          </div>
         )}
 
         <Sidebar view={view} setView={setView} cartCount={cart.length} pendingCount={pendingAccs.length} products={products} sales={sales} session={session} onLogout={onLogout} isOnline={isOnline}/>
@@ -2701,43 +2729,43 @@ function genRepCode(repairs){
 function printRepairTicket(rep){
   var statusInfo=REP_STATUS[rep.status]||{label:rep.status,icon:"•"};
   var html='<!DOCTYPE html><html><head><meta charset="UTF-8"><title>Orden '+rep.repCode+'</title>'+
-      '<style>*{margin:0;padding:0;box-sizing:border-box;}body{font-family:Arial,sans-serif;font-size:12px;color:#222;max-width:700px;margin:0 auto;padding:24px;}'+
-      '.header{display:flex;justify-content:space-between;align-items:flex-start;border-bottom:3px solid #1D9E75;padding-bottom:14px;margin-bottom:18px;}'+
-      '.brand h1{font-size:20px;font-weight:900;color:#1a2535;}.brand p{font-size:10px;color:#1D9E75;font-weight:700;letter-spacing:2px;margin-top:2px;}'+
-      '.rep-num .label{font-size:10px;color:#999;text-transform:uppercase;letter-spacing:1px;}.rep-num .num{font-size:22px;font-weight:900;color:#1D9E75;margin-top:2px;}'+
-      '.grid{display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-bottom:16px;padding:12px;background:#f8f9fa;border-radius:8px;border-left:4px solid #1D9E75;}'+
-      '.block .lbl{font-size:10px;color:#999;text-transform:uppercase;letter-spacing:0.8px;margin-bottom:3px;}.block .val{font-size:13px;font-weight:700;}.block .sub{font-size:11px;color:#666;margin-top:1px;}'+
-      '.status-bar{background:#1a2535;color:#fff;padding:10px 16px;border-radius:8px;margin-bottom:16px;display:flex;justify-content:space-between;align-items:center;}'+
-      '.section{margin-bottom:14px;border:1px solid #eee;border-radius:8px;overflow:hidden;}'+
-      '.section-title{background:#f0efeb;padding:8px 12px;font-weight:700;font-size:12px;color:#444;border-bottom:1px solid #eee;}'+
-      '.section-body{padding:12px;}'+
-      '.parts-table{width:100%;border-collapse:collapse;}.parts-table th{background:#1D9E75;color:#fff;padding:6px 8px;text-align:left;font-size:11px;}.parts-table td{padding:6px 8px;border-bottom:1px solid #eee;font-size:12px;}'+
-      '.footer{border-top:2px dashed #ccc;padding-top:14px;margin-top:16px;display:flex;justify-content:space-between;font-size:11px;color:#999;}'+
-      '.firma{margin-top:32px;border-top:1px solid #ccc;padding-top:8px;text-align:center;font-size:11px;color:#999;}'+
-      '@media print{body{padding:12px;}}'+
-      '</style></head><body>'+
-      '<div class="header">'+
-      '<div class="brand"><h1>MUNDO CEL DIAZ</h1><p>ORDEN DE TRABAJO</p></div>'+
-      '<div class="rep-num"><div class="label">N° Orden</div><div class="num">'+rep.repCode+'</div></div>'+
-      '</div>'+
-      '<div class="status-bar"><span>Estado: <b>'+statusInfo.icon+' '+statusInfo.label+'</b></span><span>Registrada: '+new Date(rep.createdAt).toLocaleDateString("es-GT",{day:"2-digit",month:"short",year:"numeric"})+'</span>'+(rep.promisedDate?'<span>Entrega prometida: <b>'+new Date(rep.promisedDate+"T00:00:00").toLocaleDateString("es-GT",{day:"2-digit",month:"short",year:"numeric"})+'</b></span>':'')+
-      '</div>'+
-      '<div class="grid">'+
-      '<div class="block"><div class="lbl">Cliente</div><div class="val">'+rep.clientName+'</div>'+(rep.clientPhone?'<div class="sub">Tel: '+rep.clientPhone+'</div>':'')+
-      (rep.clientCli?'<div class="sub">'+rep.clientCli+'</div>':'')+'</div>'+
-      '<div class="block"><div class="lbl">Dispositivo</div><div class="val">'+rep.brand+' '+rep.model+'</div>'+(rep.imei?'<div class="sub">IMEI: '+rep.imei+'</div>':'')+'</div>'+
-      '<div class="block"><div class="lbl">Técnico asignado</div><div class="val">'+(rep.techName||'Sin asignar')+'</div></div>'+
-      '<div class="block"><div class="lbl">Costo estimado</div><div class="val" style="color:#1D9E75;">Q '+(rep.estimatedCost?Number(rep.estimatedCost).toFixed(2):'Por definir')+'</div></div>'+
-      '</div>'+
-      '<div class="section"><div class="section-title">⚠️ Problema reportado por el cliente</div><div class="section-body">'+rep.problemDesc+'</div></div>'+
-      (rep.diagnosis?'<div class="section"><div class="section-title">🔍 Diagnóstico técnico</div><div class="section-body">'+rep.diagnosis+'</div></div>':'')+
-      (rep.parts&&rep.parts.length>0?'<div class="section"><div class="section-title">🔩 Repuestos utilizados</div><div class="section-body"><table class="parts-table"><thead><tr><th>Código</th><th>Repuesto</th><th>Cant.</th><th>Precio</th></tr></thead><tbody>'+
-          rep.parts.map(function(p){return '<tr><td style="font-family:monospace;">'+p.code+'</td><td>'+p.name+'</td><td>'+p.qty+'</td><td>Q '+Number(p.price).toFixed(2)+'</td></tr>';}).join("")+
-          '</tbody></table></div></div>':'')+
-      (rep.internalNote?'<div class="section"><div class="section-title">📝 Nota interna</div><div class="section-body" style="color:#666;">'+rep.internalNote+'</div></div>':'')+
-      '<div class="footer"><div><b>Mundo Cel Diaz</b> · Guatemala</div><div>Ref: '+rep.repCode+' · '+rep.id.slice(0,8).toUpperCase()+'</div></div>'+
-      '<div class="firma">Firma del cliente: _____________________________ &nbsp;&nbsp;&nbsp; Fecha entrega: _______________</div>'+
-      '</body></html>';
+  '<style>*{margin:0;padding:0;box-sizing:border-box;}body{font-family:Arial,sans-serif;font-size:12px;color:#222;max-width:700px;margin:0 auto;padding:24px;}'+
+  '.header{display:flex;justify-content:space-between;align-items:flex-start;border-bottom:3px solid #1D9E75;padding-bottom:14px;margin-bottom:18px;}'+
+  '.brand h1{font-size:20px;font-weight:900;color:#1a2535;}.brand p{font-size:10px;color:#1D9E75;font-weight:700;letter-spacing:2px;margin-top:2px;}'+
+  '.rep-num .label{font-size:10px;color:#999;text-transform:uppercase;letter-spacing:1px;}.rep-num .num{font-size:22px;font-weight:900;color:#1D9E75;margin-top:2px;}'+
+  '.grid{display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-bottom:16px;padding:12px;background:#f8f9fa;border-radius:8px;border-left:4px solid #1D9E75;}'+
+  '.block .lbl{font-size:10px;color:#999;text-transform:uppercase;letter-spacing:0.8px;margin-bottom:3px;}.block .val{font-size:13px;font-weight:700;}.block .sub{font-size:11px;color:#666;margin-top:1px;}'+
+  '.status-bar{background:#1a2535;color:#fff;padding:10px 16px;border-radius:8px;margin-bottom:16px;display:flex;justify-content:space-between;align-items:center;}'+
+  '.section{margin-bottom:14px;border:1px solid #eee;border-radius:8px;overflow:hidden;}'+
+  '.section-title{background:#f0efeb;padding:8px 12px;font-weight:700;font-size:12px;color:#444;border-bottom:1px solid #eee;}'+
+  '.section-body{padding:12px;}'+
+  '.parts-table{width:100%;border-collapse:collapse;}.parts-table th{background:#1D9E75;color:#fff;padding:6px 8px;text-align:left;font-size:11px;}.parts-table td{padding:6px 8px;border-bottom:1px solid #eee;font-size:12px;}'+
+  '.footer{border-top:2px dashed #ccc;padding-top:14px;margin-top:16px;display:flex;justify-content:space-between;font-size:11px;color:#999;}'+
+  '.firma{margin-top:32px;border-top:1px solid #ccc;padding-top:8px;text-align:center;font-size:11px;color:#999;}'+
+  '@media print{body{padding:12px;}}'+
+  '</style></head><body>'+
+  '<div class="header">'+
+    '<div class="brand"><h1>MUNDO CEL DIAZ</h1><p>ORDEN DE TRABAJO</p></div>'+
+    '<div class="rep-num"><div class="label">N° Orden</div><div class="num">'+rep.repCode+'</div></div>'+
+  '</div>'+
+  '<div class="status-bar"><span>Estado: <b>'+statusInfo.icon+' '+statusInfo.label+'</b></span><span>Registrada: '+new Date(rep.createdAt).toLocaleDateString("es-GT",{day:"2-digit",month:"short",year:"numeric"})+'</span>'+(rep.promisedDate?'<span>Entrega prometida: <b>'+new Date(rep.promisedDate+"T00:00:00").toLocaleDateString("es-GT",{day:"2-digit",month:"short",year:"numeric"})+'</b></span>':'')+
+  '</div>'+
+  '<div class="grid">'+
+    '<div class="block"><div class="lbl">Cliente</div><div class="val">'+rep.clientName+'</div>'+(rep.clientPhone?'<div class="sub">Tel: '+rep.clientPhone+'</div>':'')+
+    (rep.clientCli?'<div class="sub">'+rep.clientCli+'</div>':'')+'</div>'+
+    '<div class="block"><div class="lbl">Dispositivo</div><div class="val">'+rep.brand+' '+rep.model+'</div>'+(rep.imei?'<div class="sub">IMEI: '+rep.imei+'</div>':'')+'</div>'+
+    '<div class="block"><div class="lbl">Técnico asignado</div><div class="val">'+(rep.techName||'Sin asignar')+'</div></div>'+
+    '<div class="block"><div class="lbl">Costo estimado</div><div class="val" style="color:#1D9E75;">Q '+(rep.estimatedCost?Number(rep.estimatedCost).toFixed(2):'Por definir')+'</div></div>'+
+  '</div>'+
+  '<div class="section"><div class="section-title">⚠️ Problema reportado por el cliente</div><div class="section-body">'+rep.problemDesc+'</div></div>'+
+  (rep.diagnosis?'<div class="section"><div class="section-title">🔍 Diagnóstico técnico</div><div class="section-body">'+rep.diagnosis+'</div></div>':'')+
+  (rep.parts&&rep.parts.length>0?'<div class="section"><div class="section-title">🔩 Repuestos utilizados</div><div class="section-body"><table class="parts-table"><thead><tr><th>Código</th><th>Repuesto</th><th>Cant.</th><th>Precio</th></tr></thead><tbody>'+
+    rep.parts.map(function(p){return '<tr><td style="font-family:monospace;">'+p.code+'</td><td>'+p.name+'</td><td>'+p.qty+'</td><td>Q '+Number(p.price).toFixed(2)+'</td></tr>';}).join("")+
+  '</tbody></table></div></div>':'')+
+  (rep.internalNote?'<div class="section"><div class="section-title">📝 Nota interna</div><div class="section-body" style="color:#666;">'+rep.internalNote+'</div></div>':'')+
+  '<div class="footer"><div><b>Mundo Cel Diaz</b> · Guatemala</div><div>Ref: '+rep.repCode+' · '+rep.id.slice(0,8).toUpperCase()+'</div></div>'+
+  '<div class="firma">Firma del cliente: _____________________________ &nbsp;&nbsp;&nbsp; Fecha entrega: _______________</div>'+
+  '</body></html>';
   var w=window.open("","_blank","width=800,height=700");
   w.document.write(html);
   w.document.close();
@@ -2846,99 +2874,99 @@ function RepairsScreen(props){
     var nextStatus={recibido:"en_revision",en_revision:"listo",listo:"entregado"};
     var nextLabel={recibido:"🔧 Iniciar revisión",en_revision:"✅ Marcar como listo",listo:"📦 Marcar como entregado"};
     return (
-        <div>
-          <div style={{display:"flex",gap:10,marginBottom:16}}>
-            <button style={mB("gray")} onClick={function(){setSelRep(null);}}>← Volver</button>
-            <button style={mB("teal")} onClick={function(){printRepairTicket(rep);}}>🖨 Imprimir / PDF</button>
-            {rep.status!=="entregado"&&<button style={mB("blue")} onClick={function(){updateRepairStatus(rep.id,nextStatus[rep.status]);showFlash("✓ Estado actualizado","ok");}}>
-              {nextLabel[rep.status]}
-            </button>}
-            {(rep.status==="listo"||rep.status==="entregado")&&<button style={mB("teal")} onClick={function(){onCobrar(rep);setSelRep(null);}}>💰 Cobrar reparación</button>}
-          </div>
-          <div style={sC}>
-            <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start",marginBottom:20}}>
-              <div>
-                <div style={{display:"flex",alignItems:"center",gap:10,marginBottom:6}}>
-                  <p style={{fontWeight:800,fontSize:20,margin:0,color:TEAL}}>{rep.repCode}</p>
-                  <span style={mBg(statusInfo.color)}>{statusInfo.icon} {statusInfo.label}</span>
-                </div>
-                <p style={{fontSize:13,color:"#666",margin:"0 0 2px"}}>Registrada: {fmtD(rep.createdAt)} {fmtT(rep.createdAt)}</p>
-                {rep.registradoPor&&<p style={{fontSize:12,color:"#999",margin:0}}>Por: <b>{rep.registradoPor.name}</b></p>}
-              </div>
-              <div style={{textAlign:"right"}}>
-                {rep.promisedDate&&<p style={{fontSize:12,color:"#666",margin:"0 0 4px"}}>Entrega prometida: <b>{new Date(rep.promisedDate+"T00:00:00").toLocaleDateString("es-GT",{day:"2-digit",month:"short",year:"numeric"})}</b></p>}
-                <p style={{fontSize:22,fontWeight:700,color:TEAL,margin:0}}>Q {Number(rep.estimatedCost||0).toFixed(2)}</p>
-              </div>
-            </div>
-
-            {/* Stepper de estado */}
-            <div style={{display:"flex",gap:0,marginBottom:20,background:"#f5f4f0",borderRadius:10,overflow:"hidden"}}>
-              {["recibido","en_revision","listo","entregado"].map(function(s,i){
-                var info=REP_STATUS[s];
-                var isDone=["recibido","en_revision","listo","entregado"].indexOf(rep.status)>=i;
-                return <div key={s} style={{flex:1,padding:"10px 4px",textAlign:"center",background:isDone?TEAL:"transparent",color:isDone?"#fff":"#999",fontSize:11,fontWeight:isDone?700:400,borderRight:i<3?"1px solid rgba(255,255,255,0.2)":"none"}}>
-                  <div style={{fontSize:16}}>{info.icon}</div>
-                  <div style={{marginTop:2}}>{info.label}</div>
-                </div>;
-              })}
-            </div>
-
-            <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:16,marginBottom:16}}>
-              <div style={{background:"#f9f8f5",borderRadius:8,padding:14}}>
-                <p style={{fontSize:11,color:"#999",textTransform:"uppercase",letterSpacing:"0.8px",margin:"0 0 8px"}}>Cliente</p>
-                <p style={{fontWeight:700,fontSize:15,margin:"0 0 2px"}}>{rep.clientName}</p>
-                {rep.clientPhone&&<p style={{fontSize:13,color:"#666",margin:"0 0 2px"}}>📞 {rep.clientPhone}</p>}
-                {rep.clientCli&&<p style={{fontSize:12,color:TEAL,margin:0,fontFamily:"monospace"}}>{rep.clientCli}</p>}
-              </div>
-              <div style={{background:"#f9f8f5",borderRadius:8,padding:14}}>
-                <p style={{fontSize:11,color:"#999",textTransform:"uppercase",letterSpacing:"0.8px",margin:"0 0 8px"}}>Dispositivo</p>
-                <p style={{fontWeight:700,fontSize:15,margin:"0 0 2px"}}>{rep.brand} {rep.model}</p>
-                {rep.imei&&<p style={{fontSize:12,color:"#666",margin:0,fontFamily:"monospace"}}>IMEI: {rep.imei}</p>}
-              </div>
-              <div style={{background:"#f9f8f5",borderRadius:8,padding:14}}>
-                <p style={{fontSize:11,color:"#999",textTransform:"uppercase",letterSpacing:"0.8px",margin:"0 0 6px"}}>Técnico asignado</p>
-                <p style={{fontWeight:600,fontSize:14,margin:0}}>{rep.techName||"Sin asignar"}</p>
-              </div>
-              <div style={{background:"#EAF3DE",borderRadius:8,padding:14}}>
-                <p style={{fontSize:11,color:"#999",textTransform:"uppercase",letterSpacing:"0.8px",margin:"0 0 6px"}}>Costo estimado</p>
-                <p style={{fontWeight:700,fontSize:18,color:TEAL,margin:0}}>Q {Number(rep.estimatedCost||0).toFixed(2)}</p>
-              </div>
-            </div>
-
-            <div style={{marginBottom:12,background:"#FCEBEB",borderRadius:8,padding:"10px 14px",border:"1px solid #F09595"}}>
-              <p style={{fontSize:11,color:"#999",textTransform:"uppercase",margin:"0 0 4px"}}>⚠️ Problema reportado</p>
-              <p style={{fontSize:14,color:"#791F1F",margin:0,fontWeight:500}}>{rep.problemDesc}</p>
-            </div>
-
-            {rep.diagnosis&&<div style={{marginBottom:12,background:"#E6F1FB",borderRadius:8,padding:"10px 14px",border:"1px solid #a8ccee"}}>
-              <p style={{fontSize:11,color:"#999",textTransform:"uppercase",margin:"0 0 4px"}}>🔍 Diagnóstico técnico</p>
-              <p style={{fontSize:14,color:"#0C447C",margin:0}}>{rep.diagnosis}</p>
-            </div>}
-
-            {rep.parts&&rep.parts.length>0&&(
-                <div style={{marginBottom:12}}>
-                  <p style={{fontWeight:600,margin:"0 0 8px",fontSize:13}}>🔩 Repuestos utilizados</p>
-                  <table style={{width:"100%",borderCollapse:"collapse"}}>
-                    <thead><tr>{["Código","Repuesto","Cant.","Precio","Subtotal"].map(function(h){return <th key={h} style={sTH}>{h}</th>;})}</tr></thead>
-                    <tbody>
-                    {rep.parts.map(function(p,i){return <tr key={i}>
-                      <td style={Object.assign({},sTD,{fontFamily:"monospace",fontSize:12})}>{p.code}</td>
-                      <td style={Object.assign({},sTD,{fontWeight:500})}>{p.name}</td>
-                      <td style={sTD}>{p.qty}</td>
-                      <td style={sTD}>Q {Number(p.price).toFixed(2)}</td>
-                      <td style={Object.assign({},sTD,{fontWeight:700,color:TEAL})}>Q {Number(p.price*p.qty).toFixed(2)}</td>
-                    </tr>;})}
-                    </tbody>
-                  </table>
-                </div>
-            )}
-
-            {rep.internalNote&&<div style={{background:"#FFF8E1",borderRadius:8,padding:"10px 14px",border:"1px solid #FFD54F"}}>
-              <p style={{fontSize:11,color:"#999",textTransform:"uppercase",margin:"0 0 4px"}}>📝 Nota interna</p>
-              <p style={{fontSize:13,color:"#666",margin:0}}>{rep.internalNote}</p>
-            </div>}
-          </div>
+      <div>
+        <div style={{display:"flex",gap:10,marginBottom:16}}>
+          <button style={mB("gray")} onClick={function(){setSelRep(null);}}>← Volver</button>
+          <button style={mB("teal")} onClick={function(){printRepairTicket(rep);}}>🖨 Imprimir / PDF</button>
+          {rep.status!=="entregado"&&<button style={mB("blue")} onClick={function(){updateRepairStatus(rep.id,nextStatus[rep.status]);showFlash("✓ Estado actualizado","ok");}}>
+            {nextLabel[rep.status]}
+          </button>}
+          {(rep.status==="listo"||rep.status==="entregado")&&<button style={mB("teal")} onClick={function(){onCobrar(rep);setSelRep(null);}}>💰 Cobrar reparación</button>}
         </div>
+        <div style={sC}>
+          <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start",marginBottom:20}}>
+            <div>
+              <div style={{display:"flex",alignItems:"center",gap:10,marginBottom:6}}>
+                <p style={{fontWeight:800,fontSize:20,margin:0,color:TEAL}}>{rep.repCode}</p>
+                <span style={mBg(statusInfo.color)}>{statusInfo.icon} {statusInfo.label}</span>
+              </div>
+              <p style={{fontSize:13,color:"#666",margin:"0 0 2px"}}>Registrada: {fmtD(rep.createdAt)} {fmtT(rep.createdAt)}</p>
+              {rep.registradoPor&&<p style={{fontSize:12,color:"#999",margin:0}}>Por: <b>{rep.registradoPor.name}</b></p>}
+            </div>
+            <div style={{textAlign:"right"}}>
+              {rep.promisedDate&&<p style={{fontSize:12,color:"#666",margin:"0 0 4px"}}>Entrega prometida: <b>{new Date(rep.promisedDate+"T00:00:00").toLocaleDateString("es-GT",{day:"2-digit",month:"short",year:"numeric"})}</b></p>}
+              <p style={{fontSize:22,fontWeight:700,color:TEAL,margin:0}}>Q {Number(rep.estimatedCost||0).toFixed(2)}</p>
+            </div>
+          </div>
+
+          {/* Stepper de estado */}
+          <div style={{display:"flex",gap:0,marginBottom:20,background:"#f5f4f0",borderRadius:10,overflow:"hidden"}}>
+            {["recibido","en_revision","listo","entregado"].map(function(s,i){
+              var info=REP_STATUS[s];
+              var isDone=["recibido","en_revision","listo","entregado"].indexOf(rep.status)>=i;
+              return <div key={s} style={{flex:1,padding:"10px 4px",textAlign:"center",background:isDone?TEAL:"transparent",color:isDone?"#fff":"#999",fontSize:11,fontWeight:isDone?700:400,borderRight:i<3?"1px solid rgba(255,255,255,0.2)":"none"}}>
+                <div style={{fontSize:16}}>{info.icon}</div>
+                <div style={{marginTop:2}}>{info.label}</div>
+              </div>;
+            })}
+          </div>
+
+          <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:16,marginBottom:16}}>
+            <div style={{background:"#f9f8f5",borderRadius:8,padding:14}}>
+              <p style={{fontSize:11,color:"#999",textTransform:"uppercase",letterSpacing:"0.8px",margin:"0 0 8px"}}>Cliente</p>
+              <p style={{fontWeight:700,fontSize:15,margin:"0 0 2px"}}>{rep.clientName}</p>
+              {rep.clientPhone&&<p style={{fontSize:13,color:"#666",margin:"0 0 2px"}}>📞 {rep.clientPhone}</p>}
+              {rep.clientCli&&<p style={{fontSize:12,color:TEAL,margin:0,fontFamily:"monospace"}}>{rep.clientCli}</p>}
+            </div>
+            <div style={{background:"#f9f8f5",borderRadius:8,padding:14}}>
+              <p style={{fontSize:11,color:"#999",textTransform:"uppercase",letterSpacing:"0.8px",margin:"0 0 8px"}}>Dispositivo</p>
+              <p style={{fontWeight:700,fontSize:15,margin:"0 0 2px"}}>{rep.brand} {rep.model}</p>
+              {rep.imei&&<p style={{fontSize:12,color:"#666",margin:0,fontFamily:"monospace"}}>IMEI: {rep.imei}</p>}
+            </div>
+            <div style={{background:"#f9f8f5",borderRadius:8,padding:14}}>
+              <p style={{fontSize:11,color:"#999",textTransform:"uppercase",letterSpacing:"0.8px",margin:"0 0 6px"}}>Técnico asignado</p>
+              <p style={{fontWeight:600,fontSize:14,margin:0}}>{rep.techName||"Sin asignar"}</p>
+            </div>
+            <div style={{background:"#EAF3DE",borderRadius:8,padding:14}}>
+              <p style={{fontSize:11,color:"#999",textTransform:"uppercase",letterSpacing:"0.8px",margin:"0 0 6px"}}>Costo estimado</p>
+              <p style={{fontWeight:700,fontSize:18,color:TEAL,margin:0}}>Q {Number(rep.estimatedCost||0).toFixed(2)}</p>
+            </div>
+          </div>
+
+          <div style={{marginBottom:12,background:"#FCEBEB",borderRadius:8,padding:"10px 14px",border:"1px solid #F09595"}}>
+            <p style={{fontSize:11,color:"#999",textTransform:"uppercase",margin:"0 0 4px"}}>⚠️ Problema reportado</p>
+            <p style={{fontSize:14,color:"#791F1F",margin:0,fontWeight:500}}>{rep.problemDesc}</p>
+          </div>
+
+          {rep.diagnosis&&<div style={{marginBottom:12,background:"#E6F1FB",borderRadius:8,padding:"10px 14px",border:"1px solid #a8ccee"}}>
+            <p style={{fontSize:11,color:"#999",textTransform:"uppercase",margin:"0 0 4px"}}>🔍 Diagnóstico técnico</p>
+            <p style={{fontSize:14,color:"#0C447C",margin:0}}>{rep.diagnosis}</p>
+          </div>}
+
+          {rep.parts&&rep.parts.length>0&&(
+            <div style={{marginBottom:12}}>
+              <p style={{fontWeight:600,margin:"0 0 8px",fontSize:13}}>🔩 Repuestos utilizados</p>
+              <table style={{width:"100%",borderCollapse:"collapse"}}>
+                <thead><tr>{["Código","Repuesto","Cant.","Precio","Subtotal"].map(function(h){return <th key={h} style={sTH}>{h}</th>;})}</tr></thead>
+                <tbody>
+                  {rep.parts.map(function(p,i){return <tr key={i}>
+                    <td style={Object.assign({},sTD,{fontFamily:"monospace",fontSize:12})}>{p.code}</td>
+                    <td style={Object.assign({},sTD,{fontWeight:500})}>{p.name}</td>
+                    <td style={sTD}>{p.qty}</td>
+                    <td style={sTD}>Q {Number(p.price).toFixed(2)}</td>
+                    <td style={Object.assign({},sTD,{fontWeight:700,color:TEAL})}>Q {Number(p.price*p.qty).toFixed(2)}</td>
+                  </tr>;})}
+                </tbody>
+              </table>
+            </div>
+          )}
+
+          {rep.internalNote&&<div style={{background:"#FFF8E1",borderRadius:8,padding:"10px 14px",border:"1px solid #FFD54F"}}>
+            <p style={{fontSize:11,color:"#999",textTransform:"uppercase",margin:"0 0 4px"}}>📝 Nota interna</p>
+            <p style={{fontSize:13,color:"#666",margin:0}}>{rep.internalNote}</p>
+          </div>}
+        </div>
+      </div>
     );
   }
 
@@ -2948,184 +2976,184 @@ function RepairsScreen(props){
   var totalEntregadas=repairs.filter(function(r){return r.status==="entregado";}).length;
 
   return (
-      <div>
-        <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:20}}>
-          <p style={H1}>🔧 Reparaciones</p>
-          <button style={mB(showForm?"red":"teal")} onClick={function(){if(showForm){closeForm();}else{resetForm();setShowForm(true);}}}>
-            {showForm?"✕ Cancelar":"+ Nueva orden"}
-          </button>
-        </div>
+    <div>
+      <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:20}}>
+        <p style={H1}>🔧 Reparaciones</p>
+        <button style={mB(showForm?"red":"teal")} onClick={function(){if(showForm){closeForm();}else{resetForm();setShowForm(true);}}}>
+          {showForm?"✕ Cancelar":"+ Nueva orden"}
+        </button>
+      </div>
 
-        {/* FORMULARIO NUEVA ORDEN */}
-        {showForm&&(
-            <div style={Object.assign({},sC,{marginBottom:16,borderColor:TEAL,borderWidth:"1.5px"})}>
-              <p style={{fontWeight:700,margin:"0 0 16px",fontSize:15}}>📋 Nueva Orden de Reparación</p>
-              {fErr&&<p style={{color:"#E24B4A",fontSize:13,margin:"0 0 12px"}}>⚠ {fErr}</p>}
+      {/* FORMULARIO NUEVA ORDEN */}
+      {showForm&&(
+        <div style={Object.assign({},sC,{marginBottom:16,borderColor:TEAL,borderWidth:"1.5px"})}>
+          <p style={{fontWeight:700,margin:"0 0 16px",fontSize:15}}>📋 Nueva Orden de Reparación</p>
+          {fErr&&<p style={{color:"#E24B4A",fontSize:13,margin:"0 0 12px"}}>⚠ {fErr}</p>}
 
-              {/* Cliente */}
-              <p style={{fontWeight:600,fontSize:13,color:"#555",margin:"0 0 10px",borderBottom:"1px solid #eee",paddingBottom:6}}>👤 Datos del cliente</p>
-              <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:12,marginBottom:14}}>
-                <div>
-                  <label style={sL}>Buscar cliente registrado</label>
-                  <div style={{position:"relative"}}>
-                    <input style={sI} value={fClientQ} placeholder="Nombre, DPI o código CLI..."
-                           onChange={function(e){setFClientQ(e.target.value);setFClientName(e.target.value);setFClientId(null);setShowCliDrop(true);}}
-                           onFocus={function(){setShowCliDrop(true);}}
-                           onBlur={function(){setTimeout(function(){setShowCliDrop(false);},200);}}
-                    />
-                    {showCliDrop&&fClientQ.trim().length>0&&(
-                        <div style={{position:"absolute",top:"100%",left:0,right:0,background:"#fff",border:"1px solid rgba(0,0,0,0.15)",borderRadius:8,boxShadow:"0 4px 12px rgba(0,0,0,0.1)",zIndex:100,marginTop:2}}>
-                          {cliResults.map(function(c){return (
-                              <div key={c.id} onMouseDown={function(){selectClient(c);}} style={{padding:"8px 12px",cursor:"pointer",borderBottom:"1px solid #f0f0f0",fontSize:13}}>
-                                <b>{c.name}</b> <span style={{fontSize:11,color:"#999",fontFamily:"monospace"}}>{c.cliCode}{c.phone?" · "+c.phone:""}</span>
-                              </div>
-                          );})}
-                          {cliResults.length===0&&<div style={{padding:"8px 12px",fontSize:12,color:"#999"}}>Sin resultados — podés escribir el nombre directamente</div>}
-                        </div>
-                    )}
+          {/* Cliente */}
+          <p style={{fontWeight:600,fontSize:13,color:"#555",margin:"0 0 10px",borderBottom:"1px solid #eee",paddingBottom:6}}>👤 Datos del cliente</p>
+          <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:12,marginBottom:14}}>
+            <div>
+              <label style={sL}>Buscar cliente registrado</label>
+              <div style={{position:"relative"}}>
+                <input style={sI} value={fClientQ} placeholder="Nombre, DPI o código CLI..."
+                  onChange={function(e){setFClientQ(e.target.value);setFClientName(e.target.value);setFClientId(null);setShowCliDrop(true);}}
+                  onFocus={function(){setShowCliDrop(true);}}
+                  onBlur={function(){setTimeout(function(){setShowCliDrop(false);},200);}}
+                />
+                {showCliDrop&&fClientQ.trim().length>0&&(
+                  <div style={{position:"absolute",top:"100%",left:0,right:0,background:"#fff",border:"1px solid rgba(0,0,0,0.15)",borderRadius:8,boxShadow:"0 4px 12px rgba(0,0,0,0.1)",zIndex:100,marginTop:2}}>
+                    {cliResults.map(function(c){return (
+                      <div key={c.id} onMouseDown={function(){selectClient(c);}} style={{padding:"8px 12px",cursor:"pointer",borderBottom:"1px solid #f0f0f0",fontSize:13}}>
+                        <b>{c.name}</b> <span style={{fontSize:11,color:"#999",fontFamily:"monospace"}}>{c.cliCode}{c.phone?" · "+c.phone:""}</span>
+                      </div>
+                    );})}
+                    {cliResults.length===0&&<div style={{padding:"8px 12px",fontSize:12,color:"#999"}}>Sin resultados — podés escribir el nombre directamente</div>}
                   </div>
-                  {fClientId&&<div style={{marginTop:4,fontSize:11,color:TEAL}}>✓ Cliente registrado vinculado</div>}
-                </div>
-                <div>
-                  <label style={sL}>Teléfono de contacto</label>
-                  <input style={sI} value={fClientPhone} placeholder="Ej: 55551234" onChange={function(e){setFClientPhone(e.target.value);}}/>
-                </div>
-              </div>
-
-              {/* Dispositivo */}
-              <p style={{fontWeight:600,fontSize:13,color:"#555",margin:"0 0 10px",borderBottom:"1px solid #eee",paddingBottom:6}}>📱 Dispositivo</p>
-              <div style={{display:"grid",gridTemplateColumns:"1fr 1fr 1fr",gap:12,marginBottom:14}}>
-                <div>
-                  <label style={sL}>Marca</label>
-                  <select style={sI} value={fBrand} onChange={function(e){setFErr("");setFBrand(e.target.value);}}>
-                    <option value="">— Seleccioná —</option>
-                    {REP_BRANDS.map(function(b){return <option key={b}>{b}</option>;})}
-                  </select>
-                </div>
-                <div>
-                  <label style={sL}>Modelo</label>
-                  <input style={sI} value={fModel} placeholder="Ej: iPhone 11, Galaxy A32..." onChange={function(e){setFErr("");setFModel(e.target.value);}}/>
-                </div>
-                <div>
-                  <label style={sL}>IMEI (opcional)</label>
-                  <input style={sI} value={fImei} placeholder="15 dígitos" onChange={function(e){setFImei(e.target.value);}}/>
-                </div>
-              </div>
-
-              {/* Problema y diagnóstico */}
-              <p style={{fontWeight:600,fontSize:13,color:"#555",margin:"0 0 10px",borderBottom:"1px solid #eee",paddingBottom:6}}>🔍 Problema y diagnóstico</p>
-              <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:12,marginBottom:14}}>
-                <div>
-                  <label style={sL}>Problema reportado por el cliente *</label>
-                  <textarea style={Object.assign({},sI,{height:72,resize:"vertical"})} value={fProblem} placeholder="¿Qué le pasa al equipo según el cliente?"
-                            onChange={function(e){setFErr("");setFProblem(e.target.value);}}/>
-                </div>
-                <div>
-                  <label style={sL}>Diagnóstico técnico (opcional)</label>
-                  <textarea style={Object.assign({},sI,{height:72,resize:"vertical"})} value={fDiag} placeholder="Diagnóstico interno del técnico..."
-                            onChange={function(e){setFDiag(e.target.value);}}/>
-                </div>
-              </div>
-
-              {/* Técnico, costo, fecha */}
-              <p style={{fontWeight:600,fontSize:13,color:"#555",margin:"0 0 10px",borderBottom:"1px solid #eee",paddingBottom:6}}>⚙️ Asignación y costos</p>
-              <div style={{display:"grid",gridTemplateColumns:"1fr 1fr 1fr",gap:12,marginBottom:14}}>
-                <div>
-                  <label style={sL}>Técnico asignado</label>
-                  <input style={sI} value={fTech} placeholder={"Por defecto: "+session.name} onChange={function(e){setFTech(e.target.value);}}/>
-                </div>
-                <div>
-                  <label style={sL}>Costo estimado (Q)</label>
-                  <input type="number" style={sI} value={fCost} placeholder="0.00" onChange={function(e){setFCost(e.target.value);}}/>
-                </div>
-                <div>
-                  <label style={sL}>Fecha de entrega prometida</label>
-                  <input type="date" style={sI} value={fDate} onChange={function(e){setFDate(e.target.value);}}/>
-                </div>
-              </div>
-
-              {/* Repuestos */}
-              <p style={{fontWeight:600,fontSize:13,color:"#555",margin:"0 0 10px",borderBottom:"1px solid #eee",paddingBottom:6}}>🔩 Repuestos del inventario (opcional)</p>
-              <div style={{marginBottom:14}}>
-                <div style={{display:"flex",gap:8,marginBottom:8}}>
-                  <input id="partCodeInp" style={Object.assign({},sI,{flex:1})} placeholder="Ingresá el código del producto (ej: B001) y presioná Enter"
-                         onKeyDown={function(e){if(e.key==="Enter"){addPart(e.target.value);e.target.value="";}}}/>
-                  <button style={mB("gray")} onClick={function(){var inp=document.getElementById("partCodeInp");if(inp){addPart(inp.value);inp.value="";}}}>+ Agregar</button>
-                </div>
-                {fParts.length>0&&(
-                    <table style={{width:"100%",borderCollapse:"collapse"}}>
-                      <thead><tr>{["Código","Repuesto","Cant.","Precio",""].map(function(h){return <th key={h} style={sTH}>{h}</th>;})}</tr></thead>
-                      <tbody>
-                      {fParts.map(function(p){return <tr key={p.code}>
-                        <td style={Object.assign({},sTD,{fontFamily:"monospace",fontSize:12})}>{p.code}</td>
-                        <td style={Object.assign({},sTD,{fontWeight:500})}>{p.name}</td>
-                        <td style={sTD}>{p.qty}</td>
-                        <td style={Object.assign({},sTD,{color:TEAL})}>Q {Number(p.price).toFixed(2)}</td>
-                        <td style={sTD}><span onClick={function(){removePart(p.code);}} style={{cursor:"pointer",color:"#E24B4A",fontSize:16}}>×</span></td>
-                      </tr>;})}
-                      </tbody>
-                    </table>
                 )}
               </div>
-
-              {/* Nota interna */}
-              <div style={{marginBottom:16}}>
-                <label style={sL}>📝 Nota interna (no se imprime en el ticket del cliente)</label>
-                <input style={sI} value={fNote} placeholder="Observaciones internas..." onChange={function(e){setFNote(e.target.value);}}/>
-              </div>
-
-              <div style={{display:"flex",gap:10}}>
-                <button style={Object.assign({},mB("teal"),{padding:"10px 24px"})} onClick={submitRepair}>✓ Registrar orden</button>
-                <button style={mB("gray")} onClick={closeForm}>Cancelar</button>
-              </div>
+              {fClientId&&<div style={{marginTop:4,fontSize:11,color:TEAL}}>✓ Cliente registrado vinculado</div>}
             </div>
-        )}
-
-        {/* MÉTRICAS */}
-        <div style={{display:"grid",gridTemplateColumns:"repeat(4,1fr)",gap:14,marginBottom:20}}>
-          <MetricBox label="Activas" value={totalActivas} color="#378ADD"/>
-          <MetricBox label="Listas para entregar" value={totalListas} color={TEAL}/>
-          <MetricBox label="Entregadas" value={totalEntregadas} color="#666"/>
-          <MetricBox label="Total órdenes" value={repairs.length} color="#7F77DD"/>
-        </div>
-
-        {/* FILTROS */}
-        <div style={Object.assign({},sC,{marginBottom:14})}>
-          <div style={{display:"flex",gap:8,flexWrap:"wrap"}}>
-            {[["activas","Activas"],["recibido","📥 Recibidas"],["en_revision","🔧 En revisión"],["listo","✅ Listas"],["entregado","📦 Entregadas"],["todos","Todas"]].map(function(pair){
-              return <button key={pair[0]} style={Object.assign({},mB(filter===pair[0]?"teal":"gray"),{padding:"6px 14px"})} onClick={function(){setFilter(pair[0]);}}>{pair[1]}</button>;
-            })}
+            <div>
+              <label style={sL}>Teléfono de contacto</label>
+              <input style={sI} value={fClientPhone} placeholder="Ej: 55551234" onChange={function(e){setFClientPhone(e.target.value);}}/>
+            </div>
           </div>
-        </div>
 
-        {/* LISTA */}
-        <div style={sC}>
-          {filtered.length===0?<p style={{textAlign:"center",color:"#999",padding:40}}>Sin órdenes en esta categoría</p>:(
+          {/* Dispositivo */}
+          <p style={{fontWeight:600,fontSize:13,color:"#555",margin:"0 0 10px",borderBottom:"1px solid #eee",paddingBottom:6}}>📱 Dispositivo</p>
+          <div style={{display:"grid",gridTemplateColumns:"1fr 1fr 1fr",gap:12,marginBottom:14}}>
+            <div>
+              <label style={sL}>Marca</label>
+              <select style={sI} value={fBrand} onChange={function(e){setFErr("");setFBrand(e.target.value);}}>
+                <option value="">— Seleccioná —</option>
+                {REP_BRANDS.map(function(b){return <option key={b}>{b}</option>;})}
+              </select>
+            </div>
+            <div>
+              <label style={sL}>Modelo</label>
+              <input style={sI} value={fModel} placeholder="Ej: iPhone 11, Galaxy A32..." onChange={function(e){setFErr("");setFModel(e.target.value);}}/>
+            </div>
+            <div>
+              <label style={sL}>IMEI (opcional)</label>
+              <input style={sI} value={fImei} placeholder="15 dígitos" onChange={function(e){setFImei(e.target.value);}}/>
+            </div>
+          </div>
+
+          {/* Problema y diagnóstico */}
+          <p style={{fontWeight:600,fontSize:13,color:"#555",margin:"0 0 10px",borderBottom:"1px solid #eee",paddingBottom:6}}>🔍 Problema y diagnóstico</p>
+          <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:12,marginBottom:14}}>
+            <div>
+              <label style={sL}>Problema reportado por el cliente *</label>
+              <textarea style={Object.assign({},sI,{height:72,resize:"vertical"})} value={fProblem} placeholder="¿Qué le pasa al equipo según el cliente?"
+                onChange={function(e){setFErr("");setFProblem(e.target.value);}}/>
+            </div>
+            <div>
+              <label style={sL}>Diagnóstico técnico (opcional)</label>
+              <textarea style={Object.assign({},sI,{height:72,resize:"vertical"})} value={fDiag} placeholder="Diagnóstico interno del técnico..."
+                onChange={function(e){setFDiag(e.target.value);}}/>
+            </div>
+          </div>
+
+          {/* Técnico, costo, fecha */}
+          <p style={{fontWeight:600,fontSize:13,color:"#555",margin:"0 0 10px",borderBottom:"1px solid #eee",paddingBottom:6}}>⚙️ Asignación y costos</p>
+          <div style={{display:"grid",gridTemplateColumns:"1fr 1fr 1fr",gap:12,marginBottom:14}}>
+            <div>
+              <label style={sL}>Técnico asignado</label>
+              <input style={sI} value={fTech} placeholder={"Por defecto: "+session.name} onChange={function(e){setFTech(e.target.value);}}/>
+            </div>
+            <div>
+              <label style={sL}>Costo estimado (Q)</label>
+              <input type="number" style={sI} value={fCost} placeholder="0.00" onChange={function(e){setFCost(e.target.value);}}/>
+            </div>
+            <div>
+              <label style={sL}>Fecha de entrega prometida</label>
+              <input type="date" style={sI} value={fDate} onChange={function(e){setFDate(e.target.value);}}/>
+            </div>
+          </div>
+
+          {/* Repuestos */}
+          <p style={{fontWeight:600,fontSize:13,color:"#555",margin:"0 0 10px",borderBottom:"1px solid #eee",paddingBottom:6}}>🔩 Repuestos del inventario (opcional)</p>
+          <div style={{marginBottom:14}}>
+            <div style={{display:"flex",gap:8,marginBottom:8}}>
+              <input id="partCodeInp" style={Object.assign({},sI,{flex:1})} placeholder="Ingresá el código del producto (ej: B001) y presioná Enter"
+                onKeyDown={function(e){if(e.key==="Enter"){addPart(e.target.value);e.target.value="";}}}/>
+              <button style={mB("gray")} onClick={function(){var inp=document.getElementById("partCodeInp");if(inp){addPart(inp.value);inp.value="";}}}>+ Agregar</button>
+            </div>
+            {fParts.length>0&&(
               <table style={{width:"100%",borderCollapse:"collapse"}}>
-                <thead><tr>{["Orden","Cliente","Dispositivo","Técnico","Estado","Costo","Entrega",""].map(function(h){return <th key={h} style={sTH}>{h}</th>;})}</tr></thead>
+                <thead><tr>{["Código","Repuesto","Cant.","Precio",""].map(function(h){return <th key={h} style={sTH}>{h}</th>;})}</tr></thead>
                 <tbody>
-                {filtered.slice().sort(function(a,b){return new Date(b.createdAt)-new Date(a.createdAt);}).map(function(r){
-                  var info=REP_STATUS[r.status]||{label:r.status,color:"gray"};
-                  var vencida=r.promisedDate&&r.status!=="entregado"&&new Date(r.promisedDate+"T23:59:59")<new Date();
-                  return (
-                      <tr key={r.id} style={{cursor:"pointer"}} onClick={function(){setSelRep(r.id);}}>
-                        <td style={Object.assign({},sTD,{fontFamily:"monospace",fontSize:12,color:TEAL,fontWeight:700})}>{r.repCode}</td>
-                        <td style={Object.assign({},sTD,{fontWeight:600})}>{r.clientName}{r.clientCli&&<div style={{fontSize:10,color:"#999",fontFamily:"monospace"}}>{r.clientCli}</div>}</td>
-                        <td style={sTD}><div style={{fontWeight:500}}>{r.brand} {r.model}</div>{r.imei&&<div style={{fontSize:10,color:"#999",fontFamily:"monospace"}}>{r.imei}</div>}</td>
-                        <td style={Object.assign({},sTD,{color:"#666"})}>{r.techName||"—"}</td>
-                        <td style={sTD}><span style={mBg(info.color)}>{REP_STATUS[r.status]?REP_STATUS[r.status].icon+" "+REP_STATUS[r.status].label:r.status}</span></td>
-                        <td style={Object.assign({},sTD,{fontWeight:600,color:TEAL})}>Q {Number(r.estimatedCost||0).toFixed(2)}</td>
-                        <td style={sTD}>{r.promisedDate?<span style={{color:vencida?"#E24B4A":"inherit",fontWeight:vencida?700:400}}>{vencida?"⚠ ":""}{new Date(r.promisedDate+"T00:00:00").toLocaleDateString("es-GT",{day:"2-digit",month:"short"})}
-                    </span>:"—"}</td>
-                        <td style={Object.assign({},sTD,{color:"#999",fontSize:12})}>Ver →</td>
-                      </tr>
-                  );
-                })}
+                  {fParts.map(function(p){return <tr key={p.code}>
+                    <td style={Object.assign({},sTD,{fontFamily:"monospace",fontSize:12})}>{p.code}</td>
+                    <td style={Object.assign({},sTD,{fontWeight:500})}>{p.name}</td>
+                    <td style={sTD}>{p.qty}</td>
+                    <td style={Object.assign({},sTD,{color:TEAL})}>Q {Number(p.price).toFixed(2)}</td>
+                    <td style={sTD}><span onClick={function(){removePart(p.code);}} style={{cursor:"pointer",color:"#E24B4A",fontSize:16}}>×</span></td>
+                  </tr>;})}
                 </tbody>
               </table>
-          )}
+            )}
+          </div>
+
+          {/* Nota interna */}
+          <div style={{marginBottom:16}}>
+            <label style={sL}>📝 Nota interna (no se imprime en el ticket del cliente)</label>
+            <input style={sI} value={fNote} placeholder="Observaciones internas..." onChange={function(e){setFNote(e.target.value);}}/>
+          </div>
+
+          <div style={{display:"flex",gap:10}}>
+            <button style={Object.assign({},mB("teal"),{padding:"10px 24px"})} onClick={submitRepair}>✓ Registrar orden</button>
+            <button style={mB("gray")} onClick={closeForm}>Cancelar</button>
+          </div>
+        </div>
+      )}
+
+      {/* MÉTRICAS */}
+      <div style={{display:"grid",gridTemplateColumns:"repeat(4,1fr)",gap:14,marginBottom:20}}>
+        <MetricBox label="Activas" value={totalActivas} color="#378ADD"/>
+        <MetricBox label="Listas para entregar" value={totalListas} color={TEAL}/>
+        <MetricBox label="Entregadas" value={totalEntregadas} color="#666"/>
+        <MetricBox label="Total órdenes" value={repairs.length} color="#7F77DD"/>
+      </div>
+
+      {/* FILTROS */}
+      <div style={Object.assign({},sC,{marginBottom:14})}>
+        <div style={{display:"flex",gap:8,flexWrap:"wrap"}}>
+          {[["activas","Activas"],["recibido","📥 Recibidas"],["en_revision","🔧 En revisión"],["listo","✅ Listas"],["entregado","📦 Entregadas"],["todos","Todas"]].map(function(pair){
+            return <button key={pair[0]} style={Object.assign({},mB(filter===pair[0]?"teal":"gray"),{padding:"6px 14px"})} onClick={function(){setFilter(pair[0]);}}>{pair[1]}</button>;
+          })}
         </div>
       </div>
+
+      {/* LISTA */}
+      <div style={sC}>
+        {filtered.length===0?<p style={{textAlign:"center",color:"#999",padding:40}}>Sin órdenes en esta categoría</p>:(
+          <table style={{width:"100%",borderCollapse:"collapse"}}>
+            <thead><tr>{["Orden","Cliente","Dispositivo","Técnico","Estado","Costo","Entrega",""].map(function(h){return <th key={h} style={sTH}>{h}</th>;})}</tr></thead>
+            <tbody>
+              {filtered.slice().sort(function(a,b){return new Date(b.createdAt)-new Date(a.createdAt);}).map(function(r){
+                var info=REP_STATUS[r.status]||{label:r.status,color:"gray"};
+                var vencida=r.promisedDate&&r.status!=="entregado"&&new Date(r.promisedDate+"T23:59:59")<new Date();
+                return (
+                  <tr key={r.id} style={{cursor:"pointer"}} onClick={function(){setSelRep(r.id);}}>
+                    <td style={Object.assign({},sTD,{fontFamily:"monospace",fontSize:12,color:TEAL,fontWeight:700})}>{r.repCode}</td>
+                    <td style={Object.assign({},sTD,{fontWeight:600})}>{r.clientName}{r.clientCli&&<div style={{fontSize:10,color:"#999",fontFamily:"monospace"}}>{r.clientCli}</div>}</td>
+                    <td style={sTD}><div style={{fontWeight:500}}>{r.brand} {r.model}</div>{r.imei&&<div style={{fontSize:10,color:"#999",fontFamily:"monospace"}}>{r.imei}</div>}</td>
+                    <td style={Object.assign({},sTD,{color:"#666"})}>{r.techName||"—"}</td>
+                    <td style={sTD}><span style={mBg(info.color)}>{REP_STATUS[r.status]?REP_STATUS[r.status].icon+" "+REP_STATUS[r.status].label:r.status}</span></td>
+                    <td style={Object.assign({},sTD,{fontWeight:600,color:TEAL})}>Q {Number(r.estimatedCost||0).toFixed(2)}</td>
+                    <td style={sTD}>{r.promisedDate?<span style={{color:vencida?"#E24B4A":"inherit",fontWeight:vencida?700:400}}>{vencida?"⚠ ":""}{new Date(r.promisedDate+"T00:00:00").toLocaleDateString("es-GT",{day:"2-digit",month:"short"})}
+                    </span>:"—"}</td>
+                    <td style={Object.assign({},sTD,{color:"#999",fontSize:12})}>Ver →</td>
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
+        )}
+      </div>
+    </div>
   );
 }
 
@@ -3230,87 +3258,87 @@ function CuadresScreen(props){
   function printCuadre(){
     var salesRows=periodSales.slice().sort(function(a,b){return new Date(b.date)-new Date(a.date);}).map(function(s){
       return '<tr><td>'+new Date(s.date).toLocaleDateString("es-GT",{day:"2-digit",month:"short"})+'</td>'+
-          '<td>'+new Date(s.date).toLocaleTimeString("es-GT",{hour:"2-digit",minute:"2-digit"})+'</td>'+
-          '<td>'+s.client+'</td>'+
-          '<td>'+s.items.length+' art.</td>'+
-          '<td><span style="background:#E1F5EE;color:#085041;padding:2px 8px;border-radius:12px;font-size:11px;">'+s.method+'</span></td>'+
-          '<td style="text-align:right;font-weight:700;color:#1D9E75;">Q '+Number(s.total).toFixed(2)+'</td></tr>';
+        '<td>'+new Date(s.date).toLocaleTimeString("es-GT",{hour:"2-digit",minute:"2-digit"})+'</td>'+
+        '<td>'+s.client+'</td>'+
+        '<td>'+s.items.length+' art.</td>'+
+        '<td><span style="background:#E1F5EE;color:#085041;padding:2px 8px;border-radius:12px;font-size:11px;">'+s.method+'</span></td>'+
+        '<td style="text-align:right;font-weight:700;color:#1D9E75;">Q '+Number(s.total).toFixed(2)+'</td></tr>';
     }).join("");
 
     var html='<!DOCTYPE html><html><head><meta charset="UTF-8"><title>Cuadre — MUNDO CEL DIAZ</title>'+
-        '<style>*{margin:0;padding:0;box-sizing:border-box;}body{font-family:Arial,sans-serif;font-size:12px;color:#222;padding:24px;max-width:900px;margin:0 auto;}'+
-        '.header{border-bottom:3px solid #1D9E75;padding-bottom:14px;margin-bottom:20px;display:flex;justify-content:space-between;align-items:flex-start;}'+
-        '.brand h1{font-size:20px;font-weight:900;color:#1a2535;}.brand p{font-size:10px;color:#1D9E75;font-weight:700;letter-spacing:2px;}'+
-        '.period{text-align:right;}.period .lbl{font-size:10px;color:#999;text-transform:uppercase;}.period .val{font-size:16px;font-weight:700;color:#1D9E75;margin-top:2px;}'+
-        '.grid4{display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin-bottom:20px;}'+
-        '.grid3{display:grid;grid-template-columns:repeat(3,1fr);gap:12px;margin-bottom:20px;}'+
-        '.metric{background:#f8f9fa;border-radius:8px;padding:12px;border-left:4px solid #1D9E75;}'+
-        '.metric .lbl{font-size:10px;color:#999;text-transform:uppercase;letter-spacing:0.8px;margin-bottom:4px;}'+
-        '.metric .val{font-size:18px;font-weight:800;color:#1D9E75;}'+
-        '.metric.red .val{color:#E24B4A;}.metric.gray .val{color:#444;}.metric.navy .val{color:#1a2535;}'+
-        '.section{margin-bottom:20px;}'+
-        '.section-title{font-size:13px;font-weight:700;color:#444;border-bottom:1px solid #eee;padding-bottom:6px;margin-bottom:12px;}'+
-        'table{width:100%;border-collapse:collapse;}'+
-        'thead th{background:#1a2535;color:#fff;padding:7px 10px;text-align:left;font-size:11px;font-weight:600;}'+
-        'tbody tr:nth-child(even){background:#f9f9f9;}'+
-        'td{padding:6px 10px;border-bottom:1px solid #eee;font-size:12px;}'+
-        '.footer{border-top:2px dashed #ccc;padding-top:14px;margin-top:20px;display:flex;justify-content:space-between;font-size:11px;color:#999;}'+
-        '@media print{body{padding:12px;}}'+
-        '</style></head><body>'+
-        '<div class="header">'+
-        '<div class="brand"><h1>MUNDO CEL DIAZ</h1><p>CUADRE / REPORTE DE CIERRE</p></div>'+
-        '<div class="period"><div class="lbl">Período</div><div class="val">'+getRangeLabel()+'</div>'+
+    '<style>*{margin:0;padding:0;box-sizing:border-box;}body{font-family:Arial,sans-serif;font-size:12px;color:#222;padding:24px;max-width:900px;margin:0 auto;}'+
+    '.header{border-bottom:3px solid #1D9E75;padding-bottom:14px;margin-bottom:20px;display:flex;justify-content:space-between;align-items:flex-start;}'+
+    '.brand h1{font-size:20px;font-weight:900;color:#1a2535;}.brand p{font-size:10px;color:#1D9E75;font-weight:700;letter-spacing:2px;}'+
+    '.period{text-align:right;}.period .lbl{font-size:10px;color:#999;text-transform:uppercase;}.period .val{font-size:16px;font-weight:700;color:#1D9E75;margin-top:2px;}'+
+    '.grid4{display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin-bottom:20px;}'+
+    '.grid3{display:grid;grid-template-columns:repeat(3,1fr);gap:12px;margin-bottom:20px;}'+
+    '.metric{background:#f8f9fa;border-radius:8px;padding:12px;border-left:4px solid #1D9E75;}'+
+    '.metric .lbl{font-size:10px;color:#999;text-transform:uppercase;letter-spacing:0.8px;margin-bottom:4px;}'+
+    '.metric .val{font-size:18px;font-weight:800;color:#1D9E75;}'+
+    '.metric.red .val{color:#E24B4A;}.metric.gray .val{color:#444;}.metric.navy .val{color:#1a2535;}'+
+    '.section{margin-bottom:20px;}'+
+    '.section-title{font-size:13px;font-weight:700;color:#444;border-bottom:1px solid #eee;padding-bottom:6px;margin-bottom:12px;}'+
+    'table{width:100%;border-collapse:collapse;}'+
+    'thead th{background:#1a2535;color:#fff;padding:7px 10px;text-align:left;font-size:11px;font-weight:600;}'+
+    'tbody tr:nth-child(even){background:#f9f9f9;}'+
+    'td{padding:6px 10px;border-bottom:1px solid #eee;font-size:12px;}'+
+    '.footer{border-top:2px dashed #ccc;padding-top:14px;margin-top:20px;display:flex;justify-content:space-between;font-size:11px;color:#999;}'+
+    '@media print{body{padding:12px;}}'+
+    '</style></head><body>'+
+    '<div class="header">'+
+      '<div class="brand"><h1>MUNDO CEL DIAZ</h1><p>CUADRE / REPORTE DE CIERRE</p></div>'+
+      '<div class="period"><div class="lbl">Período</div><div class="val">'+getRangeLabel()+'</div>'+
         '<div style="font-size:11px;color:#999;margin-top:4px;">Generado por: '+session.name+' · '+(ROLE_LABEL[session.role]||session.role)+'</div>'+
-        '</div>'+
-        '</div>'+
+      '</div>'+
+    '</div>'+
 
-        '<div class="section"><div class="section-title">📊 Resumen de ventas</div>'+
-        '<div class="grid4">'+
-        '<div class="metric"><div class="lbl">Total ventas</div><div class="val">'+periodSales.length+'</div></div>'+
-        '<div class="metric"><div class="lbl">Ingresos ventas</div><div class="val">Q '+totalVentas.toFixed(2)+'</div></div>'+
-        '<div class="metric"><div class="lbl">Abonos cobrados</div><div class="val">Q '+abonosPeriod.toFixed(2)+'</div></div>'+
-        '<div class="metric"><div class="lbl">Total ingresado</div><div class="val">Q '+totalIngresos.toFixed(2)+'</div></div>'+
-        '</div></div>'+
+    '<div class="section"><div class="section-title">📊 Resumen de ventas</div>'+
+    '<div class="grid4">'+
+      '<div class="metric"><div class="lbl">Total ventas</div><div class="val">'+periodSales.length+'</div></div>'+
+      '<div class="metric"><div class="lbl">Ingresos ventas</div><div class="val">Q '+totalVentas.toFixed(2)+'</div></div>'+
+      '<div class="metric"><div class="lbl">Abonos cobrados</div><div class="val">Q '+abonosPeriod.toFixed(2)+'</div></div>'+
+      '<div class="metric"><div class="lbl">Total ingresado</div><div class="val">Q '+totalIngresos.toFixed(2)+'</div></div>'+
+    '</div></div>'+
 
-        '<div class="section"><div class="section-title">💵 Por método de pago</div>'+
-        '<div class="grid3">'+
-        '<div class="metric"><div class="lbl">Efectivo (neto)</div><div class="val">Q '+totalEfectivo.toFixed(2)+'</div></div>'+
-        '<div class="metric navy"><div class="lbl">Tarjeta</div><div class="val">Q '+byMethod.Tarjeta.toFixed(2)+'</div></div>'+
-        '<div class="metric gray"><div class="lbl">Transferencia</div><div class="val">Q '+byMethod.Transferencia.toFixed(2)+'</div></div>'+
-        '</div></div>'+
+    '<div class="section"><div class="section-title">💵 Por método de pago</div>'+
+    '<div class="grid3">'+
+      '<div class="metric"><div class="lbl">Efectivo (neto)</div><div class="val">Q '+totalEfectivo.toFixed(2)+'</div></div>'+
+      '<div class="metric navy"><div class="lbl">Tarjeta</div><div class="val">Q '+byMethod.Tarjeta.toFixed(2)+'</div></div>'+
+      '<div class="metric gray"><div class="lbl">Transferencia</div><div class="val">Q '+byMethod.Transferencia.toFixed(2)+'</div></div>'+
+    '</div></div>'+
 
-        (costoVentas>0?'<div class="section"><div class="section-title">📉 Costos y ganancia bruta</div>'+
-            '<div class="grid3">'+
-            '<div class="metric"><div class="lbl">Ventas brutas</div><div class="val">Q '+totalVentas.toFixed(2)+'</div></div>'+
-            '<div class="metric red"><div class="lbl">Costo productos</div><div class="val">Q '+costoVentas.toFixed(2)+'</div></div>'+
-            '<div class="metric" style="border-left-color:#2E7D32;"><div class="lbl">Ganancia bruta</div><div class="val" style="color:#2E7D32;">Q '+gananciaBruta.toFixed(2)+'</div></div>'+
-            '</div></div>':'')+
+    (costoVentas>0?'<div class="section"><div class="section-title">📉 Costos y ganancia bruta</div>'+
+    '<div class="grid3">'+
+      '<div class="metric"><div class="lbl">Ventas brutas</div><div class="val">Q '+totalVentas.toFixed(2)+'</div></div>'+
+      '<div class="metric red"><div class="lbl">Costo productos</div><div class="val">Q '+costoVentas.toFixed(2)+'</div></div>'+
+      '<div class="metric" style="border-left-color:#2E7D32;"><div class="lbl">Ganancia bruta</div><div class="val" style="color:#2E7D32;">Q '+gananciaBruta.toFixed(2)+'</div></div>'+
+    '</div></div>':'')+
 
-        (reembolsosPeriod>0?'<div class="section"><div class="section-title">🔄 Reembolsos del período</div>'+
-            '<div class="grid3">'+
-            '<div class="metric red"><div class="lbl">Total reembolsado</div><div class="val">Q '+reembolsosPeriod.toFixed(2)+'</div></div>'+
-            '<div class="metric red"><div class="lbl">Reemb. en efectivo</div><div class="val">Q '+reembolsosEfectivo.toFixed(2)+'</div></div>'+
-            '<div class="metric gray"><div class="lbl">Devoluciones</div><div class="val">'+returns.filter(function(r){return inRange(r.date);}).length+'</div></div>'+
-            '</div></div>':'')+
+    (reembolsosPeriod>0?'<div class="section"><div class="section-title">🔄 Reembolsos del período</div>'+
+    '<div class="grid3">'+
+      '<div class="metric red"><div class="lbl">Total reembolsado</div><div class="val">Q '+reembolsosPeriod.toFixed(2)+'</div></div>'+
+      '<div class="metric red"><div class="lbl">Reemb. en efectivo</div><div class="val">Q '+reembolsosEfectivo.toFixed(2)+'</div></div>'+
+      '<div class="metric gray"><div class="lbl">Devoluciones</div><div class="val">'+returns.filter(function(r){return inRange(r.date);}).length+'</div></div>'+
+    '</div></div>':'')+
 
-        (top5.length>0?'<div class="section"><div class="section-title">🏆 Más vendidos del período</div>'+
-            '<table><thead><tr><th>#</th><th>Producto</th><th>Unidades vendidas</th></tr></thead><tbody>'+
-            top5.map(function(item,i){return '<tr><td>'+(i+1)+'</td><td>'+item[0]+'</td><td style="font-weight:700;color:#1D9E75;">'+item[1]+' uds</td></tr>';}).join("")+
-            '</tbody></table></div>':'')+
+    (top5.length>0?'<div class="section"><div class="section-title">🏆 Más vendidos del período</div>'+
+    '<table><thead><tr><th>#</th><th>Producto</th><th>Unidades vendidas</th></tr></thead><tbody>'+
+    top5.map(function(item,i){return '<tr><td>'+(i+1)+'</td><td>'+item[0]+'</td><td style="font-weight:700;color:#1D9E75;">'+item[1]+' uds</td></tr>';}).join("")+
+    '</tbody></table></div>':'')+
 
-        (periodSales.length>0?'<div class="section"><div class="section-title">📋 Detalle de ventas</div>'+
-            '<table><thead><tr><th>Fecha</th><th>Hora</th><th>Cliente</th><th>Artículos</th><th>Método</th><th style="text-align:right;">Total</th></tr></thead>'+
-            '<tbody>'+salesRows+'</tbody>'+
-            '<tfoot><tr style="background:#1a2535;color:#fff;"><td colspan="5" style="padding:8px 10px;font-weight:700;">TOTAL DEL PERÍODO</td>'+
-            '<td style="padding:8px 10px;text-align:right;font-weight:800;font-size:14px;">Q '+totalVentas.toFixed(2)+'</td></tr></tfoot>'+
-            '</table></div>':
-            '<div class="section" style="text-align:center;color:#999;padding:40px;">Sin ventas en el período seleccionado</div>')+
+    (periodSales.length>0?'<div class="section"><div class="section-title">📋 Detalle de ventas</div>'+
+    '<table><thead><tr><th>Fecha</th><th>Hora</th><th>Cliente</th><th>Artículos</th><th>Método</th><th style="text-align:right;">Total</th></tr></thead>'+
+    '<tbody>'+salesRows+'</tbody>'+
+    '<tfoot><tr style="background:#1a2535;color:#fff;"><td colspan="5" style="padding:8px 10px;font-weight:700;">TOTAL DEL PERÍODO</td>'+
+    '<td style="padding:8px 10px;text-align:right;font-weight:800;font-size:14px;">Q '+totalVentas.toFixed(2)+'</td></tr></tfoot>'+
+    '</table></div>':
+    '<div class="section" style="text-align:center;color:#999;padding:40px;">Sin ventas en el período seleccionado</div>')+
 
-        '<div class="footer">'+
-        '<div><b>Mundo Cel Diaz</b> · Guatemala · Sistema de Gestión v2.1</div>'+
-        '<div>Impreso: '+now.toLocaleDateString("es-GT",{day:"2-digit",month:"short",year:"numeric"})+' '+now.toLocaleTimeString("es-GT",{hour:"2-digit",minute:"2-digit"})+'</div>'+
-        '</div>'+
-        '</body></html>';
+    '<div class="footer">'+
+      '<div><b>Mundo Cel Diaz</b> · Guatemala · Sistema de Gestión v2.1</div>'+
+      '<div>Impreso: '+now.toLocaleDateString("es-GT",{day:"2-digit",month:"short",year:"numeric"})+' '+now.toLocaleTimeString("es-GT",{hour:"2-digit",minute:"2-digit"})+'</div>'+
+    '</div>'+
+    '</body></html>';
 
     var w=window.open("","_blank","width=900,height=700");
     w.document.write(html); w.document.close();
@@ -3320,116 +3348,116 @@ function CuadresScreen(props){
   var rangos=[["hoy","Hoy"],["semana","Esta semana"],["quincenal","Últimos 15 días"],["mes","Este mes"],["mes_ant","Mes anterior"],["custom","Personalizado"]];
 
   return (
-      <div>
-        <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:20}}>
-          <p style={H1}>📈 Cuadres y Reportes</p>
-          <button style={Object.assign({},mB("teal"),{padding:"10px 20px"})} onClick={printCuadre}>🖨 Imprimir / PDF</button>
-        </div>
+    <div>
+      <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:20}}>
+        <p style={H1}>📈 Cuadres y Reportes</p>
+        <button style={Object.assign({},mB("teal"),{padding:"10px 20px"})} onClick={printCuadre}>🖨 Imprimir / PDF</button>
+      </div>
 
-        {/* Selector de rango */}
-        <div style={Object.assign({},sC,{marginBottom:16})}>
-          <p style={{fontWeight:600,fontSize:13,margin:"0 0 12px",color:"#555"}}>📅 Período del cuadre</p>
-          <div style={{display:"flex",gap:8,flexWrap:"wrap",marginBottom:rango==="custom"?12:0}}>
-            {rangos.map(function(pair){
-              return <button key={pair[0]} style={Object.assign({},mB(rango===pair[0]?"teal":"gray"),{padding:"7px 16px"})} onClick={function(){setRango(pair[0]);}}>{pair[1]}</button>;
-            })}
+      {/* Selector de rango */}
+      <div style={Object.assign({},sC,{marginBottom:16})}>
+        <p style={{fontWeight:600,fontSize:13,margin:"0 0 12px",color:"#555"}}>📅 Período del cuadre</p>
+        <div style={{display:"flex",gap:8,flexWrap:"wrap",marginBottom:rango==="custom"?12:0}}>
+          {rangos.map(function(pair){
+            return <button key={pair[0]} style={Object.assign({},mB(rango===pair[0]?"teal":"gray"),{padding:"7px 16px"})} onClick={function(){setRango(pair[0]);}}>{pair[1]}</button>;
+          })}
+        </div>
+        {rango==="custom"&&(
+          <div style={{display:"flex",gap:12,alignItems:"center",marginTop:10}}>
+            <div><label style={sL}>Desde</label><input type="date" style={Object.assign({},sI,{width:160})} value={dateFrom} onChange={function(e){setDateFrom(e.target.value);}}/></div>
+            <div><label style={sL}>Hasta</label><input type="date" style={Object.assign({},sI,{width:160})} value={dateTo} onChange={function(e){setDateTo(e.target.value);}}/></div>
           </div>
-          {rango==="custom"&&(
-              <div style={{display:"flex",gap:12,alignItems:"center",marginTop:10}}>
-                <div><label style={sL}>Desde</label><input type="date" style={Object.assign({},sI,{width:160})} value={dateFrom} onChange={function(e){setDateFrom(e.target.value);}}/></div>
-                <div><label style={sL}>Hasta</label><input type="date" style={Object.assign({},sI,{width:160})} value={dateTo} onChange={function(e){setDateTo(e.target.value);}}/></div>
+        )}
+      </div>
+
+      {/* Período activo */}
+      <div style={{background:"linear-gradient(135deg,"+NAVY+" 0%,#1a3a2a 100%)",borderRadius:12,padding:"14px 20px",marginBottom:16,display:"flex",justifyContent:"space-between",alignItems:"center"}}>
+        <div>
+          <p style={{color:"rgba(255,255,255,0.5)",fontSize:10,textTransform:"uppercase",letterSpacing:"1px",margin:0}}>Período activo</p>
+          <p style={{color:"#fff",fontWeight:700,fontSize:16,margin:"2px 0 0"}}>{getRangeLabel()}</p>
+        </div>
+        <p style={{color:TEAL,fontSize:28,fontWeight:800,margin:0}}>Q {totalIngresos.toFixed(2)}</p>
+      </div>
+
+      {/* Métricas principales */}
+      <div style={{display:"grid",gridTemplateColumns:"repeat(4,1fr)",gap:14,marginBottom:16}}>
+        <MetricBox label="Ventas del período" value={periodSales.length} color="#378ADD"/>
+        <MetricBox label="Ingresos ventas" value={Q(totalVentas)} color={TEAL}/>
+        <MetricBox label="Abonos cobrados" value={Q(abonosPeriod)} color="#7F77DD"/>
+        <MetricBox label="Reembolsos" value={Q(reembolsosPeriod)} color="#E24B4A"/>
+      </div>
+
+      {/* Por método */}
+      <div style={{display:"grid",gridTemplateColumns:"1fr 1fr 2fr",gap:14,marginBottom:16}}>
+        <div style={sC}>
+          <p style={{fontSize:11,color:"#999",textTransform:"uppercase",margin:"0 0 8px"}}>💵 Saldo caja efectivo</p>
+          <p style={{fontSize:26,fontWeight:800,color:totalEfectivo>=0?TEAL:"#E24B4A",margin:0}}>Q {totalEfectivo.toFixed(2)}</p>
+          <p style={{fontSize:11,color:"#999",margin:"4px 0 0"}}>Ventas + abonos − reembolsos en efectivo</p>
+        </div>
+        <div style={sC}>
+          <p style={{fontSize:11,color:"#999",textTransform:"uppercase",margin:"0 0 8px"}}>💳 Tarjeta + Transferencia</p>
+          <p style={{fontSize:26,fontWeight:800,color:"#378ADD",margin:0}}>Q {(byMethod.Tarjeta+byMethod.Transferencia).toFixed(2)}</p>
+          <p style={{fontSize:11,color:"#999",margin:"4px 0 0"}}>Tarjeta: Q {byMethod.Tarjeta.toFixed(2)} · Trans: Q {byMethod.Transferencia.toFixed(2)}</p>
+        </div>
+        {costoVentas>0?(
+          <div style={sC}>
+            <p style={{fontSize:11,color:"#999",textTransform:"uppercase",margin:"0 0 10px"}}>📉 Ganancia bruta estimada</p>
+            <div style={{display:"flex",gap:16,alignItems:"center"}}>
+              <div><p style={{fontSize:11,color:"#999",margin:"0 0 2px"}}>Ventas</p><p style={{fontWeight:700,color:TEAL}}>Q {totalVentas.toFixed(2)}</p></div>
+              <span style={{color:"#E24B4A",fontSize:18}}>−</span>
+              <div><p style={{fontSize:11,color:"#999",margin:"0 0 2px"}}>Costo</p><p style={{fontWeight:700,color:"#E24B4A"}}>Q {costoVentas.toFixed(2)}</p></div>
+              <span style={{color:"#2E7D32",fontSize:18}}>=</span>
+              <div><p style={{fontSize:11,color:"#999",margin:"0 0 2px"}}>Ganancia</p><p style={{fontWeight:800,fontSize:18,color:"#2E7D32"}}>Q {gananciaBruta.toFixed(2)}</p></div>
+            </div>
+          </div>
+        ):(
+          <div style={sC}>
+            <p style={{fontSize:11,color:"#999",textTransform:"uppercase",margin:"0 0 8px"}}>🔧 Reparaciones activas</p>
+            <p style={{fontSize:26,fontWeight:800,color:"#378ADD",margin:0}}>{repActivas}</p>
+            <p style={{fontSize:11,color:repListas>0?TEAL:"#999",margin:"4px 0 0"}}>{repListas>0?"✅ "+repListas+" listas para entregar":"Sin órdenes listas aún"}</p>
+          </div>
+        )}
+      </div>
+
+      {/* Top 5 + Detalle ventas */}
+      <div style={{display:"grid",gridTemplateColumns:"1fr 2fr",gap:16}}>
+        <div style={sC}>
+          <p style={{fontWeight:600,fontSize:14,margin:"0 0 12px"}}>🏆 Más vendidos</p>
+          {top5.length===0?<p style={{color:"#999",fontSize:13}}>Sin ventas en el período</p>:
+            top5.map(function(item,i){return (
+              <div key={i} style={{display:"flex",justifyContent:"space-between",padding:"7px 0",borderBottom:"1px solid rgba(0,0,0,0.06)",fontSize:13}}>
+                <span style={{color:"#666"}}><b style={{color:TEAL,marginRight:6}}>{i+1}.</b>{item[0]}</span>
+                <span style={{fontWeight:700,color:TEAL}}>{item[1]} uds</span>
               </div>
+            );}
           )}
         </div>
-
-        {/* Período activo */}
-        <div style={{background:"linear-gradient(135deg,"+NAVY+" 0%,#1a3a2a 100%)",borderRadius:12,padding:"14px 20px",marginBottom:16,display:"flex",justifyContent:"space-between",alignItems:"center"}}>
-          <div>
-            <p style={{color:"rgba(255,255,255,0.5)",fontSize:10,textTransform:"uppercase",letterSpacing:"1px",margin:0}}>Período activo</p>
-            <p style={{color:"#fff",fontWeight:700,fontSize:16,margin:"2px 0 0"}}>{getRangeLabel()}</p>
-          </div>
-          <p style={{color:TEAL,fontSize:28,fontWeight:800,margin:0}}>Q {totalIngresos.toFixed(2)}</p>
-        </div>
-
-        {/* Métricas principales */}
-        <div style={{display:"grid",gridTemplateColumns:"repeat(4,1fr)",gap:14,marginBottom:16}}>
-          <MetricBox label="Ventas del período" value={periodSales.length} color="#378ADD"/>
-          <MetricBox label="Ingresos ventas" value={Q(totalVentas)} color={TEAL}/>
-          <MetricBox label="Abonos cobrados" value={Q(abonosPeriod)} color="#7F77DD"/>
-          <MetricBox label="Reembolsos" value={Q(reembolsosPeriod)} color="#E24B4A"/>
-        </div>
-
-        {/* Por método */}
-        <div style={{display:"grid",gridTemplateColumns:"1fr 1fr 2fr",gap:14,marginBottom:16}}>
-          <div style={sC}>
-            <p style={{fontSize:11,color:"#999",textTransform:"uppercase",margin:"0 0 8px"}}>💵 Saldo caja efectivo</p>
-            <p style={{fontSize:26,fontWeight:800,color:totalEfectivo>=0?TEAL:"#E24B4A",margin:0}}>Q {totalEfectivo.toFixed(2)}</p>
-            <p style={{fontSize:11,color:"#999",margin:"4px 0 0"}}>Ventas + abonos − reembolsos en efectivo</p>
-          </div>
-          <div style={sC}>
-            <p style={{fontSize:11,color:"#999",textTransform:"uppercase",margin:"0 0 8px"}}>💳 Tarjeta + Transferencia</p>
-            <p style={{fontSize:26,fontWeight:800,color:"#378ADD",margin:0}}>Q {(byMethod.Tarjeta+byMethod.Transferencia).toFixed(2)}</p>
-            <p style={{fontSize:11,color:"#999",margin:"4px 0 0"}}>Tarjeta: Q {byMethod.Tarjeta.toFixed(2)} · Trans: Q {byMethod.Transferencia.toFixed(2)}</p>
-          </div>
-          {costoVentas>0?(
-              <div style={sC}>
-                <p style={{fontSize:11,color:"#999",textTransform:"uppercase",margin:"0 0 10px"}}>📉 Ganancia bruta estimada</p>
-                <div style={{display:"flex",gap:16,alignItems:"center"}}>
-                  <div><p style={{fontSize:11,color:"#999",margin:"0 0 2px"}}>Ventas</p><p style={{fontWeight:700,color:TEAL}}>Q {totalVentas.toFixed(2)}</p></div>
-                  <span style={{color:"#E24B4A",fontSize:18}}>−</span>
-                  <div><p style={{fontSize:11,color:"#999",margin:"0 0 2px"}}>Costo</p><p style={{fontWeight:700,color:"#E24B4A"}}>Q {costoVentas.toFixed(2)}</p></div>
-                  <span style={{color:"#2E7D32",fontSize:18}}>=</span>
-                  <div><p style={{fontSize:11,color:"#999",margin:"0 0 2px"}}>Ganancia</p><p style={{fontWeight:800,fontSize:18,color:"#2E7D32"}}>Q {gananciaBruta.toFixed(2)}</p></div>
-                </div>
+        <div style={sC}>
+          <p style={{fontWeight:600,fontSize:14,margin:"0 0 12px"}}>📋 Ventas del período <span style={{fontWeight:400,color:"#999",fontSize:12}}>({periodSales.length})</span></p>
+          {periodSales.length===0?<p style={{color:"#999",fontSize:13,padding:"20px 0",textAlign:"center"}}>Sin ventas en el período seleccionado</p>:(
+            <div style={{maxHeight:280,overflowY:"auto"}}>
+              <table style={{width:"100%",borderCollapse:"collapse"}}>
+                <thead><tr>{["Fecha","Hora","Cliente","Método","Total"].map(function(h){return <th key={h} style={sTH}>{h}</th>;})}</tr></thead>
+                <tbody>
+                  {periodSales.slice().sort(function(a,b){return new Date(b.date)-new Date(a.date);}).map(function(s){
+                    return <tr key={s.id}>
+                      <td style={sTD}>{fmtD(s.date)}</td>
+                      <td style={sTD}>{fmtT(s.date)}</td>
+                      <td style={Object.assign({},sTD,{fontWeight:500})}>{s.client}</td>
+                      <td style={sTD}><span style={mBg("teal")}>{s.method}</span></td>
+                      <td style={Object.assign({},sTD,{fontWeight:700,color:TEAL})}>{Q(s.total)}</td>
+                    </tr>;
+                  })}
+                </tbody>
+              </table>
+              <div style={{borderTop:"2px solid rgba(0,0,0,0.1)",marginTop:8,paddingTop:8,textAlign:"right",fontSize:14,fontWeight:700,color:TEAL}}>
+                Total: {Q(totalVentas)}
               </div>
-          ):(
-              <div style={sC}>
-                <p style={{fontSize:11,color:"#999",textTransform:"uppercase",margin:"0 0 8px"}}>🔧 Reparaciones activas</p>
-                <p style={{fontSize:26,fontWeight:800,color:"#378ADD",margin:0}}>{repActivas}</p>
-                <p style={{fontSize:11,color:repListas>0?TEAL:"#999",margin:"4px 0 0"}}>{repListas>0?"✅ "+repListas+" listas para entregar":"Sin órdenes listas aún"}</p>
-              </div>
+            </div>
           )}
-        </div>
-
-        {/* Top 5 + Detalle ventas */}
-        <div style={{display:"grid",gridTemplateColumns:"1fr 2fr",gap:16}}>
-          <div style={sC}>
-            <p style={{fontWeight:600,fontSize:14,margin:"0 0 12px"}}>🏆 Más vendidos</p>
-            {top5.length===0?<p style={{color:"#999",fontSize:13}}>Sin ventas en el período</p>:
-                top5.map(function(item,i){return (
-                        <div key={i} style={{display:"flex",justifyContent:"space-between",padding:"7px 0",borderBottom:"1px solid rgba(0,0,0,0.06)",fontSize:13}}>
-                          <span style={{color:"#666"}}><b style={{color:TEAL,marginRight:6}}>{i+1}.</b>{item[0]}</span>
-                          <span style={{fontWeight:700,color:TEAL}}>{item[1]} uds</span>
-                        </div>
-                    );}
-                )}
-          </div>
-          <div style={sC}>
-            <p style={{fontWeight:600,fontSize:14,margin:"0 0 12px"}}>📋 Ventas del período <span style={{fontWeight:400,color:"#999",fontSize:12}}>({periodSales.length})</span></p>
-            {periodSales.length===0?<p style={{color:"#999",fontSize:13,padding:"20px 0",textAlign:"center"}}>Sin ventas en el período seleccionado</p>:(
-                <div style={{maxHeight:280,overflowY:"auto"}}>
-                  <table style={{width:"100%",borderCollapse:"collapse"}}>
-                    <thead><tr>{["Fecha","Hora","Cliente","Método","Total"].map(function(h){return <th key={h} style={sTH}>{h}</th>;})}</tr></thead>
-                    <tbody>
-                    {periodSales.slice().sort(function(a,b){return new Date(b.date)-new Date(a.date);}).map(function(s){
-                      return <tr key={s.id}>
-                        <td style={sTD}>{fmtD(s.date)}</td>
-                        <td style={sTD}>{fmtT(s.date)}</td>
-                        <td style={Object.assign({},sTD,{fontWeight:500})}>{s.client}</td>
-                        <td style={sTD}><span style={mBg("teal")}>{s.method}</span></td>
-                        <td style={Object.assign({},sTD,{fontWeight:700,color:TEAL})}>{Q(s.total)}</td>
-                      </tr>;
-                    })}
-                    </tbody>
-                  </table>
-                  <div style={{borderTop:"2px solid rgba(0,0,0,0.1)",marginTop:8,paddingTop:8,textAlign:"right",fontSize:14,fontWeight:700,color:TEAL}}>
-                    Total: {Q(totalVentas)}
-                  </div>
-                </div>
-            )}
-          </div>
         </div>
       </div>
+    </div>
   );
 }
 

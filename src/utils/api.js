@@ -89,6 +89,23 @@ export const usersAPI = {
   update:  function(id, d) { return api.put('/users/' + id, d); },
 };
 
+// ── Clientes ──────────────────────────────────────────
+export const clientsAPI = {
+  getAll:  function()      { return api.get('/clients'); },
+  create:  function(data)  { return api.post('/clients', data); },
+  update:  function(id, d) { return api.put('/clients/' + id, d); },
+  remove:  function(id)    { return api.delete('/clients/' + id); },
+};
+
+// ── Reparaciones ──────────────────────────────────────
+export const repairsAPI = {
+  getAll:       function()            { return api.get('/repairs'); },
+  create:       function(data)        { return api.post('/repairs', data); },
+  updateStatus: function(id, status)  { return api.put('/repairs/' + id + '/status', { status }); },
+  update:       function(id, data)    { return api.put('/repairs/' + id, data); },
+  remove:       function(id)          { return api.delete('/repairs/' + id); },
+};
+
 // ── Health check ──────────────────────────────────────
 export const checkAPI = async function() {
   try {
