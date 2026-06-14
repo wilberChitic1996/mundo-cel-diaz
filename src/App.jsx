@@ -10,11 +10,24 @@ const SK   = "mnpos-sales-v5";
 const AK   = "mnpos-accounts-v2";
 const RK   = "mnpos-returns-v2";
 const DFK  = "mnpos-defective-v1";
+const CK   = "mnpos-clients-v1";
 
 const gid  = () => Date.now().toString(36) + Math.random().toString(36).slice(2,6);
 const Q    = function(n){ return "Q " + Number(n).toFixed(2); };
 const fmtD = function(d){ return new Date(d).toLocaleDateString("es-GT",{day:"2-digit",month:"short",year:"numeric"}); };
 const fmtT = function(d){ return new Date(d).toLocaleTimeString("es-GT",{hour:"2-digit",minute:"2-digit"}); };
+
+function genCliCode(clients){
+  if(!clients||!clients.length) return "CLI-000001";
+  var nums=clients.map(function(c){ var m=(c.cliCode||"").match(/CLI-(\d+)/); return m?parseInt(m[1]):0; });
+  var max=Math.max.apply(null,nums);
+  return "CLI-"+String(max+1).padStart(6,"0");
+}
+
+function validarDPI(dpi){
+  if(!dpi||!dpi.trim()) return true; // opcional
+  return /^\d{13}$/.test(dpi.trim());
+}
 
 // db importado desde src/utils/db.js
 
@@ -60,8 +73,8 @@ var UK       = "mnpos-users-v1";
 var SESS_KEY = "mnpos-session-v1";
 
 var PERMS = {
-  admin:   ["dashboard","pos","caja","accounts","returns","defective","products","inventory","history","backup","users"],
-  cajero:  ["dashboard","pos","caja","accounts","returns","history"],
+  admin:   ["dashboard","pos","caja","accounts","returns","defective","products","inventory","history","backup","users","clients"],
+  cajero:  ["dashboard","pos","caja","accounts","returns","history","clients"],
   auditor: ["dashboard","caja","history","inventory"],
 };
 var ROLE_LABEL = { admin:"Administrador", cajero:"Cajero", auditor:"Auditor" };
@@ -527,6 +540,7 @@ function Sidebar(props) {
     {id:"dashboard", ic:"📊", lb:"Dashboard"},
     {id:"pos",       ic:"🛒", lb:"Nueva Venta"},
     {id:"caja",      ic:"💵", lb:"Caja"},
+    {id:"clients",   ic:"👤", lb:"Clientes"},
     {id:"accounts",  ic:"💳", lb:"Cuentas"},
     {id:"returns",   ic:"🔄", lb:"Devoluciones"},
     {id:"defective", ic:"🔩", lb:"Piezas Defect."},
@@ -1477,6 +1491,233 @@ function BackupScreen(props) {
   );
 }
 
+/* ══ CLIENTES ══════════════════════════════════════════════════════════ */
+function ClientsScreen(props) {
+  var clients=props.clients; var sales=props.sales; var accounts=props.accounts;
+  var returns=props.returns; var saveClient=props.saveClient; var session=props.session;
+  var showFlash=props.showFlash;
+
+  var _q=useState(""); var q=_q[0]; var setQ=_q[1];
+  var _sel=useState(null); var selCli=_sel[0]; var setSelCli=_sel[1];
+  var _sf=useState(false); var showForm=_sf[0]; var setShowForm=_sf[1];
+  var _eu=useState(null); var editCli=_eu[0]; var setEditCli=_eu[1];
+  var _fn=useState(""); var fName=_fn[0]; var setFName=_fn[1];
+  var _fd=useState(""); var fDpi=_fd[0]; var setFDpi=_fd[1];
+  var _ft=useState(""); var fTel=_ft[0]; var setFTel=_ft[1];
+  var _fa=useState(""); var fAddr=_fa[0]; var setFAddr=_fa[1];
+  var _fe=useState(""); var fErr=_fe[0]; var setFErr=_fe[1];
+
+  var filtered=clients.filter(function(c){
+    if(!q.trim()) return true;
+    var ql=q.toLowerCase();
+    return (c.name||"").toLowerCase().includes(ql)||(c.dpi||"").includes(q.trim())||(c.cliCode||"").toLowerCase().includes(ql)||(c.phone||"").includes(q.trim());
+  });
+
+  function resetForm(){setFName("");setFDpi("");setFTel("");setFAddr("");setFErr("");setEditCli(null);setShowForm(false);}
+
+  function doSave(){
+    if(!fName.trim()){setFErr("El nombre es obligatorio");return;}
+    if(fDpi.trim()&&!validarDPI(fDpi)){setFErr("El DPI debe tener exactamente 13 dígitos");return;}
+    if(fDpi.trim()){
+      var dup=clients.find(function(c){return c.dpi===fDpi.trim()&&(!editCli||c.id!==editCli.id);});
+      if(dup){setFErr("Ya existe un cliente con ese DPI: "+dup.name+" ("+dup.cliCode+")");return;}
+    }
+    var cliCode=editCli?editCli.cliCode:genCliCode(clients);
+    var obj={
+      id:editCli?editCli.id:gid(),
+      cliCode:cliCode,
+      name:fName.trim(),
+      dpi:fDpi.trim()||"",
+      phone:fTel.trim()||"",
+      address:fAddr.trim()||"",
+      active:true,
+      createdAt:editCli?editCli.createdAt:new Date().toISOString(),
+      createdBy:editCli?editCli.createdBy:{userId:session.userId,name:session.name,role:session.role},
+    };
+    saveClient(obj,!!editCli);
+    showFlash(editCli?"✓ Cliente actualizado":"✓ Cliente registrado — "+cliCode,"ok");
+    resetForm();
+  }
+
+  function startEdit(c){setEditCli(c);setFName(c.name);setFDpi(c.dpi||"");setFTel(c.phone||"");setFAddr(c.address||"");setFErr("");setShowForm(true);}
+
+  // Vista perfil 360°
+  if(selCli){
+    var cli=clients.find(function(c){return c.id===selCli;});
+    if(!cli){setSelCli(null);return null;}
+    var cliSales=sales.filter(function(s){return s.clientId===cli.id||(s.client===cli.name&&!s.clientId);});
+    var cliAccs=accounts.filter(function(a){return a.clientId===cli.id||(a.client===cli.name&&!a.clientId);});
+    var cliRets=returns.filter(function(r){return r.clientId===cli.id||(r.client===cli.name&&!r.clientId);});
+    var totalComprado=cliSales.reduce(function(s,x){return s+x.total;},0);
+    var totalPendiente=cliAccs.filter(function(a){return a.status!=="pagado";}).reduce(function(s,a){return s+a.balance;},0);
+    var esFrecuente=cliSales.length>=5||totalComprado>=1000;
+    var ultimaVisita=cliSales.length>0?cliSales.slice().sort(function(a,b){return new Date(b.date)-new Date(a.date);})[0].date:null;
+
+    return (
+        <div>
+          <button style={Object.assign({},mB("gray"),{marginBottom:16})} onClick={function(){setSelCli(null);}}>← Volver</button>
+          <div style={Object.assign({},sC,{marginBottom:16})}>
+            <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start",marginBottom:16}}>
+              <div>
+                <div style={{display:"flex",alignItems:"center",gap:10,marginBottom:6}}>
+                  <p style={{fontSize:22,fontWeight:700,margin:0}}>{cli.name}</p>
+                  {esFrecuente&&<span style={mBg("amber")}>⭐ Cliente frecuente</span>}
+                  {totalPendiente>0&&<span style={mBg("red")}>⚠ Deuda: {Q(totalPendiente)}</span>}
+                </div>
+                <div style={{display:"flex",gap:16,fontSize:13,color:"#666",flexWrap:"wrap"}}>
+                  <span style={{fontFamily:"monospace",background:"#f5f4f0",padding:"2px 8px",borderRadius:6,fontWeight:600,color:TEAL}}>{cli.cliCode}</span>
+                  {cli.dpi&&<span>🪪 DPI: {cli.dpi}</span>}
+                  {cli.phone&&<span>📱 {cli.phone}</span>}
+                  {cli.address&&<span>📍 {cli.address}</span>}
+                </div>
+              </div>
+              <button style={Object.assign({},mB("blue"),{padding:"6px 12px",fontSize:12})} onClick={function(){startEdit(cli);setSelCli(null);}}>✏ Editar</button>
+            </div>
+            <div style={{display:"grid",gridTemplateColumns:"repeat(4,1fr)",gap:12}}>
+              <MetricBox label="Total compras"     value={cliSales.length}    color={TEAL}/>
+              <MetricBox label="Total comprado"    value={Q(totalComprado)}   color="#378ADD"/>
+              <MetricBox label="Deuda pendiente"   value={Q(totalPendiente)}  color={totalPendiente>0?"#E24B4A":TEAL}/>
+              <MetricBox label="Devoluciones"      value={cliRets.length}     color="#7F77DD"/>
+            </div>
+            {ultimaVisita&&<p style={{fontSize:12,color:"#999",margin:"12px 0 0"}}>Última visita: {fmtD(ultimaVisita)} — Registrado: {fmtD(cli.createdAt)}</p>}
+          </div>
+
+          {cliAccs.filter(function(a){return a.status!=="pagado";}).length>0&&(
+              <div style={Object.assign({},sC,{marginBottom:16,borderLeft:"4px solid #E24B4A"})}>
+                <p style={{fontWeight:600,margin:"0 0 10px",fontSize:14,color:"#E24B4A"}}>⚠ Cuentas pendientes</p>
+                {cliAccs.filter(function(a){return a.status!=="pagado";}).map(function(a){
+                  return <div key={a.id} style={{display:"flex",justifyContent:"space-between",padding:"6px 0",borderBottom:"1px solid rgba(0,0,0,0.05)",fontSize:14}}>
+                    <span>{fmtD(a.date)} — {a.items.length} artículos</span>
+                    <span style={{fontWeight:700,color:"#E24B4A"}}>{Q(a.balance)}</span>
+                  </div>;
+                })}
+              </div>
+          )}
+
+          {cliSales.length>0&&(
+              <div style={Object.assign({},sC,{marginBottom:16})}>
+                <p style={{fontWeight:600,margin:"0 0 12px",fontSize:15}}>🛒 Historial de compras</p>
+                <table style={{width:"100%",borderCollapse:"collapse"}}>
+                  <thead><tr>{["Fecha","Artículos","Método","Total","Estado"].map(function(h){return <th key={h} style={sTH}>{h}</th>;})}</tr></thead>
+                  <tbody>{cliSales.slice(0,10).map(function(s){
+                    return <tr key={s.id}>
+                      <td style={sTD}>{fmtD(s.date)}</td>
+                      <td style={Object.assign({},sTD,{color:"#666"})}>{(s.items||[]).length} art.</td>
+                      <td style={sTD}><span style={mBg("teal")}>{s.method}</span></td>
+                      <td style={Object.assign({},sTD,{fontWeight:700,color:TEAL})}>{Q(s.total)}</td>
+                      <td style={sTD}><span style={mBg("green")}>✓ Cobrada</span></td>
+                    </tr>;
+                  })}</tbody>
+                </table>
+              </div>
+          )}
+
+          {cliRets.length>0&&(
+              <div style={sC}>
+                <p style={{fontWeight:600,margin:"0 0 12px",fontSize:15}}>🔄 Devoluciones</p>
+                <table style={{width:"100%",borderCollapse:"collapse"}}>
+                  <thead><tr>{["Fecha","Motivo","Estado artículo","Reembolso"].map(function(h){return <th key={h} style={sTH}>{h}</th>;})}</tr></thead>
+                  <tbody>{cliRets.map(function(r){
+                    return <tr key={r.id}>
+                      <td style={sTD}>{fmtD(r.date)}</td>
+                      <td style={sTD}>{r.reason}</td>
+                      <td style={sTD}><span style={mBg(r.itemCondition==="bueno"?"green":"amber")}>{r.itemCondition==="bueno"?"Buen estado":"Defectuoso"}</span></td>
+                      <td style={Object.assign({},sTD,{fontWeight:600,color:r.refundAmount>0?"#E24B4A":"#999"})}>{r.refundAmount>0?Q(r.refundAmount):"Sin reembolso"}</td>
+                    </tr>;
+                  })}</tbody>
+                </table>
+              </div>
+          )}
+
+          {cliSales.length===0&&cliAccs.length===0&&cliRets.length===0&&(
+              <div style={Object.assign({},sC,{textAlign:"center",padding:48,color:"#999"})}>Sin transacciones registradas aún para este cliente.</div>
+          )}
+        </div>
+    );
+  }
+
+  var totalClientes=clients.length;
+  var conDeuda=clients.filter(function(c){return accounts.filter(function(a){return (a.clientId===c.id||(a.client===c.name&&!a.clientId))&&a.status!=="pagado";}).length>0;}).length;
+  var frecuentes=clients.filter(function(c){var cs=sales.filter(function(s){return s.clientId===c.id||(s.client===c.name&&!s.clientId);});return cs.length>=5||cs.reduce(function(s,x){return s+x.total;},0)>=1000;}).length;
+
+  return (
+      <div>
+        <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:20}}>
+          <p style={H1}>👥 Clientes</p>
+          <button style={mB("teal")} onClick={function(){resetForm();setShowForm(true);}}>+ Nuevo cliente</button>
+        </div>
+
+        {showForm&&(
+            <div style={Object.assign({},sC,{marginBottom:16,borderColor:TEAL,borderWidth:"1.5px"})}>
+              <p style={{fontWeight:600,margin:"0 0 14px",fontSize:15}}>{editCli?"✏️ Editar cliente":"➕ Nuevo cliente"}</p>
+              {fErr&&<div style={{background:"#FCEBEB",borderRadius:8,padding:"8px 14px",marginBottom:12,color:"#791F1F",fontSize:13}}>⚠ {fErr}</div>}
+              <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:12,marginBottom:14}}>
+                <div><label style={sL}>Nombre completo *</label><input style={sI} value={fName} placeholder="Nombre del cliente" onChange={function(e){setFErr("");setFName(e.target.value);}}/></div>
+                <div>
+                  <label style={sL}>DPI (13 dígitos, opcional)</label>
+                  <input style={sI} value={fDpi} placeholder="Sin DPI → se asigna ID automático" maxLength={13} onChange={function(e){setFErr("");setFDpi(e.target.value.replace(/\D/g,""));}}/>
+                  {fDpi&&!validarDPI(fDpi)&&<p style={{fontSize:11,color:"#E24B4A",margin:"3px 0 0"}}>⚠ Debe tener 13 dígitos ({fDpi.length}/13)</p>}
+                  {fDpi&&validarDPI(fDpi)&&fDpi.length===13&&<p style={{fontSize:11,color:TEAL,margin:"3px 0 0"}}>✓ DPI válido</p>}
+                </div>
+                <div><label style={sL}>Teléfono</label><input style={sI} value={fTel} placeholder="Ej: 55551234" onChange={function(e){setFTel(e.target.value);}}/></div>
+                <div><label style={sL}>Dirección</label><input style={sI} value={fAddr} placeholder="Opcional" onChange={function(e){setFAddr(e.target.value);}}/></div>
+              </div>
+              {!editCli&&<div style={{background:"#f5f4f0",borderRadius:8,padding:"8px 14px",marginBottom:14,fontSize:12,color:"#666"}}>
+                💡 Si el cliente no tiene DPI, se le asignará un código único automático (CLI-000001, CLI-000002…)
+              </div>}
+              <div style={{display:"flex",gap:10}}>
+                <button style={mB("teal")} onClick={doSave}>{editCli?"Guardar cambios":"Registrar cliente"}</button>
+                <button style={mB("gray")} onClick={resetForm}>Cancelar</button>
+              </div>
+            </div>
+        )}
+
+        <div style={{display:"grid",gridTemplateColumns:"repeat(3,1fr)",gap:14,marginBottom:20}}>
+          <MetricBox label="Total clientes"   value={totalClientes} color={TEAL}/>
+          <MetricBox label="Con deuda activa" value={conDeuda}      color="#E24B4A"/>
+          <MetricBox label="Clientes frecuentes" value={frecuentes} color="#E65100"/>
+        </div>
+
+        <div style={Object.assign({},sC,{marginBottom:14})}>
+          <input style={sI} value={q} placeholder="🔍 Buscar por nombre, DPI, código CLI o teléfono..." onChange={function(e){setQ(e.target.value);}}/>
+        </div>
+
+        <div style={sC}>
+          {filtered.length===0?(
+              <div style={{textAlign:"center",padding:48,color:"#999"}}>
+                {q?"Sin resultados para \""+q+"\""  :"Sin clientes registrados aún"}
+              </div>
+          ):(
+              <table style={{width:"100%",borderCollapse:"collapse"}}>
+                <thead><tr>{["Código","Nombre","DPI","Teléfono","Compras","Deuda",""].map(function(h){return <th key={h} style={sTH}>{h}</th>;})}</tr></thead>
+                <tbody>
+                {filtered.map(function(c){
+                  var cliSalesCount=sales.filter(function(s){return s.clientId===c.id||(s.client===c.name&&!s.clientId);}).length;
+                  var cliDeuda=accounts.filter(function(a){return (a.clientId===c.id||(a.client===c.name&&!a.clientId))&&a.status!=="pagado";}).reduce(function(s,a){return s+a.balance;},0);
+                  var esFrecuente=cliSalesCount>=5||sales.filter(function(s){return s.clientId===c.id||(s.client===c.name&&!s.clientId);}).reduce(function(s,x){return s+x.total;},0)>=1000;
+                  return (
+                      <tr key={c.id} style={{cursor:"pointer"}} onClick={function(){setSelCli(c.id);}}>
+                        <td style={Object.assign({},sTD,{fontFamily:"monospace",fontSize:12,color:TEAL,fontWeight:600})}>{c.cliCode}</td>
+                        <td style={Object.assign({},sTD,{fontWeight:600})}>
+                          {c.name}
+                          {esFrecuente&&<span style={Object.assign({},mBg("amber"),{marginLeft:6})}>⭐</span>}
+                        </td>
+                        <td style={Object.assign({},sTD,{fontFamily:"monospace",fontSize:12})}>{c.dpi||<span style={{color:"#bbb"}}>Sin DPI</span>}</td>
+                        <td style={Object.assign({},sTD,{color:"#666"})}>{c.phone||"—"}</td>
+                        <td style={sTD}>{cliSalesCount} compras</td>
+                        <td style={sTD}>{cliDeuda>0?<span style={mBg("red")}>{Q(cliDeuda)}</span>:<span style={mBg("green")}>✓ Al día</span>}</td>
+                        <td style={Object.assign({},sTD,{color:"#999",fontSize:12})}>Ver →</td>
+                      </tr>
+                  );
+                })}
+                </tbody>
+              </table>
+          )}
+        </div>
+      </div>
+  );
+}
+
 /* ══ APP ══════════════════════════════════════════════════════════════ */
 function App(props) {
   var session=props.session||{}; var onLogout=props.onLogout||function(){}; var isOnline=props.isOnline||false;
@@ -1485,6 +1726,7 @@ function App(props) {
   var _a=useState([]); var accounts=_a[0]; var setAccounts=_a[1];
   var _r=useState([]); var returns=_r[0]; var setReturns=_r[1];
   var _d=useState([]); var defectives=_d[0]; var setDefectives=_d[1];
+  var _cl=useState([]); var clients=_cl[0]; var setClients=_cl[1];
   var _ld=useState(false); var loaded=_ld[0]; var setLoaded=_ld[1];
   var _on=useState(false); var isOnline=_on[0]; var setIsOnline=_on[1];
 
@@ -1532,7 +1774,8 @@ function App(props) {
         var a = await db.load(AK, []);
         var r = await db.load(RK, []);
         var d = await db.load(DFK, []);
-        setProducts(p); setSales(s); setAccounts(a); setReturns(r); setDefectives(d);
+        var cl = await db.load(CK, []);
+        setProducts(p); setSales(s); setAccounts(a); setReturns(r); setDefectives(d); setClients(cl);
       }
       setLoaded(true);
     }
@@ -1545,6 +1788,7 @@ function App(props) {
   useEffect(function(){ if(loaded&&!isOnline) db.save(AK,accounts);    },[accounts,loaded,isOnline]);
   useEffect(function(){ if(loaded&&!isOnline) db.save(RK,returns);     },[returns,loaded,isOnline]);
   useEffect(function(){ if(loaded&&!isOnline) db.save(DFK,defectives); },[defectives,loaded,isOnline]);
+  useEffect(function(){ if(loaded)            db.save(CK,clients);     },[clients,loaded]);
 
   var _v=useState(function(){ return canAccess(session.role,"pos")?"pos":"dashboard"; }); var view=_v[0]; var setView=_v[1];
   var _fl=useState({msg:"",type:"ok"}); var flash=_fl[0]; var setFlash=_fl[1];
@@ -1823,8 +2067,16 @@ function App(props) {
     showFlash("Producto eliminado","ok");
   }
 
+  function saveClient(obj, isEdit){
+    if(isEdit){
+      setClients(function(p){return p.map(function(c){return c.id===obj.id?obj:c;});});
+    } else {
+      setClients(function(p){return p.concat([obj]);});
+    }
+  }
+
   function exportJSON(){
-    var data={version:"2.1",exportDate:new Date().toISOString(),negocio:"MUNDO CEL DIAZ",products:products,sales:sales,accounts:accounts,returns:returns,defectives:defectives};
+    var data={version:"2.1",exportDate:new Date().toISOString(),negocio:"MUNDO CEL DIAZ",products:products,sales:sales,accounts:accounts,returns:returns,defectives:defectives,clients:clients};
     var blob=new Blob([JSON.stringify(data,null,2)],{type:"application/json"});
     var url=URL.createObjectURL(blob);
     var a=document.createElement("a");a.href=url;a.download="MundoCelDiaz_backup_"+new Date().toISOString().slice(0,10)+".json";
@@ -1900,7 +2152,7 @@ function App(props) {
         <Sidebar view={view} setView={setView} cartCount={cart.length} pendingCount={pendingAccs.length} products={products} sales={sales} session={session} onLogout={onLogout} isOnline={isOnline}/>
         <div style={{flex:1,padding:"24px 28px",overflowY:"auto",minWidth:0}}>
           {view==="dashboard"&&canAccess(session.role,"dashboard")&&<DashboardScreen sales={sales} todaySales={todaySales} pendingAccs={pendingAccs} totalPend={totalPend} products={products} top5={top5} setSelectedSale={setSelSale} setView={setView} accounts={accounts} returns={returns}/>}
-          {view==="pos"      &&canAccess(session.role,"pos")&&<POSScreen products={products} filteredPOS={filteredPOS} cart={cart} posQ={posQ} setPosQ={setPosQ} payMethod={payMethod} setPayMethod={setPayMethod} payType={payType} setPayType={setPayType} cashIn={cashIn} setCashIn={setCashIn} initialPay={initialPay} setInitialPay={setInitialPay} clientName={clientName} setClientName={setClientName} cartTotal={cartTotal} vuelto={vuelto} initPaidVal={initPaidVal} addToCart={addToCart} changeQty={changeQty} removeFromCart={removeFromCart} checkout={checkout} resetPOS={resetPOS} flash={flash}/>}
+          {view==="pos"      &&canAccess(session.role,"pos")&&<POSScreen products={products} filteredPOS={filteredPOS} cart={cart} posQ={posQ} setPosQ={setPosQ} payMethod={payMethod} setPayMethod={setPayMethod} payType={payType} setPayType={setPayType} cashIn={cashIn} setCashIn={setCashIn} initialPay={initialPay} setInitialPay={setInitialPay} clientName={clientName} setClientName={setClientName} cartTotal={cartTotal} vuelto={vuelto} initPaidVal={initPaidVal} addToCart={addToCart} changeQty={changeQty} removeFromCart={removeFromCart} checkout={checkout} resetPOS={resetPOS} flash={flash} clients={clients}/>}
           {view==="caja"     &&canAccess(session.role,"caja")&&<CajaScreen sales={sales} accounts={accounts} returns={returns}/>}
           {view==="accounts" &&canAccess(session.role,"accounts")&&<AccountsScreen accounts={accounts} pendingAccs={pendingAccs} totalPend={totalPend} addPayment={addPayment} showFlash={showFlash}/>}
           {view==="returns"  &&canAccess(session.role,"returns")&&<ReturnsScreen returns={returns} products={products} onProcess={processReturn} showFlash={showFlash}/>}
@@ -1910,6 +2162,7 @@ function App(props) {
           {view==="history"  &&canAccess(session.role,"history")&&<HistoryScreen sales={sales} selectedSale={selSale} setSelectedSale={setSelSale}/>}
           {view==="backup"   &&canAccess(session.role,"backup")&&<BackupScreen products={products} sales={sales} accounts={accounts} returns={returns} defectives={defectives} onExportJSON={exportJSON} onExportExcel={exportExcel} onImport={importData}/>}
           {view==="users"    &&canAccess(session.role,"users")&&<UsersScreen session={session} showFlash={showFlash}/>}
+          {view==="clients"  &&canAccess(session.role,"clients")&&<ClientsScreen clients={clients} sales={sales} accounts={accounts} returns={returns} saveClient={saveClient} session={session} showFlash={showFlash}/>}
         </div>
       </div>
   );
