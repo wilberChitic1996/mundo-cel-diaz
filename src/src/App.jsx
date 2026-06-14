@@ -97,7 +97,6 @@ function createSession(user) {
 function clearSession() { sessionStorage.removeItem(SESS_KEY); }
 
 /* ── LoginScreen ── */
-/* ── LoginScreen ── */
 function LoginScreen(props) {
   var onLogin=props.onLogin;
   var _e=useState(""); var email=_e[0]; var setEmail=_e[1];
@@ -108,27 +107,15 @@ function LoginScreen(props) {
   var _at=useState(0); var attempts=_at[0]; var setAttempts=_at[1];
   var _bl=useState(false); var blocked=_bl[0]; var setBlocked=_bl[1];
 
-  // Flujo recuperación
-  var _rm=useState("login"); var recMode=_rm[0]; var setRecMode=_rm[1];
-  var _re=useState(""); var recEmail=_re[0]; var setRecEmail=_re[1];
-  var _rq=useState(""); var recAnswer=_rq[0]; var setRecAnswer=_rq[1];
-  var _np=useState(""); var newPass=_np[0]; var setNewPass=_np[1];
-  var _np2=useState(""); var newPass2=_np2[0]; var setNewPass2=_np2[1];
-  var _ru=useState(null); var recUser=_ru[0]; var setRecUser=_ru[1];
-  var _snp=useState(false); var showNewPass=_snp[0]; var setShowNewPass=_snp[1];
-  var _snp2=useState(false); var showNewPass2=_snp2[0]; var setShowNewPass2=_snp2[1];
-  var _recErr=useState(""); var recErr=_recErr[0]; var setRecErr=_recErr[1];
-  var _recOk=useState(""); var recOk=_recOk[0]; var setRecOk=_recOk[1];
-
   function handleKey(e){ if(e.key==="Enter") doLogin(); }
 
   async function doLogin(){
     if(blocked){setErr("Cuenta bloqueada 5 minutos por seguridad.");return;}
-    if(!email.trim()||!pass){setErr("Ingresá tu email y contraseña.");return;}
+    if(!email.trim()||!pass){setErr("Ingresá tu email y contraseña");return;}
     setLoading(true);setErr("");
     var users=await db.load(UK,[]);
     var user=(users||[]).find(function(u){return u.email.toLowerCase()===email.trim().toLowerCase()&&u.active;});
-    if(!user){setAttempts(function(a){return a+1;});setErr("Email o contraseña incorrectos.");setLoading(false);return;}
+    if(!user){setAttempts(function(a){return a+1;});setErr("Email o contraseña incorrectos");setLoading(false);return;}
     var hash=await hashPass(pass);
     if(hash!==user.passwordHash){
       var na=attempts+1; setAttempts(na);
@@ -143,184 +130,61 @@ function LoginScreen(props) {
     }
     var updated=(users||[]).map(function(u){return u.id===user.id?Object.assign({},u,{lastLogin:new Date().toISOString()}):u;});
     await db.save(UK,updated);
-    try { await authAPI.login(email.trim(),pass); } catch(e){}
+    // Intentar login en el backend para sincronizacion en la nube
+    try {
+      await authAPI.login(email.trim(), pass);
+      console.log("Backend conectado — modo nube activo");
+    } catch(e) {
+      console.log("Backend no disponible — modo local activo");
+    }
     setLoading(false);
     onLogin(createSession(user));
   }
 
-  async function doFindUser(){
-    setRecErr("");
-    if(!recEmail.trim()){setRecErr("Ingresá tu email.");return;}
-    var users=await db.load(UK,[]);
-    var user=(users||[]).find(function(u){return u.email.toLowerCase()===recEmail.trim().toLowerCase()&&u.active;});
-    if(!user){setRecErr("No se encontró una cuenta activa con ese email.");return;}
-    if(!user.secQuestion){setRecErr("Esta cuenta no tiene pregunta de seguridad configurada. Contactá al administrador del sistema.");return;}
-    setRecUser(user);
-    setRecMode("question");
-  }
-
-  async function doVerifyAnswer(){
-    setRecErr("");
-    if(!recAnswer.trim()){setRecErr("Ingresá la respuesta.");return;}
-    var ansHash=await hashPass(recAnswer.trim().toLowerCase());
-    if(ansHash!==recUser.secAnswerHash){setRecErr("Respuesta incorrecta.");return;}
-    setRecMode("newpass");
-  }
-
-  async function doResetPass(){
-    setRecErr("");
-    if(!newPass||newPass.length<8){setRecErr("La contraseña debe tener mínimo 8 caracteres.");return;}
-    if(newPass!==newPass2){setRecErr("Las contraseñas no coinciden.");return;}
-    var newHash=await hashPass(newPass);
-    var users=await db.load(UK,[]);
-    var updated=users.map(function(u){return u.id===recUser.id?Object.assign({},u,{passwordHash:newHash}):u;});
-    await db.save(UK,updated);
-    setRecOk("¡Contraseña actualizada! Ya podés iniciar sesión.");
-    setRecMode("done");
-  }
-
-  var inBg={width:"100%",padding:"11px 14px",borderRadius:8,border:"1px solid rgba(255,255,255,0.15)",background:"rgba(255,255,255,0.08)",color:"#fff",fontSize:14,boxSizing:"border-box",outline:"none"};
-  var lblSt={color:"rgba(255,255,255,0.6)",fontSize:12,marginBottom:6,display:"block",textTransform:"uppercase",letterSpacing:"0.5px"};
-  var btnPrimary={width:"100%",padding:"12px",borderRadius:8,border:"none",cursor:"pointer",background:TEAL,color:"#fff",fontSize:15,fontWeight:700};
-  var btnSecondary={width:"100%",padding:"10px",borderRadius:8,border:"1px solid rgba(255,255,255,0.15)",background:"transparent",color:"rgba(255,255,255,0.6)",fontSize:13,cursor:"pointer",marginTop:10};
-
-  function renderPassField(label,val,setter,show,setShow){
-    return (
-        <div style={{marginBottom:18}}>
-          <label style={lblSt}>{label}</label>
-          <div style={{position:"relative"}}>
-            <input type={show?"text":"password"} style={Object.assign({},inBg,{paddingRight:44})} value={val} placeholder="••••••••"
-                   onChange={function(e){setter(e.target.value);setRecErr("");}} onKeyDown={function(e){if(e.key==="Enter"&&recMode==="newpass")doResetPass();}}/>
-            <span onClick={function(){setShow(!show);}} style={{position:"absolute",right:12,top:"50%",transform:"translateY(-50%)",cursor:"pointer",color:"rgba(255,255,255,0.4)",fontSize:16,userSelect:"none"}}>
-            {show?"🙈":"👁"}
-          </span>
-          </div>
-        </div>
-    );
-  }
-
+  var inBg  = {width:"100%",padding:"11px 14px",borderRadius:8,border:"1px solid rgba(255,255,255,0.15)",background:"rgba(255,255,255,0.08)",color:"#fff",fontSize:14,boxSizing:"border-box",outline:"none"};
   return (
-      <div style={{minHeight:"100vh",background:"linear-gradient(135deg,#0e1e2e 0%,"+NAVY+" 60%,#1a3a2a 100%)",display:"flex",alignItems:"center",justifyContent:"center",padding:20}}>
-        <div style={{width:"100%",maxWidth:400}}>
-
-          {/* Logo */}
-          <div style={{textAlign:"center",marginBottom:32}}>
-            <div style={{display:"inline-flex",alignItems:"center",justifyContent:"center",width:64,height:64,borderRadius:16,background:"linear-gradient(135deg,"+TEAL+",#0a6b4a)",marginBottom:16,boxShadow:"0 8px 24px rgba(29,158,117,0.4)"}}>
-              <svg width="34" height="34" viewBox="0 0 24 24" fill="none">
-                <rect x="5" y="2" width="14" height="20" rx="2.5" stroke="white" strokeWidth="1.8"/>
-                <circle cx="12" cy="17.5" r="1.4" fill="white"/>
-                <line x1="9" y1="5.5" x2="15" y2="5.5" stroke="white" strokeWidth="1.5" strokeLinecap="round"/>
-              </svg>
-            </div>
-            <p style={{color:"#fff",fontSize:26,fontWeight:800,margin:"0 0 4px",letterSpacing:"-0.5px"}}>MUNDO CEL DIAZ</p>
-            <p style={{color:TEAL,fontSize:13,fontWeight:600,margin:0,letterSpacing:"1px"}}>SISTEMA DE GESTIÓN v2.1</p>
+    <div style={{minHeight:"100vh",background:"linear-gradient(135deg,#0e1e2e 0%,"+NAVY+" 60%,#1a3a2a 100%)",display:"flex",alignItems:"center",justifyContent:"center",padding:20}}>
+      <div style={{width:"100%",maxWidth:400}}>
+        <div style={{textAlign:"center",marginBottom:32}}>
+          <div style={{display:"inline-flex",alignItems:"center",justifyContent:"center",width:64,height:64,borderRadius:16,background:"linear-gradient(135deg,"+TEAL+",#0a6b4a)",marginBottom:16,boxShadow:"0 8px 24px rgba(29,158,117,0.4)"}}>
+            <svg width="34" height="34" viewBox="0 0 24 24" fill="none">
+              <rect x="5" y="2" width="14" height="20" rx="2.5" stroke="white" strokeWidth="1.8"/>
+              <circle cx="12" cy="17.5" r="1.4" fill="white"/>
+              <line x1="9" y1="5.5" x2="15" y2="5.5" stroke="white" strokeWidth="1.5" strokeLinecap="round"/>
+            </svg>
           </div>
-
-          <div style={{background:"rgba(255,255,255,0.05)",borderRadius:16,border:"1px solid rgba(255,255,255,0.1)",padding:32}}>
-
-            {/* ── MODO LOGIN ── */}
-            {recMode==="login"&&(
-                <div>
-                  <p style={{color:"#fff",fontSize:18,fontWeight:700,margin:"0 0 24px",textAlign:"center"}}>Iniciar sesión</p>
-                  {err&&<div style={{background:"rgba(226,75,74,0.15)",border:"1px solid rgba(226,75,74,0.4)",borderRadius:8,padding:"10px 14px",marginBottom:16,color:"#F09595",fontSize:13}}>⚠ {err}</div>}
-                  <div style={{marginBottom:14}}>
-                    <label style={lblSt}>Correo electrónico</label>
-                    <input type="email" style={inBg} value={email} placeholder="tu@correo.com"
-                           onChange={function(e){setEmail(e.target.value);setErr("");}} onKeyDown={handleKey}/>
-                  </div>
-                  <div style={{marginBottom:8}}>
-                    <label style={lblSt}>Contraseña</label>
-                    <div style={{position:"relative"}}>
-                      <input type={showPass?"text":"password"} style={Object.assign({},inBg,{paddingRight:44})} value={pass} placeholder="••••••••"
-                             onChange={function(e){setPass(e.target.value);setErr("");}} onKeyDown={handleKey}/>
-                      <span onClick={function(){setShowPass(!showPass);}} style={{position:"absolute",right:12,top:"50%",transform:"translateY(-50%)",cursor:"pointer",color:"rgba(255,255,255,0.4)",fontSize:16,userSelect:"none"}}>
-                    {showPass?"🙈":"👁"}
-                  </span>
-                    </div>
-                  </div>
-                  <div style={{textAlign:"right",marginBottom:20}}>
-                <span onClick={function(){setRecMode("recover");setRecErr("");setRecEmail("");}}
-                      style={{color:TEAL,fontSize:12,cursor:"pointer",textDecoration:"underline"}}>
-                  ¿Olvidaste tu contraseña?
-                </span>
-                  </div>
-                  <button onClick={doLogin} disabled={loading||blocked}
-                          style={Object.assign({},btnPrimary,{background:loading||blocked?"rgba(255,255,255,0.1)":TEAL,cursor:loading||blocked?"not-allowed":"pointer"})}>
-                    {loading?"Verificando...":blocked?"🔒 Bloqueado":"Ingresar al sistema"}
-                  </button>
-                </div>
-            )}
-
-            {/* ── MODO RECUPERAR — buscar email ── */}
-            {recMode==="recover"&&(
-                <div>
-                  <p style={{color:"#fff",fontSize:18,fontWeight:700,margin:"0 0 8px",textAlign:"center"}}>Recuperar acceso</p>
-                  <p style={{color:"rgba(255,255,255,0.5)",fontSize:13,margin:"0 0 24px",textAlign:"center"}}>Ingresá tu correo para verificar tu identidad</p>
-                  {recErr&&<div style={{background:"rgba(226,75,74,0.15)",border:"1px solid rgba(226,75,74,0.4)",borderRadius:8,padding:"10px 14px",marginBottom:16,color:"#F09595",fontSize:13}}>⚠ {recErr}</div>}
-                  <div style={{marginBottom:20}}>
-                    <label style={lblSt}>Correo electrónico</label>
-                    <input type="email" style={inBg} value={recEmail} placeholder="tu@correo.com"
-                           onChange={function(e){setRecEmail(e.target.value);setRecErr("");}}
-                           onKeyDown={function(e){if(e.key==="Enter")doFindUser();}}/>
-                  </div>
-                  <button onClick={doFindUser} style={btnPrimary}>Continuar</button>
-                  <button onClick={function(){setRecMode("login");setRecErr("");}} style={btnSecondary}>← Volver al login</button>
-                </div>
-            )}
-
-            {/* ── MODO PREGUNTA DE SEGURIDAD ── */}
-            {recMode==="question"&&recUser&&(
-                <div>
-                  <p style={{color:"#fff",fontSize:18,fontWeight:700,margin:"0 0 8px",textAlign:"center"}}>Verificación de identidad</p>
-                  <p style={{color:"rgba(255,255,255,0.5)",fontSize:13,margin:"0 0 24px",textAlign:"center"}}>Respondé tu pregunta de seguridad</p>
-                  {recErr&&<div style={{background:"rgba(226,75,74,0.15)",border:"1px solid rgba(226,75,74,0.4)",borderRadius:8,padding:"10px 14px",marginBottom:16,color:"#F09595",fontSize:13}}>⚠ {recErr}</div>}
-                  <div style={{background:"rgba(29,158,117,0.1)",borderRadius:8,padding:"12px 14px",marginBottom:20,border:"1px solid rgba(29,158,117,0.2)"}}>
-                    <p style={{color:"rgba(255,255,255,0.5)",fontSize:11,margin:"0 0 4px",textTransform:"uppercase",letterSpacing:"0.5px"}}>Pregunta de seguridad</p>
-                    <p style={{color:"#fff",fontSize:14,margin:0,fontWeight:500}}>{recUser.secQuestion}</p>
-                  </div>
-                  <div style={{marginBottom:20}}>
-                    <label style={lblSt}>Tu respuesta</label>
-                    <input type="text" style={inBg} value={recAnswer} placeholder="Ingresá tu respuesta..."
-                           onChange={function(e){setRecAnswer(e.target.value);setRecErr("");}}
-                           onKeyDown={function(e){if(e.key==="Enter")doVerifyAnswer();}}/>
-                  </div>
-                  <button onClick={doVerifyAnswer} style={btnPrimary}>Verificar respuesta</button>
-                  <button onClick={function(){setRecMode("login");setRecErr("");setRecAnswer("");}} style={btnSecondary}>← Volver al login</button>
-                </div>
-            )}
-
-            {/* ── MODO NUEVA CONTRASEÑA ── */}
-            {recMode==="newpass"&&(
-                <div>
-                  <p style={{color:"#fff",fontSize:18,fontWeight:700,margin:"0 0 8px",textAlign:"center"}}>Nueva contraseña</p>
-                  <p style={{color:"rgba(255,255,255,0.5)",fontSize:13,margin:"0 0 24px",textAlign:"center"}}>Ingresá tu nueva contraseña (mín. 8 caracteres)</p>
-                  {recErr&&<div style={{background:"rgba(226,75,74,0.15)",border:"1px solid rgba(226,75,74,0.4)",borderRadius:8,padding:"10px 14px",marginBottom:16,color:"#F09595",fontSize:13}}>⚠ {recErr}</div>}
-                  {renderPassField("Nueva contraseña",newPass,setNewPass,showNewPass,setShowNewPass)}
-                  {renderPassField("Confirmar contraseña",newPass2,setNewPass2,showNewPass2,setShowNewPass2)}
-                  <button onClick={doResetPass} style={btnPrimary}>Guardar nueva contraseña</button>
-                </div>
-            )}
-
-            {/* ── MODO DONE ── */}
-            {recMode==="done"&&(
-                <div style={{textAlign:"center"}}>
-                  <div style={{fontSize:48,marginBottom:16}}>✅</div>
-                  <p style={{color:"#fff",fontSize:18,fontWeight:700,margin:"0 0 8px"}}>¡Listo!</p>
-                  <p style={{color:"rgba(255,255,255,0.6)",fontSize:14,margin:"0 0 24px"}}>{recOk}</p>
-                  <button onClick={function(){setRecMode("login");setEmail(recUser.email);setPass("");setRecUser(null);setRecAnswer("");setNewPass("");setNewPass2("");}} style={btnPrimary}>
-                    Ir al login
-                  </button>
-                </div>
-            )}
-
-          </div>
-          <p style={{color:"rgba(255,255,255,0.2)",fontSize:11,textAlign:"center",marginTop:16}}>
-            Sesión expira en 8 horas · Bloqueo tras 5 intentos fallidos
-          </p>
+          <p style={{color:"#fff",fontSize:26,fontWeight:800,margin:"0 0 4px",letterSpacing:"-0.5px"}}>MUNDO CEL DIAZ</p>
+          <p style={{color:TEAL,fontSize:13,fontWeight:600,margin:0,letterSpacing:"1px"}}>SISTEMA DE GESTIÓN v2.1</p>
         </div>
+        <div style={{background:"rgba(255,255,255,0.05)",borderRadius:16,border:"1px solid rgba(255,255,255,0.1)",padding:32}}>
+          <p style={{color:"#fff",fontSize:18,fontWeight:700,margin:"0 0 24px",textAlign:"center"}}>Iniciar sesión</p>
+          {err&&<div style={{background:"rgba(226,75,74,0.15)",border:"1px solid rgba(226,75,74,0.4)",borderRadius:8,padding:"10px 14px",marginBottom:16,color:"#F09595",fontSize:13}}>⚠ {err}</div>}
+          <div style={{marginBottom:14}}>
+            <label style={{color:"rgba(255,255,255,0.6)",fontSize:12,marginBottom:6,display:"block",textTransform:"uppercase",letterSpacing:"0.5px"}}>Email</label>
+            <input type="email" style={inBg} value={email} placeholder="usuario@mundoceldiaz.com" onChange={function(e){setEmail(e.target.value);setErr("");}} onKeyDown={handleKey}/>
+          </div>
+          <div style={{marginBottom:24}}>
+            <label style={{color:"rgba(255,255,255,0.6)",fontSize:12,marginBottom:6,display:"block",textTransform:"uppercase",letterSpacing:"0.5px"}}>Contraseña</label>
+            <div style={{position:"relative"}}>
+              <input type={showPass?"text":"password"} style={Object.assign({},inBg,{paddingRight:44})} value={pass} placeholder="••••••••" onChange={function(e){setPass(e.target.value);setErr("");}} onKeyDown={handleKey}/>
+              <span onClick={function(){setShowPass(!showPass);}} style={{position:"absolute",right:12,top:"50%",transform:"translateY(-50%)",cursor:"pointer",color:"rgba(255,255,255,0.4)",fontSize:16,userSelect:"none"}}>{showPass?"🙈":"👁"}</span>
+            </div>
+          </div>
+          <button onClick={doLogin} disabled={loading||blocked} style={{width:"100%",padding:"12px",borderRadius:8,border:"none",cursor:loading||blocked?"not-allowed":"pointer",background:loading||blocked?"rgba(255,255,255,0.1)":TEAL,color:"#fff",fontSize:15,fontWeight:700}}>
+            {loading?"Verificando...":blocked?"🔒 Bloqueado":"Ingresar al sistema"}
+          </button>
+          <div style={{marginTop:20,padding:"12px 14px",background:"rgba(29,158,117,0.1)",borderRadius:8,border:"1px solid rgba(29,158,117,0.2)"}}>
+            <p style={{color:TEAL,fontSize:11,margin:"0 0 4px",fontWeight:600,letterSpacing:"0.5px"}}>ACCESO INICIAL (cambiar después)</p>
+            <p style={{color:"rgba(255,255,255,0.5)",fontSize:12,margin:"0 0 2px",fontFamily:"monospace"}}>admin@mundoceldiaz.com</p>
+            <p style={{color:"rgba(255,255,255,0.5)",fontSize:12,margin:0,fontFamily:"monospace"}}>Admin2026#</p>
+          </div>
+        </div>
+        <p style={{color:"rgba(255,255,255,0.2)",fontSize:11,textAlign:"center",marginTop:16}}>Sesión expira en 8 horas · Bloqueo tras 5 intentos fallidos</p>
       </div>
+    </div>
   );
 }
+
 /* ── UsersScreen ── */
 function UsersScreen(props) {
   var session=props.session; var showFlash=props.showFlash;
@@ -333,13 +197,11 @@ function UsersScreen(props) {
   var _fp=useState(""); var fPass=_fp[0]; var setFPass=_fp[1];
   var _fr=useState("cajero"); var fRole=_fr[0]; var setFRole=_fr[1];
   var _fer=useState(""); var fErr=_fer[0]; var setFErr=_fer[1];
-  var _fsq=useState(""); var fSecQ=_fsq[0]; var setFSecQ=_fsq[1];
-  var _fsa=useState(""); var fSecA=_fsa[0]; var setFSecA=_fsa[1];
 
   useEffect(function(){async function load(){var u=await db.load(UK,[]);setUsers(u||[]);setUsersLoaded(true);}load();},[]);
   useEffect(function(){if(usersLoaded)db.save(UK,users);},[users,usersLoaded]);
 
-  function resetForm(){setFName("");setFEmail("");setFPass("");setFRole("cajero");setFErr("");setFSecQ("");setFSecA("");setEditUser(null);setShowForm(false);}
+  function resetForm(){setFName("");setFEmail("");setFPass("");setFRole("cajero");setFErr("");setEditUser(null);setShowForm(false);}
 
   async function saveUser(){
     if(!fName.trim()||!fEmail.trim()){setFErr("Nombre y email son obligatorios");return;}
@@ -348,13 +210,11 @@ function UsersScreen(props) {
     if(!editUser&&!fPass.trim()){setFErr("La contraseña es obligatoria para usuarios nuevos");return;}
     if(fPass&&fPass.length<8){setFErr("Contraseña: mínimo 8 caracteres");return;}
     var hash=fPass?await hashPass(fPass):(editUser?editUser.passwordHash:"");
-    var secAnswerHash=fSecA?await hashPass(fSecA.trim().toLowerCase()):(editUser?editUser.secAnswerHash:"");
-    var secQuestion=fSecQ||(editUser?editUser.secQuestion:"");
     if(editUser){
-      setUsers(function(p){return p.map(function(u){return u.id===editUser.id?Object.assign({},u,{name:fName.trim(),email:fEmail.trim(),role:fRole,passwordHash:hash,secQuestion:secQuestion,secAnswerHash:secAnswerHash}):u;});});
+      setUsers(function(p){return p.map(function(u){return u.id===editUser.id?Object.assign({},u,{name:fName.trim(),email:fEmail.trim(),role:fRole,passwordHash:hash}):u;});});
       showFlash("✓ Usuario actualizado","ok");
     } else {
-      setUsers(function(p){return p.concat([{id:gid(),name:fName.trim(),email:fEmail.trim(),passwordHash:hash,role:fRole,active:true,createdAt:new Date().toISOString(),secQuestion:secQuestion,secAnswerHash:secAnswerHash}]);});
+      setUsers(function(p){return p.concat([{id:gid(),name:fName.trim(),email:fEmail.trim(),passwordHash:hash,role:fRole,active:true,createdAt:new Date().toISOString()}]);});
       showFlash("✓ Usuario creado","ok");
     }
     resetForm();
@@ -368,7 +228,7 @@ function UsersScreen(props) {
     setUsers(function(p){return p.map(function(u){return u.id===uid?Object.assign({},u,{active:!u.active}):u;});});
   }
 
-  function startEdit(u){setEditUser(u);setFName(u.name);setFEmail(u.email);setFPass("");setFRole(u.role);setFErr("");setFSecQ(u.secQuestion||"");setFSecA("");setShowForm(true);}
+  function startEdit(u){setEditUser(u);setFName(u.name);setFEmail(u.email);setFPass("");setFRole(u.role);setFErr("");setShowForm(true);}
 
   return (
     <div>
@@ -384,16 +244,7 @@ function UsersScreen(props) {
             <div><label style={sL}>Nombre</label><input style={sI} value={fName} placeholder="Nombre completo" onChange={function(e){setFErr("");setFName(e.target.value);}}/></div>
             <div><label style={sL}>Email</label><input type="email" style={sI} value={fEmail} placeholder="email@ejemplo.com" onChange={function(e){setFErr("");setFEmail(e.target.value);}}/></div>
             <div><label style={sL}>{editUser?"Nueva contraseña (vacío = no cambiar)":"Contraseña (mín. 8 chars)"}</label><input type="password" style={sI} value={fPass} placeholder="••••••••" onChange={function(e){setFErr("");setFPass(e.target.value);}}/></div>
-            <div><label style={sL}>Pregunta de seguridad</label>
-              <select style={sI} value={fSecQ} onChange={function(e){setFSecQ(e.target.value);}}>
-                <option value="">— Seleccioná una pregunta —</option>
-                <option value="¿Cuál es el nombre de tu primera mascota?">¿Cuál es el nombre de tu primera mascota?</option>
-                <option value="¿En qué ciudad naciste?">¿En qué ciudad naciste?</option>
-                <option value="¿Cuál es el apellido de soltera de tu madre?">¿Cuál es el apellido de soltera de tu madre?</option>
-                <option value="¿Cuál fue el nombre de tu primera escuela?">¿Cuál fue el nombre de tu primera escuela?</option>
-                <option value="¿Cuál es tu comida favorita?">¿Cuál es tu comida favorita?</option>
-              </select></div>
-            <div><label style={sL}>Respuesta de seguridad</label><input type="text" style={sI} value={fSecA} placeholder="Tu respuesta (no distingue mayúsculas)" onChange={function(e){setFErr("");setFSecA(e.target.value);}}/></div>            <div><label style={sL}>Rol</label>
+            <div><label style={sL}>Rol</label>
               <select style={sI} value={fRole} onChange={function(e){setFRole(e.target.value);}}>
                 <option value="admin">Administrador</option>
                 <option value="cajero">Cajero</option>
@@ -416,7 +267,7 @@ function UsersScreen(props) {
       </div>
       <div style={sC}>
         <table style={{width:"100%",borderCollapse:"collapse"}}>
-          <thead><tr>{["Nombre","Email","Rol","Estado","Seguridad","Último acceso",""].map(function(h){return <th key={h} style={sTH}>{h}</th>;})}</tr></thead>
+          <thead><tr>{["Nombre","Email","Rol","Estado","Último acceso",""].map(function(h){return <th key={h} style={sTH}>{h}</th>;})}</tr></thead>
           <tbody>
             {users.map(function(u){
               var isSelf=u.id===session.userId;
@@ -426,7 +277,6 @@ function UsersScreen(props) {
                   <td style={Object.assign({},sTD,{fontFamily:"monospace",fontSize:12})}>{u.email}</td>
                   <td style={sTD}><span style={mBg(u.role==="admin"?"teal":u.role==="cajero"?"blue":"purple")}>{ROLE_LABEL[u.role]||u.role}</span></td>
                   <td style={sTD}><span style={mBg(u.active?"green":"red")}>{u.active?"✓ Activo":"✗ Inactivo"}</span></td>
-                  <td style={sTD}><span style={mBg(u.secQuestion?"green":"amber")}>{u.secQuestion?"✓ Configurada":"⚠ Sin configurar"}</span></td>
                   <td style={Object.assign({},sTD,{color:"#666",fontSize:12})}>{u.lastLogin?fmtD(u.lastLogin)+" "+fmtT(u.lastLogin):"Nunca"}</td>
                   <td style={sTD}>
                     <div style={{display:"flex",gap:6}}>
