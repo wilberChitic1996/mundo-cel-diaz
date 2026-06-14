@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import * as XLSX from 'xlsx';
 import { db } from './utils/db.js';
 import { authAPI, productsAPI, salesAPI, accountsAPI, returnsAPI, defectivesAPI, usersAPI, checkAPI } from './utils/api.js';
@@ -1550,6 +1550,59 @@ function App(props) {
   var _fl=useState({msg:"",type:"ok"}); var flash=_fl[0]; var setFlash=_fl[1];
   var _ss=useState(null); var selSale=_ss[0]; var setSelSale=_ss[1];
 
+  // ── Timeout de inactividad ──
+  var INACTIVITY_MS = 15 * 60 * 1000;   // 15 minutos de inactividad  var WARNING_SEC   = 60;           // segundos de cuenta regresiva antes de cerrar sesión
+  var _tw=useState(false); var showWarning=_tw[0]; var setShowWarning=_tw[1];
+  var _cd=useState(WARNING_SEC); var countdown=_cd[0]; var setCountdown=_cd[1];
+  var inactivityTimer = React.useRef(null);
+  var countdownTimer  = React.useRef(null);
+
+  var resetInactivityTimer = useCallback(function(){
+    if(showWarning) return;
+    clearTimeout(inactivityTimer.current);
+    inactivityTimer.current = setTimeout(function(){
+      setShowWarning(true);
+      setCountdown(WARNING_SEC);
+    }, INACTIVITY_MS);
+  }, [showWarning]);
+
+  useEffect(function(){
+    var events = ["mousemove","mousedown","keydown","touchstart","scroll","click"];
+    events.forEach(function(e){ document.addEventListener(e, resetInactivityTimer, true); });
+    resetInactivityTimer();
+    return function(){
+      events.forEach(function(e){ document.removeEventListener(e, resetInactivityTimer, true); });
+      clearTimeout(inactivityTimer.current);
+      clearInterval(countdownTimer.current);
+    };
+  }, [resetInactivityTimer]);
+
+  useEffect(function(){
+    if(!showWarning){ clearInterval(countdownTimer.current); return; }
+    countdownTimer.current = setInterval(function(){
+      setCountdown(function(c){
+        if(c <= 1){
+          clearInterval(countdownTimer.current);
+          clearSession();
+          onLogout();
+          return 0;
+        }
+        return c - 1;
+      });
+    }, 1000);
+    return function(){ clearInterval(countdownTimer.current); };
+  }, [showWarning]);
+
+  function handleContinueSession(){
+    setShowWarning(false);
+    setCountdown(WARNING_SEC);
+    clearTimeout(inactivityTimer.current);
+    inactivityTimer.current = setTimeout(function(){
+      setShowWarning(true);
+      setCountdown(WARNING_SEC);
+    }, INACTIVITY_MS);
+  }
+
   var _ca=useState([]); var cart=_ca[0]; var setCart=_ca[1];
   var _pq=useState(""); var posQ=_pq[0]; var setPosQ=_pq[1];
   var _pm=useState("Efectivo"); var payMethod=_pm[0]; var setPayMethod=_pm[1];
@@ -1819,6 +1872,30 @@ function App(props) {
 
   return (
       <div style={{display:"flex",minHeight:"100vh",background:"#eceae4"}}>
+
+        {/* ── Modal de inactividad ── */}
+        {showWarning&&(
+            <div style={{position:"fixed",top:0,left:0,width:"100%",height:"100%",background:"rgba(0,0,0,0.65)",zIndex:9999,display:"flex",alignItems:"center",justifyContent:"center"}}>
+              <div style={{background:"#fff",borderRadius:16,padding:"36px 40px",maxWidth:400,width:"90%",textAlign:"center",boxShadow:"0 20px 60px rgba(0,0,0,0.3)"}}>
+                <div style={{fontSize:48,marginBottom:12}}>⏱️</div>
+                <p style={{fontSize:20,fontWeight:700,margin:"0 0 8px",color:"#1a1a1a"}}>¿Seguís ahí?</p>
+                <p style={{fontSize:14,color:"#666",margin:"0 0 20px",lineHeight:1.6}}>Tu sesión se cerrará automáticamente por inactividad.</p>
+                <div style={{background:"#f5f4f0",borderRadius:12,padding:"16px",marginBottom:24}}>
+                  <p style={{fontSize:13,color:"#666",margin:"0 0 4px"}}>Cierre de sesión en</p>
+                  <p style={{fontSize:40,fontWeight:800,margin:0,color:countdown<=10?"#E24B4A":TEAL}}>{countdown}s</p>
+                </div>
+                <div style={{display:"flex",gap:12}}>
+                  <button onClick={function(){clearSession();onLogout();}} style={{flex:1,padding:"11px",borderRadius:8,border:"1px solid rgba(0,0,0,0.15)",background:"#fff",color:"#666",fontSize:14,cursor:"pointer",fontWeight:500}}>
+                    Cerrar sesión
+                  </button>
+                  <button onClick={handleContinueSession} style={{flex:2,padding:"11px",borderRadius:8,border:"none",background:TEAL,color:"#fff",fontSize:14,cursor:"pointer",fontWeight:700}}>
+                    ✓ Continuar sesión
+                  </button>
+                </div>
+              </div>
+            </div>
+        )}
+
         <Sidebar view={view} setView={setView} cartCount={cart.length} pendingCount={pendingAccs.length} products={products} sales={sales} session={session} onLogout={onLogout} isOnline={isOnline}/>
         <div style={{flex:1,padding:"24px 28px",overflowY:"auto",minWidth:0}}>
           {view==="dashboard"&&canAccess(session.role,"dashboard")&&<DashboardScreen sales={sales} todaySales={todaySales} pendingAccs={pendingAccs} totalPend={totalPend} products={products} top5={top5} setSelectedSale={setSelSale} setView={setView} accounts={accounts} returns={returns}/>}
