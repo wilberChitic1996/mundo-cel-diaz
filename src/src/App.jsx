@@ -1342,9 +1342,7 @@ function App(props) {
       var online = await checkAPI();
       setIsOnline(online);
 
-      var hasApiToken = !!sessionStorage.getItem('mnpos-api-session');
-      if(online && hasApiToken){
-        // Modo online: cargar datos desde el API
+      if(online){        // Modo online: cargar datos desde el API
         try {
           var [prods, sls, accs, rets, defs] = await Promise.all([
             productsAPI.getAll(),
