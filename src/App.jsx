@@ -1551,7 +1551,8 @@ function App(props) {
   var _ss=useState(null); var selSale=_ss[0]; var setSelSale=_ss[1];
 
   // ── Timeout de inactividad ──
-  var INACTIVITY_MS = 15 * 60 * 1000;   // 15 minutos de inactividad  var WARNING_SEC   = 60;           // segundos de cuenta regresiva antes de cerrar sesión
+  var INACTIVITY_MS = 15 * 60 * 1000; // 15 minutos de inactividad
+  var WARNING_SEC   = 60;           // segundos de cuenta regresiva antes de cerrar sesión
   var _tw=useState(false); var showWarning=_tw[0]; var setShowWarning=_tw[1];
   var _cd=useState(WARNING_SEC); var countdown=_cd[0]; var setCountdown=_cd[1];
   var inactivityTimer = React.useRef(null);
