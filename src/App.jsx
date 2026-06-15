@@ -480,60 +480,49 @@ function UsersScreen(props) {
 
 /* ── Theme CSS ── */
 var THEME_CSS = `
-/* ── Fix global: cursor y selección de texto ── */
-*, *::before, *::after {
-  box-sizing: border-box;
-}
+/* ══════════════════════════════════════════════════
+   SISTEMA DE FOCO PROFESIONAL
+   Técnica usada por Google, GitHub, Notion, Linear.
+   - Mouse: sin outline, sin caret, limpio
+   - Teclado: outline teal visible solo al navegar
+   ══════════════════════════════════════════════════ */
 
-/* Fix cursor — solo afecta visualmente, no bloquea foco */
-body {
-  cursor: default;
-}
-p, span, div, h1, h2, h3, h4, h5, h6, td, th, li {
-  cursor: default;
-}
+*, *::before, *::after { box-sizing: border-box; }
 
-/* Elementos clickeables — cursor pointer */
-button, a, [role="button"] {
-  cursor: pointer !important;
-}
+/* Reset completo de outline por defecto del browser */
+*, *:focus { outline: none; }
 
-/* Inputs — cursor texto y selección habilitada */
-input, textarea {
-  cursor: text !important;
-  user-select: text !important;
-  -webkit-user-select: text !important;
-}
-select {
-  cursor: pointer !important;
-}
-input[type="checkbox"], input[type="radio"], input[type="file"] {
-  cursor: pointer !important;
-}
+/* Cursor correcto por tipo de elemento */
+body, p, div, span, h1, h2, h3, h4, h5, h6,
+td, th, li, label, nav, section { cursor: default; }
+button, a, [role="button"] { cursor: pointer; }
+input, textarea { cursor: text; }
+select, input[type="checkbox"],
+input[type="radio"], input[type="file"] { cursor: pointer; }
 
-/* Foco visible en divs interactivos (sidebar, tarjetas POS) */
-div:focus-visible, span:focus-visible, tr:focus-visible {
+/* Modo MOUSE: sin ningún outline (clase agregada por JS) */
+body.using-mouse *:focus { outline: none !important; box-shadow: none !important; }
+
+/* Modo TECLADO: outline teal profesional (clase agregada por JS) */
+body.using-keyboard *:focus-visible {
   outline: 2px solid #1D9E75 !important;
-  outline-offset: 2px !important;
-  border-radius: 4px;
+  outline-offset: 3px !important;
+  border-radius: 6px !important;
+  box-shadow: 0 0 0 4px rgba(29,158,117,0.15) !important;
 }
 
-/* Foco de teclado visible — anillo teal para todos los elementos */
-button:focus-visible,
-input:focus-visible,
-select:focus-visible,
-textarea:focus-visible,
-a:focus-visible,
-[tabindex]:focus-visible {
+/* Inputs siempre muestran borde teal al tener foco (en ambos modos) */
+body.using-keyboard input:focus,
+body.using-keyboard select:focus,
+body.using-keyboard textarea:focus {
   outline: 2px solid #1D9E75 !important;
-  outline-offset: 2px !important;
+  outline-offset: 0px !important;
+  box-shadow: 0 0 0 3px rgba(29,158,117,0.2) !important;
 }
 
-/* Quitar outline feo al hacer clic con mouse */
-button:focus:not(:focus-visible),
-input:focus:not(:focus-visible),
-select:focus:not(:focus-visible) {
-  outline: none;
+/* Eliminar caret/cursor parpadeante en elementos no editables */
+[tabindex]:not(input):not(textarea):not(select) {
+  caret-color: transparent;
 }
 
 /* Responsive — ocultar sidebar en móvil */
@@ -628,6 +617,35 @@ function AppWrapper() {
       }
     }
     initAdmin();
+  },[]);
+
+  /* ── Detector de modo mouse vs teclado (patrón profesional) ── */
+  useEffect(function(){
+    var usingMouse = true;
+    document.body.classList.add("using-mouse");
+
+    function onMouseDown(){
+      if(!usingMouse){
+        usingMouse = true;
+        document.body.classList.remove("using-keyboard");
+        document.body.classList.add("using-mouse");
+      }
+    }
+    function onKeyDown(e){
+      // Solo activar modo teclado con teclas de navegación
+      var navKeys = ["Tab","ArrowUp","ArrowDown","ArrowLeft","ArrowRight","Enter"," ","Escape"];
+      if(navKeys.indexOf(e.key) >= 0 && usingMouse){
+        usingMouse = false;
+        document.body.classList.remove("using-mouse");
+        document.body.classList.add("using-keyboard");
+      }
+    }
+    document.addEventListener("mousedown", onMouseDown);
+    document.addEventListener("keydown", onKeyDown);
+    return function(){
+      document.removeEventListener("mousedown", onMouseDown);
+      document.removeEventListener("keydown", onKeyDown);
+    };
   },[]);
 
   return (
