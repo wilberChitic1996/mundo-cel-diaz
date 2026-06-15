@@ -157,9 +157,13 @@ function LoginScreen(props) {
     var updated=(users||[]).map(function(u){return u.id===user.id?Object.assign({},u,{lastLogin:new Date().toISOString()}):u;});
     await db.save(UK,updated);
     try {
-      await authAPI.login(email.trim(),pass);
-      // authAPI.login ya guarda la sesión con token via saveLocalSession
-    } catch(e){}
+      var apiResp=await authAPI.login(email.trim(),pass);
+      if(apiResp&&apiResp.user){
+        setLoading(false);
+        onLogin(createSession({id:apiResp.user.id,name:apiResp.user.name,email:apiResp.user.email,role:apiResp.user.role}));
+        return;
+      }
+    } catch(e){ console.warn("API login no disponible, usando local:",e); }
     setLoading(false);
     onLogin(createSession(user));
   }
@@ -352,7 +356,28 @@ function UsersScreen(props) {
   var _fsq=useState(""); var fSecQ=_fsq[0]; var setFSecQ=_fsq[1];
   var _fsa=useState(""); var fSecA=_fsa[0]; var setFSecA=_fsa[1];
 
-  useEffect(function(){async function load(){var u=await db.load(UK,[]);setUsers(u||[]);setUsersLoaded(true);}load();},[]);
+  useEffect(function(){
+    async function load(){
+      var u=await db.load(UK,[]);
+      setUsers(u||[]);
+      try {
+        var apiUsers=await usersAPI.getAll();
+        if(apiUsers&&apiUsers.length>0){
+          var merged=apiUsers.map(function(au){
+            var local=(u||[]).find(function(lu){return lu.email.toLowerCase()===au.email.toLowerCase();});
+            return {id:au.id,name:au.name,email:au.email,role:au.role,active:au.active,
+              passwordHash:local?local.passwordHash:"",secQuestion:local?local.secQuestion:"",
+              secAnswerHash:local?local.secAnswerHash:"",lastLogin:au.last_login||null,
+              createdAt:au.created_at||new Date().toISOString()};
+          });
+          setUsers(merged);
+          await db.save(UK,merged);
+        }
+      } catch(e){ console.warn("No se pudo cargar usuarios desde API:",e); }
+      setUsersLoaded(true);
+    }
+    load();
+  },[]);
   useEffect(function(){if(usersLoaded)db.save(UK,users);},[users,usersLoaded]);
 
   function resetForm(){setFName("");setFEmail("");setFPass("");setFRole("cajero");setFErr("");setFSecQ("");setFSecA("");setEditUser(null);setShowForm(false);}
@@ -368,20 +393,24 @@ function UsersScreen(props) {
     var secQuestion=fSecQ||(editUser?editUser.secQuestion:"");
     if(editUser){
       setUsers(function(p){return p.map(function(u){return u.id===editUser.id?Object.assign({},u,{name:fName.trim(),email:fEmail.trim(),role:fRole,passwordHash:hash,secQuestion:secQuestion,secAnswerHash:secAnswerHash}):u;});});
+      try{ var upd={name:fName.trim(),email:fEmail.trim(),role:fRole,active:editUser.active}; if(fPass)upd.password=fPass; await usersAPI.update(editUser.id,upd); }catch(e){ console.warn("Sync Supabase user update:",e); }
       showFlash("✓ Usuario actualizado","ok");
     } else {
       setUsers(function(p){return p.concat([{id:gid(),name:fName.trim(),email:fEmail.trim(),passwordHash:hash,role:fRole,active:true,createdAt:new Date().toISOString(),secQuestion:secQuestion,secAnswerHash:secAnswerHash}]);});
+      try{ await usersAPI.create({name:fName.trim(),email:fEmail.trim(),password:fPass,role:fRole}); }catch(e){ console.warn("Sync Supabase user create:",e); }
       showFlash("✓ Usuario creado","ok");
     }
     resetForm();
   }
 
-  function toggleActive(uid){
+  async function toggleActive(uid){
     if(uid===session.userId){showFlash("No podés desactivar tu propia cuenta","warn");return;}
     var admins=users.filter(function(u){return u.role==="admin"&&u.active;});
     var tgt=users.find(function(u){return u.id===uid;});
     if(tgt&&tgt.role==="admin"&&admins.length<=1&&tgt.active){showFlash("Debe existir al menos un administrador activo","warn");return;}
-    setUsers(function(p){return p.map(function(u){return u.id===uid?Object.assign({},u,{active:!u.active}):u;});});
+    var newActive=!tgt.active;
+    setUsers(function(p){return p.map(function(u){return u.id===uid?Object.assign({},u,{active:newActive}):u;});});
+    try{ await usersAPI.update(uid,{active:newActive}); }catch(e){ console.warn("Sync Supabase toggleActive:",e); }
   }
 
   function startEdit(u){setEditUser(u);setFName(u.name);setFEmail(u.email);setFPass("");setFRole(u.role);setFErr("");setFSecQ(u.secQuestion||"");setFSecA("");setShowForm(true);}
@@ -1742,6 +1771,10 @@ function HistoryScreen(props) {
         '<div class="label">Comprobante de Venta</div>'+
         '<div class="num"># '+ventaNum+'</div>'+
       '</div>'+
+      '<div style="text-align:center;margin-top:4px;">'+
+        '<div id="qrv" style="display:inline-block;"></div>'+
+        '<div style="font-size:9px;color:#999;margin-top:3px;letter-spacing:0.5px;">ESCANEAR PARA VERIFICAR</div>'+
+      '</div>'+
     '</div>'+
 
     '<div class="info-grid">'+
@@ -1801,9 +1834,9 @@ function HistoryScreen(props) {
     '</body></html>';
 
     var w=window.open("","_blank","width=800,height=700");
-    w.document.write(html);
+    var qrTxt='MUNDO CEL DIAZ | #'+ventaNum+' | '+sale.client+' | '+fecha+' | Q'+Number(sale.total).toFixed(2);
+    w.document.write(html+'<scr'+'ipt src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></scr'+'ipt><scr'+'ipt>window.onload=function(){try{new QRCode(document.getElementById("qrv"),{text:'+JSON.stringify(qrTxt)+',width:90,height:90,colorDark:"#1a2535",colorLight:"#fff"});}catch(e){}setTimeout(function(){window.print();},800);};</scr'+'ipt>');
     w.document.close();
-    w.onload=function(){w.print();};
   }
 
   if(selectedSale){
@@ -2746,7 +2779,13 @@ function printRepairTicket(rep){
   '</style></head><body>'+
   '<div class="header">'+
     '<div class="brand"><h1>MUNDO CEL DIAZ</h1><p>ORDEN DE TRABAJO</p></div>'+
-    '<div class="rep-num"><div class="label">N° Orden</div><div class="num">'+rep.repCode+'</div></div>'+
+    '<div style="display:flex;align-items:flex-start;gap:14px;">'+
+'<div class="rep-num"><div class="label">N° Orden</div><div class="num">'+rep.repCode+'</div></div>'+
+'<div style="text-align:center;margin-top:4px;">'+
+'<div id="qrr" style="display:inline-block;"></div>'+
+'<div style="font-size:9px;color:#999;margin-top:3px;">ESCANEAR</div>'+
+'</div>'+
+'</div>'+
   '</div>'+
   '<div class="status-bar"><span>Estado: <b>'+statusInfo.icon+' '+statusInfo.label+'</b></span><span>Registrada: '+new Date(rep.createdAt).toLocaleDateString("es-GT",{day:"2-digit",month:"short",year:"numeric"})+'</span>'+(rep.promisedDate?'<span>Entrega prometida: <b>'+new Date(rep.promisedDate+"T00:00:00").toLocaleDateString("es-GT",{day:"2-digit",month:"short",year:"numeric"})+'</b></span>':'')+
   '</div>'+
@@ -2767,9 +2806,9 @@ function printRepairTicket(rep){
   '<div class="firma">Firma del cliente: _____________________________ &nbsp;&nbsp;&nbsp; Fecha entrega: _______________</div>'+
   '</body></html>';
   var w=window.open("","_blank","width=800,height=700");
-  w.document.write(html);
+  var qrTxtR='MUNDO CEL DIAZ | Orden: '+rep.repCode+' | '+rep.clientName+' | '+rep.brand+' '+rep.model;
+  w.document.write(html+'<scr'+'ipt src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></scr'+'ipt><scr'+'ipt>window.onload=function(){try{new QRCode(document.getElementById("qrr"),{text:'+JSON.stringify(qrTxtR)+',width:85,height:85,colorDark:"#1a2535",colorLight:"#fff"});}catch(e){}setTimeout(function(){window.print();},800);};</scr'+'ipt>');
   w.document.close();
-  w.onload=function(){w.print();};
 }
 
 function RepairsScreen(props){
