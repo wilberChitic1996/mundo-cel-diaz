@@ -111,32 +111,35 @@ function LoginScreen(props) {
 
   async function doLogin(){
     if(blocked){setErr("Cuenta bloqueada 5 minutos por seguridad.");return;}
-    if(!email.trim()||!pass){setErr("Ingresá tu email y contraseña");return;}
+    if(!email.trim()||!pass){setErr("Ingresá tu email y contraseña.");return;}
     setLoading(true);setErr("");
+    // 1. Intentar API primero (Supabase)
+    try {
+      var apiResp=await authAPI.login(email.trim(),pass);
+      if(apiResp&&apiResp.user){
+        setLoading(false);
+        onLogin(createSession({id:apiResp.user.id,name:apiResp.user.name,email:apiResp.user.email,role:apiResp.user.role}));
+        return;
+      }
+    } catch(e){ console.warn("API no disponible, intentando local:",e); }
+    // 2. Fallback local (modo offline)
     var users=await db.load(UK,[]);
     var user=(users||[]).find(function(u){return u.email.toLowerCase()===email.trim().toLowerCase()&&u.active;});
-    if(!user){setAttempts(function(a){return a+1;});setErr("Email o contraseña incorrectos");setLoading(false);return;}
+    if(!user){
+      var na=attempts+1;setAttempts(na);
+      if(na>=5){setBlocked(true);setErr("5 intentos fallidos — bloqueado 5 minutos.");setTimeout(function(){setBlocked(false);setAttempts(0);setErr("");},5*60*1000);}
+      else{setErr("Email o contraseña incorrectos. Intentos: "+(5-na));}
+      setLoading(false);return;
+    }
     var hash=await hashPass(pass);
     if(hash!==user.passwordHash){
-      var na=attempts+1; setAttempts(na);
-      if(na>=5){
-        setBlocked(true);
-        setErr("5 intentos fallidos — bloqueado 5 minutos.");
-        setTimeout(function(){setBlocked(false);setAttempts(0);setErr("");},5*60*1000);
-      } else {
-        setErr("Contraseña incorrecta. Intentos restantes: "+(5-na));
-      }
+      var na2=attempts+1;setAttempts(na2);
+      if(na2>=5){setBlocked(true);setErr("5 intentos fallidos — bloqueado 5 minutos.");setTimeout(function(){setBlocked(false);setAttempts(0);setErr("");},5*60*1000);}
+      else{setErr("Contraseña incorrecta. Intentos restantes: "+(5-na2));}
       setLoading(false);return;
     }
     var updated=(users||[]).map(function(u){return u.id===user.id?Object.assign({},u,{lastLogin:new Date().toISOString()}):u;});
     await db.save(UK,updated);
-    // Intentar login en el backend para sincronizacion en la nube
-    try {
-      await authAPI.login(email.trim(), pass);
-      console.log("Backend conectado — modo nube activo");
-    } catch(e) {
-      console.log("Backend no disponible — modo local activo");
-    }
     setLoading(false);
     onLogin(createSession(user));
   }
@@ -1379,7 +1382,7 @@ function App(props) {
           var normalAccs  = (accs||[]).map(function(a){return Object.assign({},a,{items:a.account_items||[],payments:a.account_payments||[],total:Number(a.total),paid:Number(a.paid),balance:Number(a.balance),date:a.created_at});});
           var normalRets  = (rets||[]).map(function(r){return Object.assign({},r,{items:r.return_items||[],refundAmount:Number(r.refund_amount),itemCondition:r.item_condition,refundMethod:r.refund_method,date:r.created_at});});
           var normalDefs  = (defs||[]).map(function(d){return Object.assign({},d,{price:Number(d.price||0)});});
-          setProducts(normalProds.length>0?normalProds:DEMO);
+          setProducts(normalProds);
           setSales(normalSales);
           setAccounts(normalAccs);
           setReturns(normalRets);
@@ -1387,7 +1390,7 @@ function App(props) {
         } catch(e) {
           console.warn("Error cargando del API, usando local:", e);
           setIsOnline(false);
-          var p2 = await db.load(PK, DEMO);
+          var p2 = await db.load(PK, []);
           var s2 = await db.load(SK, []);
           var a2 = await db.load(AK, []);
           var r2 = await db.load(RK, []);
