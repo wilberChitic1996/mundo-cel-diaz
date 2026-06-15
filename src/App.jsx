@@ -44,13 +44,13 @@ var DEMO = [
   {id:"p10",code:"E002",name:"Funda silicona",        category:"Accesorios", price:35, cost:12, stock:25, shelf:"E-02",unit:"uni"},
 ];
 
-var sC  = {background:"#fff",borderRadius:12,border:"1px solid rgba(0,0,0,0.09)",padding:"20px 24px"};
-var sI  = {width:"100%",padding:"8px 12px",borderRadius:8,border:"1px solid rgba(0,0,0,0.2)",fontSize:14,background:"#fff",color:"#1a1a1a",boxSizing:"border-box"};
-var sL  = {fontSize:13,color:"#666",marginBottom:4,display:"block"};
-var sTH = {textAlign:"left",padding:"10px 12px",color:"#666",fontSize:13,borderBottom:"1px solid rgba(0,0,0,0.08)",fontWeight:500};
-var sTD = {padding:"10px 12px",borderBottom:"1px solid rgba(0,0,0,0.05)",color:"#1a1a1a",fontSize:14};
+var sC  = {background:"var(--bg-card,#fff)",borderRadius:12,border:"1px solid var(--border-card,rgba(0,0,0,0.09))",padding:"20px 24px"};
+var sI  = {width:"100%",padding:"8px 12px",borderRadius:8,border:"1px solid var(--border-input,rgba(0,0,0,0.2))",fontSize:14,background:"var(--bg-input,#fff)",color:"var(--text-primary,#1a1a1a)",boxSizing:"border-box"};
+var sL  = {fontSize:13,color:"var(--text-secondary,#666)",marginBottom:4,display:"block"};
+var sTH = {textAlign:"left",padding:"10px 12px",color:"var(--text-secondary,#666)",fontSize:13,borderBottom:"1px solid var(--border-table,rgba(0,0,0,0.08))",fontWeight:500,background:"var(--bg-table-head,transparent)"};
+var sTD = {padding:"10px 12px",borderBottom:"1px solid var(--border-row,rgba(0,0,0,0.05))",color:"var(--text-primary,#1a1a1a)",fontSize:14};
 var sQB = {cursor:"pointer",background:"#f0efeb",width:26,height:26,borderRadius:5,display:"flex",alignItems:"center",justifyContent:"center",fontSize:16,userSelect:"none",flexShrink:0,border:"1px solid rgba(0,0,0,0.1)"};
-var H1  = {fontSize:22,fontWeight:600,margin:"0 0 20px",color:"#1a1a1a"};
+var H1  = {fontSize:22,fontWeight:600,margin:"0 0 20px",color:"var(--text-primary,#1a1a1a)"};
 
 function mB(c) {
   var colors = {teal:TEAL,red:"#E24B4A",blue:"#378ADD",purple:"#7F77DD",gray:"#eeede9",green:"#2E7D32",amber:"#E65100"};
@@ -478,9 +478,54 @@ function UsersScreen(props) {
   );
 }
 
+/* ── Theme CSS ── */
+var THEME_CSS = `
+[data-theme="light"] {
+  --bg-main: #eceae4;
+  --bg-card: #ffffff;
+  --bg-input: #ffffff;
+  --bg-sidebar: #1a2535;
+  --bg-hover: rgba(255,255,255,0.1);
+  --text-primary: #1a1a1a;
+  --text-secondary: #666666;
+  --text-muted: #999999;
+  --border-card: rgba(0,0,0,0.09);
+  --border-input: rgba(0,0,0,0.2);
+  --border-table: rgba(0,0,0,0.08);
+  --border-row: rgba(0,0,0,0.05);
+  --bg-table-head: #f5f4f0;
+  --bg-alt: #f5f4f0;
+  --shadow: rgba(0,0,0,0.05);
+}
+[data-theme="dark"] {
+  --bg-main: #0f1923;
+  --bg-card: #1a2535;
+  --bg-input: #243044;
+  --bg-sidebar: #0d1520;
+  --bg-hover: rgba(255,255,255,0.08);
+  --text-primary: #e8eaed;
+  --text-secondary: #9aa0ab;
+  --text-muted: #666e7a;
+  --border-card: rgba(255,255,255,0.08);
+  --border-input: rgba(255,255,255,0.15);
+  --border-table: rgba(255,255,255,0.07);
+  --border-row: rgba(255,255,255,0.04);
+  --bg-table-head: #1f2e42;
+  --bg-alt: #1f2e42;
+  --shadow: rgba(0,0,0,0.3);
+}
+`;
+
 /* ── AppWrapper — controla autenticación ── */
 function AppWrapper() {
   var _s=useState(function(){return getSession();}); var session=_s[0]; var setSession=_s[1];
+  var _th=useState(function(){return localStorage.getItem("mnpos-theme")||"light";}); var theme=_th[0]; var setTheme=_th[1];
+
+  function toggleTheme(){
+    var next=theme==="light"?"dark":"light";
+    setTheme(next);
+    localStorage.setItem("mnpos-theme",next);
+  }
 
   useEffect(function(){
     async function initAdmin(){
@@ -494,8 +539,15 @@ function AppWrapper() {
     initAdmin();
   },[]);
 
-  if(!session) return <LoginScreen onLogin={function(s){setSession(s);}}/>;
-  return <App session={session} onLogout={function(){clearSession();setSession(null);}}/>;
+  return (
+    <div data-theme={theme} style={{minHeight:"100vh"}}>
+      <style dangerouslySetInnerHTML={{__html:THEME_CSS}}/>
+      {!session
+        ? <LoginScreen onLogin={function(s){setSession(s);}}/>
+        : <App session={session} onLogout={function(){clearSession();setSession(null);}} theme={theme} toggleTheme={toggleTheme}/>
+      }
+    </div>
+  );
 }
 
 /* ── MetricBox ── */
@@ -557,6 +609,7 @@ function Sidebar(props) {
   var cartLen=props.cartLen; var pendingLen=props.pendingLen;
   var products=props.products; var sales=props.sales;
   var session=props.session||{}; var onLogout=props.onLogout||function(){}; var isOnline=props.isOnline||false;
+  var theme=props.theme||"light"; var toggleTheme=props.toggleTheme||function(){};
   var NAV = [
     {id:"dashboard", ic:"📊", lb:"Dashboard"},
     {id:"pos",       ic:"🛒", lb:"Nueva Venta"},
@@ -628,6 +681,9 @@ function Sidebar(props) {
               </div>
           )}
           <div style={{padding:"8px 16px"}}>
+            <button onClick={toggleTheme} style={{width:"100%",padding:"6px 0",borderRadius:6,border:"1px solid rgba(255,255,255,0.15)",background:"rgba(255,255,255,0.05)",color:"rgba(255,255,255,0.6)",cursor:"pointer",fontSize:11,fontWeight:500,marginBottom:6}}>
+              {theme==="light"?"🌙 Modo oscuro":"☀️ Modo claro"}
+            </button>
             <div style={{fontSize:10,color:"rgba(255,255,255,0.2)",lineHeight:1.9}}>{products.length} prod · {sales.length} ventas</div>
             <div style={{fontSize:9,marginTop:2,color:isOnline?"#1D9E75":"rgba(255,255,255,0.15)"}}>● {isOnline?"Conectado a la nube":"Modo local"}</div>
           </div>
@@ -1577,10 +1633,47 @@ function DefectiveScreen(props) {
 /* ── Productos ── */
 function ProductsScreen(props) {
   var products=props.products; var saveProduct=props.saveProduct; var deleteProduct=props.deleteProduct;
+  var importProducts=props.importProducts||function(){};
   var _s=useState(""); var search=_s[0]; var setSearch=_s[1];
   var _c=useState("Todas"); var cat=_c[0]; var setCat=_c[1];
   var _o=useState("name"); var sort=_o[0]; var setSort=_o[1];
   var _e=useState(null); var editProd=_e[0]; var setEditProd=_e[1];
+  var _im=useState(false); var importing=_im[0]; var setImporting=_im[1];
+  var _imMsg=useState(""); var importMsg=_imMsg[0]; var setImportMsg=_imMsg[1];
+
+  function handleImportExcel(file){
+    if(!file) return;
+    setImporting(true); setImportMsg("");
+    var reader=new FileReader();
+    reader.onload=function(e){
+      try {
+        var wb=XLSX.read(e.target.result,{type:"binary"});
+        var ws=wb.Sheets[wb.SheetNames[0]];
+        var rows=XLSX.utils.sheet_to_json(ws,{defval:""});
+        var valid=rows.filter(function(r){return r.name&&String(r.name).trim();});
+        if(valid.length===0){setImportMsg("❌ No se encontraron productos válidos. Verificá que usás la plantilla correcta.");setImporting(false);return;}
+        var prods=valid.map(function(r){return {
+          name:String(r.name||"").trim(),
+          category:String(r.category||"").trim(),
+          shelf:String(r.shelf||"").trim(),
+          price:parseFloat(r.price)||0,
+          cost:parseFloat(r.cost)||0,
+          stock:parseInt(r.stock)||0,
+          minStock:parseInt(r.minStock||r.min_stock||5)||5,
+          unit:String(r.unit||"uni").trim().toLowerCase()==="serv"?"serv":"uni",
+        };});
+        importProducts(prods,function(ok,count){
+          setImporting(false);
+          setImportMsg(ok?"✅ "+count+" productos importados correctamente":"❌ Error al importar. Intentá de nuevo.");
+          setTimeout(function(){setImportMsg("");},5000);
+        });
+      } catch(err){
+        setImportMsg("❌ Archivo inválido: "+err.message);
+        setImporting(false);
+      }
+    };
+    reader.readAsBinaryString(file);
+  }
   var cats=["Todas"].concat(Array.from(new Set(products.map(function(p){return p.category;}))));
   var filtered=products.filter(function(p){
     var q=search.toLowerCase();
@@ -1595,8 +1688,16 @@ function ProductsScreen(props) {
       <div>
         <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:20}}>
           <p style={H1}>📦 Productos y Servicios</p>
-          <button style={mB("teal")} onClick={function(){setEditProd({code:"",name:"",category:"",price:"",cost:"",stock:"",shelf:"",unit:"uni"});}}>+ Agregar</button>
+          <div style={{display:"flex",gap:8}}>
+            <label style={Object.assign({},mB("blue"),{cursor:importing?"not-allowed":"pointer",opacity:importing?0.6:1,display:"flex",alignItems:"center",gap:6})}>
+              {importing?"⏳ Importando...":"📥 Importar Excel"}
+              <input type="file" accept=".xlsx,.xls" style={{display:"none"}} disabled={importing}
+                onChange={function(e){handleImportExcel(e.target.files[0]);e.target.value="";}}/>
+            </label>
+            <button style={mB("teal")} onClick={function(){setEditProd({name:"",category:"",price:"",cost:"",stock:"",shelf:"",unit:"uni"});}}>+ Agregar</button>
+          </div>
         </div>
+        {importMsg&&<div style={{background:importMsg.startsWith("✅")?"#EAF3DE":"#FCEBEB",border:"1px solid "+(importMsg.startsWith("✅")?"#97C459":"#F09595"),borderRadius:8,padding:"10px 16px",marginBottom:12,color:importMsg.startsWith("✅")?"#27500A":"#791F1F",fontSize:14,fontWeight:500}}>{importMsg}</div>}
         {editProd&&<ProductForm product={editProd} onSave={function(p){saveProduct(p);setEditProd(null);}} onCancel={function(){setEditProd(null);}}/>}
         <div style={Object.assign({},sC,{marginBottom:14})}>
           <div style={{display:"flex",gap:10,flexWrap:"wrap",alignItems:"center"}}>
@@ -2199,6 +2300,7 @@ function ClientsScreen(props) {
 /* ══ APP ══════════════════════════════════════════════════════════════ */
 function App(props) {
   var session=props.session||{}; var onLogout=props.onLogout||function(){};
+  var theme=props.theme||"light"; var toggleTheme=props.toggleTheme||function(){};
   var _p=useState([]); var products=_p[0]; var setProducts=_p[1];
   var _s=useState([]); var sales=_s[0]; var setSales=_s[1];
   var _a=useState([]); var accounts=_a[0]; var setAccounts=_a[1];
@@ -2569,6 +2671,31 @@ function App(props) {
     showFlash("Producto eliminado","ok");
   }
 
+  async function importProducts(prods, callback){
+    var count=0; var errors=0;
+    for(var i=0;i<prods.length;i++){
+      var prod=prods[i];
+      try{
+        if(isOnline){
+          var saved=await productsAPI.create({
+            name:prod.name,category:prod.category||"",shelf:prod.shelf||"",
+            price:prod.price,cost:prod.cost||0,stock:prod.stock||0,
+            minStock:prod.minStock||5,unit:prod.unit||"uni"
+          });
+          setProducts(function(p){return p.concat([Object.assign({},prod,{id:saved.id,code:saved.code})]);});
+        } else {
+          setProducts(function(p){return p.concat([Object.assign({},prod,{id:gid(),code:"P"+(p.length+1).toString().padStart(3,"0")})]);});
+        }
+        count++;
+      } catch(e){
+        console.warn("Error importando:",prod.name,e);
+        errors++;
+      }
+    }
+    if(callback) callback(errors===0,count);
+    showFlash("✅ "+count+" productos importados"+(errors>0?" ("+errors+" con error)":""),"ok");
+  }
+
   async function saveRepair(rep){
     if(isOnline){
       try{
@@ -2683,7 +2810,7 @@ function App(props) {
   var top5=Object.keys(pqs).map(function(k){return [k,pqs[k]];}).sort(function(a,b){return b[1]-a[1];}).slice(0,5);
 
   return (
-      <div style={{display:"flex",minHeight:"100vh",background:"#eceae4"}}>
+      <div style={{display:"flex",minHeight:"100vh",background:"var(--bg-main,#eceae4)"}}>
 
         {/* ── Modal de inactividad ── */}
         {showWarning&&(
@@ -2708,7 +2835,7 @@ function App(props) {
           </div>
         )}
 
-        <Sidebar view={view} setView={setView} cartCount={cart.length} pendingCount={pendingAccs.length} products={products} sales={sales} session={session} onLogout={onLogout} isOnline={isOnline}/>
+        <Sidebar view={view} setView={setView} cartCount={cart.length} pendingCount={pendingAccs.length} products={products} sales={sales} session={session} onLogout={onLogout} isOnline={isOnline} theme={theme} toggleTheme={toggleTheme}/>
         <div style={{flex:1,padding:"24px 28px",overflowY:"auto",minWidth:0}}>
           {view==="dashboard"&&canAccess(session.role,"dashboard")&&<DashboardScreen sales={sales} todaySales={todaySales} pendingAccs={pendingAccs} totalPend={totalPend} products={products} top5={top5} setSelectedSale={setSelSale} setView={setView} accounts={accounts} returns={returns} repairs={repairs}/>}
           {view==="pos"      &&canAccess(session.role,"pos")&&<POSScreen products={products} filteredPOS={filteredPOS} cart={cart} posQ={posQ} setPosQ={setPosQ} payMethod={payMethod} setPayMethod={setPayMethod} payType={payType} setPayType={setPayType} cashIn={cashIn} setCashIn={setCashIn} initialPay={initialPay} setInitialPay={setInitialPay} clientName={clientName} setClientName={setClientName} selectedClientId={selectedClientId} setSelectedClientId={setSelectedClientId} saleNote={saleNote} setSaleNote={setSaleNote} cartTotal={cartTotal} vuelto={vuelto} initPaidVal={initPaidVal} addToCart={addToCart} changeQty={changeQty} removeFromCart={removeFromCart} applyDiscount={applyDiscount} checkout={checkout} resetPOS={resetPOS} flash={flash} clients={clients} accounts={accounts}/>}
@@ -2716,7 +2843,7 @@ function App(props) {
           {view==="accounts" &&canAccess(session.role,"accounts")&&<AccountsScreen accounts={accounts} pendingAccs={pendingAccs} totalPend={totalPend} addPayment={addPayment} showFlash={showFlash}/>}
           {view==="returns"  &&canAccess(session.role,"returns")&&<ReturnsScreen returns={returns} products={products} onProcess={processReturn} showFlash={showFlash} clients={clients} sales={sales}/>}
           {view==="defective"&&canAccess(session.role,"defective")&&<DefectiveScreen defectives={defectives} onUpdateStatus={updateDefectiveStatus} onReingress={reingresarDefective}/>}
-          {view==="products" &&canAccess(session.role,"products")&&<ProductsScreen products={products} saveProduct={saveProduct} deleteProduct={deleteProduct}/>}
+          {view==="products" &&canAccess(session.role,"products")&&<ProductsScreen products={products} saveProduct={saveProduct} deleteProduct={deleteProduct} importProducts={importProducts}/>}
           {view==="inventory"&&canAccess(session.role,"inventory")&&<InventoryScreen products={products}/>}
           {view==="history"  &&canAccess(session.role,"history")&&<HistoryScreen sales={sales} selectedSale={selSale} setSelectedSale={setSelSale}/>}
           {view==="cuadres"  &&canAccess(session.role,"cuadres")&&<CuadresScreen sales={sales} accounts={accounts} returns={returns} products={products} repairs={repairs} session={session}/>}
