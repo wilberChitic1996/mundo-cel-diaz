@@ -100,18 +100,23 @@ textarea,
 }
 
 /* Solo en campos de texto real: caret visible con color teal */
-input[type="text"],
-input[type="email"],
-input[type="password"],
-input[type="number"],
-input[type="search"],
-input[type="tel"],
-input[type="url"],
-input[type="date"],
-input[type="time"],
-textarea,
-[contenteditable="true"] {
+/* Caret visible SOLO en campos de escritura real — alta especificidad */
+html body input[type="text"],
+html body input[type="email"],
+html body input[type="password"],
+html body input[type="number"],
+html body input[type="search"],
+html body input[type="tel"],
+html body input[type="url"],
+html body input[type="date"],
+html body input[type="time"],
+html body input:not([type]),
+html body textarea,
+html body [contenteditable="true"] {
   caret-color: #1D9E75 !important;
+  cursor: text !important;
+  user-select: text !important;
+  -webkit-user-select: text !important;
 }
 
 /* ── 5. FOCO — sistema profesional mouse vs teclado ──
