@@ -139,23 +139,6 @@ function LoginScreen(props) {
     if(blocked){setErr("Cuenta bloqueada 5 minutos por seguridad.");return;}
     if(!email.trim()||!pass){setErr("Ingresá tu email y contraseña.");return;}
     setLoading(true);setErr("");
-    var users=await db.load(UK,[]);
-    var user=(users||[]).find(function(u){return u.email.toLowerCase()===email.trim().toLowerCase()&&u.active;});
-    if(!user){setAttempts(function(a){return a+1;});setErr("Email o contraseña incorrectos.");setLoading(false);return;}
-    var hash=await hashPass(pass);
-    if(hash!==user.passwordHash){
-      var na=attempts+1; setAttempts(na);
-      if(na>=5){
-        setBlocked(true);
-        setErr("5 intentos fallidos — bloqueado 5 minutos.");
-        setTimeout(function(){setBlocked(false);setAttempts(0);setErr("");},5*60*1000);
-      } else {
-        setErr("Contraseña incorrecta. Intentos restantes: "+(5-na));
-      }
-      setLoading(false);return;
-    }
-    var updated=(users||[]).map(function(u){return u.id===user.id?Object.assign({},u,{lastLogin:new Date().toISOString()}):u;});
-    await db.save(UK,updated);
     try {
       var apiResp=await authAPI.login(email.trim(),pass);
       if(apiResp&&apiResp.user){
@@ -163,11 +146,17 @@ function LoginScreen(props) {
         onLogin(createSession({id:apiResp.user.id,name:apiResp.user.name,email:apiResp.user.email,role:apiResp.user.role}));
         return;
       }
-    } catch(e){ console.warn("API login no disponible, usando local:",e); }
+    } catch(e){ console.warn("API no disponible, intentando local:",e); }
+    var users=await db.load(UK,[]);
+    var user=(users||[]).find(function(u){return u.email.toLowerCase()===email.trim().toLowerCase()&&u.active;});
+    if(!user){var na=attempts+1;setAttempts(na);if(na>=5){setBlocked(true);setErr("5 intentos fallidos — bloqueado 5 minutos.");setTimeout(function(){setBlocked(false);setAttempts(0);setErr("");},5*60*1000);}else{setErr("Email o contraseña incorrectos. Intentos: "+(5-na));}setLoading(false);return;}
+    var hash=await hashPass(pass);
+    if(hash!==user.passwordHash){var na2=attempts+1;setAttempts(na2);if(na2>=5){setBlocked(true);setErr("5 intentos fallidos — bloqueado 5 minutos.");setTimeout(function(){setBlocked(false);setAttempts(0);setErr("");},5*60*1000);}else{setErr("Contraseña incorrecta. Intentos restantes: "+(5-na2));}setLoading(false);return;}
+    var updated=(users||[]).map(function(u){return u.id===user.id?Object.assign({},u,{lastLogin:new Date().toISOString()}):u;});
+    await db.save(UK,updated);
     setLoading(false);
     onLogin(createSession(user));
   }
-
   async function doFindUser(){
     setRecErr("");
     if(!recEmail.trim()){setRecErr("Ingresá tu email.");return;}
