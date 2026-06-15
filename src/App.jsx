@@ -480,6 +480,55 @@ function UsersScreen(props) {
 
 /* ── Theme CSS ── */
 var THEME_CSS = `
+/* Fix cursor en textos y elementos no editables */
+*, *::before, *::after { box-sizing: border-box; }
+p, span, div, label, h1, h2, h3, h4, h5, h6, td, th, li {
+  cursor: default;
+}
+button, a, [role="button"] {
+  cursor: pointer !important;
+}
+input, textarea, select {
+  cursor: text;
+}
+input[type="checkbox"], input[type="radio"] {
+  cursor: pointer;
+}
+
+/* Responsive — ocultar sidebar en móvil */
+@media (max-width: 768px) {
+  .sidebar-overlay {
+    display: block !important;
+    position: fixed;
+    top: 0; left: 0;
+    width: 100vw; height: 100vh;
+    background: rgba(0,0,0,0.5);
+    z-index: 99;
+  }
+  .sidebar-mobile {
+    position: fixed !important;
+    top: 0; left: 0;
+    height: 100vh;
+    z-index: 100;
+    transform: translateX(-100%);
+    transition: transform 0.25s ease;
+  }
+  .sidebar-mobile.open {
+    transform: translateX(0) !important;
+  }
+  .main-content {
+    padding: 16px !important;
+  }
+  .mobile-header {
+    display: flex !important;
+  }
+}
+@media (min-width: 769px) {
+  .sidebar-overlay { display: none !important; }
+  .mobile-header { display: none !important; }
+  .sidebar-mobile { position: sticky !important; transform: none !important; }
+}
+
 [data-theme="light"] {
   --bg-main: #eceae4;
   --bg-card: #ffffff;
@@ -520,6 +569,7 @@ var THEME_CSS = `
 function AppWrapper() {
   var _s=useState(function(){return getSession();}); var session=_s[0]; var setSession=_s[1];
   var _th=useState(function(){return localStorage.getItem("mnpos-theme")||"light";}); var theme=_th[0]; var setTheme=_th[1];
+  var _sb=useState(false); var sidebarOpen=_sb[0]; var setSidebarOpen=_sb[1];
 
   function toggleTheme(){
     var next=theme==="light"?"dark":"light";
@@ -544,7 +594,7 @@ function AppWrapper() {
       <style dangerouslySetInnerHTML={{__html:THEME_CSS}}/>
       {!session
         ? <LoginScreen onLogin={function(s){setSession(s);}}/>
-        : <App session={session} onLogout={function(){clearSession();setSession(null);}} theme={theme} toggleTheme={toggleTheme}/>
+        : <App session={session} onLogout={function(){clearSession();setSession(null);}} theme={theme} toggleTheme={toggleTheme} sidebarOpen={sidebarOpen} setSidebarOpen={setSidebarOpen}/>
       }
     </div>
   );
@@ -610,6 +660,7 @@ function Sidebar(props) {
   var products=props.products; var sales=props.sales;
   var session=props.session||{}; var onLogout=props.onLogout||function(){}; var isOnline=props.isOnline||false;
   var theme=props.theme||"light"; var toggleTheme=props.toggleTheme||function(){};
+  var sidebarOpen=props.sidebarOpen||false; var setSidebarOpen=props.setSidebarOpen||function(){};
   var NAV = [
     {id:"dashboard", ic:"📊", lb:"Dashboard"},
     {id:"pos",       ic:"🛒", lb:"Nueva Venta"},
@@ -627,7 +678,7 @@ function Sidebar(props) {
     {id:"users",     ic:"👥", lb:"Usuarios"},
   ];
   return (
-      <div style={{width:200,background:NAVY,display:"flex",flexDirection:"column",flexShrink:0,position:"sticky",top:0,height:"100vh"}}>
+      <div className={"sidebar-mobile"+(sidebarOpen?" open":"")} style={{width:200,background:NAVY,display:"flex",flexDirection:"column",flexShrink:0,position:"sticky",top:0,height:"100vh"}}>
         <div style={{padding:"0",borderBottom:"1px solid rgba(255,255,255,0.1)",overflow:"hidden"}}>
           <div style={{background:"linear-gradient(145deg,#1f3248 0%,#152539 60%,#0e1e2e 100%)",padding:"18px 16px 14px",position:"relative"}}>
             <div style={{position:"absolute",top:0,right:0,width:80,height:80,borderRadius:"0 0 0 80px",background:"rgba(29,158,117,0.12)"}}/>
@@ -662,7 +713,7 @@ function Sidebar(props) {
           {NAV.filter(function(item){return canAccess(session.role||"cajero",item.id);}).map(function(item){
             var isActive=view===item.id;
             return (
-                <div key={item.id} onClick={function(){setView(item.id);}} style={{display:"flex",alignItems:"center",gap:10,padding:"10px 16px",cursor:"pointer",background:isActive?"rgba(255,255,255,0.1)":"transparent",color:isActive?"#fff":"rgba(255,255,255,0.52)",fontSize:13,borderLeft:isActive?"3px solid "+TEAL:"3px solid transparent",marginBottom:1}}>
+                <div key={item.id} onClick={function(){setView(item.id);setSidebarOpen(false);}} style={{display:"flex",alignItems:"center",gap:10,padding:"10px 16px",cursor:"pointer",background:isActive?"rgba(255,255,255,0.1)":"transparent",color:isActive?"#fff":"rgba(255,255,255,0.52)",fontSize:13,borderLeft:isActive?"3px solid "+TEAL:"3px solid transparent",marginBottom:1}}>
                   <span style={{fontSize:14}}>{item.ic}</span>
                   <span style={{flex:1}}>{item.lb}</span>
                   {item.id==="pos"&&cartLen>0&&<span style={{background:TEAL,color:"#fff",borderRadius:10,fontSize:10,padding:"1px 5px",fontWeight:700}}>{cartLen}</span>}
@@ -2301,6 +2352,7 @@ function ClientsScreen(props) {
 function App(props) {
   var session=props.session||{}; var onLogout=props.onLogout||function(){};
   var theme=props.theme||"light"; var toggleTheme=props.toggleTheme||function(){};
+  var sidebarOpen=props.sidebarOpen||false; var setSidebarOpen=props.setSidebarOpen||function(){};
   var _p=useState([]); var products=_p[0]; var setProducts=_p[1];
   var _s=useState([]); var sales=_s[0]; var setSales=_s[1];
   var _a=useState([]); var accounts=_a[0]; var setAccounts=_a[1];
@@ -2835,8 +2887,16 @@ function App(props) {
           </div>
         )}
 
-        <Sidebar view={view} setView={setView} cartCount={cart.length} pendingCount={pendingAccs.length} products={products} sales={sales} session={session} onLogout={onLogout} isOnline={isOnline} theme={theme} toggleTheme={toggleTheme}/>
-        <div style={{flex:1,padding:"24px 28px",overflowY:"auto",minWidth:0}}>
+        {/* Overlay móvil */}
+        {sidebarOpen&&<div className="sidebar-overlay" onClick={function(){setSidebarOpen(false);}} style={{display:"none"}}/>}
+        {/* Header móvil */}
+        <div className="mobile-header" style={{display:"none",position:"fixed",top:0,left:0,right:0,zIndex:98,background:NAVY,padding:"10px 16px",alignItems:"center",justifyContent:"space-between",boxShadow:"0 2px 8px rgba(0,0,0,0.3)"}}>
+          <button onClick={function(){setSidebarOpen(!sidebarOpen);}} style={{background:"transparent",border:"none",color:"#fff",fontSize:22,cursor:"pointer",padding:"4px 8px",lineHeight:1}}>☰</button>
+          <span style={{color:"#fff",fontWeight:700,fontSize:15,letterSpacing:"-0.3px"}}>MUNDO CEL DIAZ</span>
+          <span style={{color:TEAL,fontSize:11,fontWeight:600}}>v2.1</span>
+        </div>
+        <Sidebar view={view} setView={setView} cartCount={cart.length} pendingCount={pendingAccs.length} products={products} sales={sales} session={session} onLogout={onLogout} isOnline={isOnline} theme={theme} toggleTheme={toggleTheme} sidebarOpen={sidebarOpen} setSidebarOpen={setSidebarOpen}/>
+        <div style={{flex:1,padding:"24px 28px",overflowY:"auto",minWidth:0}} className="main-content">
           {view==="dashboard"&&canAccess(session.role,"dashboard")&&<DashboardScreen sales={sales} todaySales={todaySales} pendingAccs={pendingAccs} totalPend={totalPend} products={products} top5={top5} setSelectedSale={setSelSale} setView={setView} accounts={accounts} returns={returns} repairs={repairs}/>}
           {view==="pos"      &&canAccess(session.role,"pos")&&<POSScreen products={products} filteredPOS={filteredPOS} cart={cart} posQ={posQ} setPosQ={setPosQ} payMethod={payMethod} setPayMethod={setPayMethod} payType={payType} setPayType={setPayType} cashIn={cashIn} setCashIn={setCashIn} initialPay={initialPay} setInitialPay={setInitialPay} clientName={clientName} setClientName={setClientName} selectedClientId={selectedClientId} setSelectedClientId={setSelectedClientId} saleNote={saleNote} setSaleNote={setSaleNote} cartTotal={cartTotal} vuelto={vuelto} initPaidVal={initPaidVal} addToCart={addToCart} changeQty={changeQty} removeFromCart={removeFromCart} applyDiscount={applyDiscount} checkout={checkout} resetPOS={resetPOS} flash={flash} clients={clients} accounts={accounts}/>}
           {view==="caja"     &&canAccess(session.role,"caja")&&<CajaScreen sales={sales} accounts={accounts} returns={returns}/>}
