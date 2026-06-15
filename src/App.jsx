@@ -492,6 +492,16 @@ var THEME_CSS = `
 /* Reset completo de outline por defecto del browser */
 *, *:focus { outline: none; }
 
+/* Sidebar nav — foco con flechas */
+.sidebar-nav-item:focus {
+  background: rgba(255,255,255,0.12) !important;
+  border-left-color: #1D9E75 !important;
+  outline: none !important;
+}
+body.using-keyboard .sidebar-nav-item:focus {
+  box-shadow: inset 3px 0 0 #1D9E75 !important;
+}
+
 /* Cursor correcto por tipo de elemento */
 body, p, div, span, h1, h2, h3, h4, h5, h6,
 td, th, li, label, nav, section { cursor: default; }
@@ -617,6 +627,24 @@ function AppWrapper() {
       }
     }
     initAdmin();
+  },[]);
+
+  /* ── Atajos globales de teclado ── */
+  useEffect(function(){
+    function onGlobalKey(e){
+      // / para enfocar búsqueda (si está en POS)
+      if(e.key==="/" && e.target.tagName!=="INPUT" && e.target.tagName!=="TEXTAREA"){
+        var search=document.querySelector('input[placeholder*="Buscar por nombre"]');
+        if(search){e.preventDefault();search.focus();}
+      }
+      // Escape para limpiar búsqueda
+      if(e.key==="Escape"){
+        var active=document.activeElement;
+        if(active&&active.tagName==="INPUT"){active.blur();}
+      }
+    }
+    document.addEventListener("keydown",onGlobalKey);
+    return function(){document.removeEventListener("keydown",onGlobalKey);};
   },[]);
 
   /* ── Detector de modo mouse vs teclado (patrón profesional) ── */
@@ -768,11 +796,18 @@ function Sidebar(props) {
             </div>
           </div>
         </div>
-        <nav style={{flex:1,padding:"10px 0",overflowY:"auto"}}>
+        <nav style={{flex:1,padding:"10px 0",overflowY:"auto"}} onKeyDown={function(e){
+        var items=document.querySelectorAll(".sidebar-nav-item");
+        var arr=Array.from(items);
+        var cur=document.activeElement;
+        var idx=arr.indexOf(cur);
+        if(e.key==="ArrowDown"){e.preventDefault();var next=arr[idx+1]||arr[0];next&&next.focus();}
+        else if(e.key==="ArrowUp"){e.preventDefault();var prev=arr[idx-1]||arr[arr.length-1];prev&&prev.focus();}
+      }}>
           {NAV.filter(function(item){return canAccess(session.role||"cajero",item.id);}).map(function(item){
             var isActive=view===item.id;
             return (
-                <div key={item.id} tabIndex={0} onClick={function(){setView(item.id);setSidebarOpen(false);}} onKeyDown={function(e){if(e.key==="Enter"||e.key===" "){setView(item.id);setSidebarOpen(false);}}} style={{display:"flex",alignItems:"center",gap:10,padding:"10px 16px",cursor:"pointer",background:isActive?"rgba(255,255,255,0.1)":"transparent",color:isActive?"#fff":"rgba(255,255,255,0.52)",fontSize:13,borderLeft:isActive?"3px solid "+TEAL:"3px solid transparent",marginBottom:1}}>
+                <div key={item.id} className="sidebar-nav-item" tabIndex={isActive?0:-1} onClick={function(){setView(item.id);setSidebarOpen(false);}} onKeyDown={function(e){if(e.key==="Enter")setView(item.id);}} style={{display:"flex",alignItems:"center",gap:10,padding:"10px 16px",cursor:"pointer",background:isActive?"rgba(255,255,255,0.1)":"transparent",color:isActive?"#fff":"rgba(255,255,255,0.52)",fontSize:13,borderLeft:isActive?"3px solid "+TEAL:"3px solid transparent",marginBottom:1}}>
                   <span style={{fontSize:14}}>{item.ic}</span>
                   <span style={{flex:1}}>{item.lb}</span>
                   {item.id==="pos"&&cartLen>0&&<span style={{background:TEAL,color:"#fff",borderRadius:10,fontSize:10,padding:"1px 5px",fontWeight:700}}>{cartLen}</span>}
@@ -1107,7 +1142,7 @@ function POSScreen(props) {
                 var inC=cart.find(function(i){return i.id===p.id;});
                 var agotado=p.stock===0&&p.unit!=="serv";
                 return (
-                    <div key={p.id} tabIndex={agotado?-1:0} onClick={function(){addToCart(p);}} onKeyDown={function(e){if((e.key==="Enter"||e.key===" ")&&!agotado)addToCart(p);}} style={{padding:12,borderRadius:10,cursor:agotado?"not-allowed":"pointer",border:"1.5px solid "+(inC?TEAL:"rgba(0,0,0,0.1)"),background:agotado?"#f5f4f0":"#fff",opacity:agotado?0.52:1,position:"relative"}}>
+                    <div key={p.id} onClick={function(){addToCart(p);}} style={{padding:12,borderRadius:10,cursor:agotado?"not-allowed":"pointer",border:"1.5px solid "+(inC?TEAL:"rgba(0,0,0,0.1)"),background:agotado?"#f5f4f0":"#fff",opacity:agotado?0.52:1,position:"relative"}}>
                       {inC&&<div style={{position:"absolute",top:6,right:6,background:TEAL,color:"#fff",borderRadius:10,fontSize:10,padding:"1px 6px",fontWeight:700}}>{inC.qty}</div>}
                       <div style={{fontSize:10,color:"#999",marginBottom:3,fontFamily:"monospace"}}>{p.code} · {p.shelf}</div>
                       <div style={{fontSize:13,fontWeight:600,marginBottom:5,lineHeight:1.35}}>{p.name}</div>
@@ -1135,13 +1170,13 @@ function POSScreen(props) {
                               <div style={{fontSize:10,color:"#999",fontFamily:"monospace"}}>{item.code}</div>
                               {hasDiscount&&<div style={{fontSize:10,color:"#E65100",marginTop:2}}>Desc. auto. por: {item.discountBy||"usuario"}</div>}
                             </div>
-                            <span tabIndex={0} style={{cursor:"pointer",color:"#E24B4A",fontSize:18,lineHeight:1,flexShrink:0}} onClick={function(){removeFromCart(item.id);}} onKeyDown={function(e){if(e.key==="Enter"||e.key==="Delete")removeFromCart(item.id);}}>×</span>
+                            <span style={{cursor:"pointer",color:"#E24B4A",fontSize:18,lineHeight:1,flexShrink:0}} onClick={function(){removeFromCart(item.id);}}>×</span>
                           </div>
                           <div style={{display:"flex",alignItems:"center",justifyContent:"space-between"}}>
                             <div style={{display:"flex",alignItems:"center",gap:8}}>
-                              <div tabIndex={0} style={sQB} onClick={function(){changeQty(item.id,-1);}} onKeyDown={function(e){if(e.key==="Enter")changeQty(item.id,-1);}}>−</div>
+                              <div style={sQB} onClick={function(){changeQty(item.id,-1);}}>−</div>
                               <span style={{fontSize:14,fontWeight:600,minWidth:22,textAlign:"center"}}>{item.qty}</span>
-                              <div tabIndex={0} style={sQB} onClick={function(){changeQty(item.id,1);}} onKeyDown={function(e){if(e.key==="Enter")changeQty(item.id,1);}}>+</div>
+                              <div style={sQB} onClick={function(){changeQty(item.id,1);}}>+</div>
                             </div>
                             <div style={{textAlign:"right"}}>
                               {hasDiscount&&<div style={{fontSize:10,color:"#999",textDecoration:"line-through"}}>{Q(item.originalPrice*item.qty)}</div>}
@@ -1395,7 +1430,7 @@ function AccountsScreen(props) {
                 <tbody>
                 {filtered.map(function(a){
                   return (
-                      <tr key={a.id} tabIndex={0} style={{cursor:"pointer"}} onClick={function(){setSelAcc(a.id);}} onKeyDown={function(e){if(e.key==="Enter")setSelAcc(a.id);}}>
+                      <tr key={a.id} style={{cursor:"pointer"}} onClick={function(){setSelAcc(a.id);}}>
                         <td style={sTD}>{fmtD(a.date)}</td>
                         <td style={Object.assign({},sTD,{fontWeight:600})}>{a.client}</td>
                         <td style={sTD}>{Q(a.total)}</td>
@@ -2103,7 +2138,7 @@ function HistoryScreen(props) {
                 <tbody>
                 {sales.map(function(s){
                   return (
-                      <tr key={s.id} tabIndex={0} style={{cursor:"pointer"}} onClick={function(){setSelectedSale(s);}} onKeyDown={function(e){if(e.key==="Enter")setSelectedSale(s);}}>
+                      <tr key={s.id} style={{cursor:"pointer"}} onClick={function(){setSelectedSale(s);}}>
                         <td style={sTD}>{fmtD(s.date)}</td><td style={sTD}>{fmtT(s.date)}</td>
                         <td style={Object.assign({},sTD,{fontWeight:500})}>{s.client}</td>
                         <td style={Object.assign({},sTD,{color:"#666"})}>{s.items.length} art.</td>
