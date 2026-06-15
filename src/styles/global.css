@@ -1,14 +1,12 @@
 /* ============================================================
-   MUNDO CEL DIAZ — Global Stylesheet v2.1
-   Sistema de estilos base para aplicativo web profesional.
-   Referencia: Material Design 3, Radix UI, Linear App.
+   MUNDO CEL DIAZ — Global Stylesheet v2.2
+   Autor: Frontend Expert
+   Referencia: Material Design 3, Radix UI, Linear, Notion
    ============================================================ */
 
 /* ── 1. Reset base ── */
 *, *::before, *::after {
   box-sizing: border-box;
-  margin: 0;
-  padding: 0;
 }
 
 html {
@@ -26,89 +24,140 @@ body {
   text-rendering: optimizeLegibility;
 }
 
-/* ── 2. Cursor por tipo de elemento ── */
-/* Elementos de texto — cursor normal, nunca de escritura */
-body, div, p, span, h1, h2, h3, h4, h5, h6,
-td, th, tr, li, ul, ol, nav, section, article,
-header, footer, aside, main, label, figure, figcaption {
+/* ── 2. CURSOR — regla de oro:
+   Solo los elementos interactivos tienen cursor pointer.
+   Solo los campos de texto tienen cursor text.
+   Todo lo demás: cursor default. SIN EXCEPCIONES.
+   ── */
+
+/* Paso 1: Todo el documento parte con cursor default */
+html, body, * {
   cursor: default;
-  user-select: none;
-  -webkit-user-select: none;
 }
 
-/* Elementos interactivos — cursor pointer */
-button, a, [role="button"], [role="tab"],
-[role="menuitem"], [role="option"],
-summary, [onclick] {
-  cursor: pointer;
-}
-
-/* Campos de texto — cursor de escritura y selección permitida */
-input:not([type="checkbox"]):not([type="radio"]):not([type="range"]):not([type="file"]),
+/* Paso 2: Campos de texto — cursor de escritura */
+input[type="text"],
+input[type="email"],
+input[type="password"],
+input[type="number"],
+input[type="search"],
+input[type="tel"],
+input[type="url"],
+input[type="date"],
+input[type="time"],
 textarea {
-  cursor: text;
-  user-select: text;
-  -webkit-user-select: text;
+  cursor: text !important;
 }
 
+/* Paso 3: Controles de selección — cursor pointer */
+button,
 select,
 input[type="checkbox"],
 input[type="radio"],
 input[type="range"],
-input[type="file"] {
-  cursor: pointer;
+input[type="file"],
+input[type="submit"],
+input[type="reset"],
+input[type="button"],
+label[for],
+a,
+[role="button"],
+[role="tab"],
+[role="menuitem"],
+[role="option"],
+[role="link"],
+summary {
+  cursor: pointer !important;
 }
 
-/* Texto seleccionable explícito */
-.selectable, p.selectable, span.selectable {
-  user-select: text;
-  -webkit-user-select: text;
-  cursor: text;
+/* ── 3. USER-SELECT — solo texto en campos editables ──
+   Evita que el usuario "arrastre" texto por accidente
+   en labels, menús, botones, etc.
+   ── */
+
+/* Por defecto: nada seleccionable */
+body {
+  user-select: none;
+  -webkit-user-select: none;
 }
 
-/* ── 3. Eliminar caret parpadeante en no-inputs ── */
-/* El caret solo debe verse en campos de escritura real */
-*:not(input):not(textarea):not([contenteditable]) {
+/* Campos editables: sí seleccionable */
+input,
+textarea,
+[contenteditable="true"] {
+  user-select: text !important;
+  -webkit-user-select: text !important;
+}
+
+/* ── 4. CARET — la línea parpadeante ──
+   SOLO debe aparecer donde el usuario va a escribir.
+   En todo lo demás: invisible.
+   ── */
+
+/* Por defecto: caret invisible en todo */
+* {
   caret-color: transparent;
 }
 
-/* ── 4. Sistema de foco profesional ──
-   Técnica: detecting-keyboard vs mouse navigation
-   Basado en: https://www.w3.org/WAI/WCAG21/Techniques/css/C15
-   - Mouse click: sin outline (limpio)
-   - Teclado Tab/flechas: outline visible profesional
-   ────────────────────────────────────── */
-
-/* Reset total de outlines — los manejamos nosotros */
-*:focus {
-  outline: none;
+/* Solo en campos de texto real: caret visible con color teal */
+input[type="text"],
+input[type="email"],
+input[type="password"],
+input[type="number"],
+input[type="search"],
+input[type="tel"],
+input[type="url"],
+input[type="date"],
+input[type="time"],
+textarea,
+[contenteditable="true"] {
+  caret-color: #1D9E75 !important;
 }
 
-/* MODO MOUSE: sin ningún indicador visual de foco */
+/* ── 5. FOCO — sistema profesional mouse vs teclado ──
+   Técnica usada por: Google Workspace, Linear, Notion, GitHub
+   
+   Con MOUSE: foco invisible (no distrae)
+   Con TECLADO: foco visible y claro (accesibilidad)
+   
+   El JS en AppWrapper agrega/quita las clases:
+   body.using-mouse / body.using-keyboard
+   ── */
+
+/* Reset total — manejamos nosotros el foco */
+*:focus,
+*:focus-visible {
+  outline: none !important;
+}
+
+/* MODO MOUSE: absolutamente limpio */
 body.using-mouse *:focus {
   outline: none !important;
   box-shadow: none !important;
 }
 
-/* MODO TECLADO: indicador de foco visible y profesional */
-body.using-keyboard *:focus-visible {
+/* MODO TECLADO: indicador claro y profesional */
+body.using-keyboard button:focus,
+body.using-keyboard a:focus,
+body.using-keyboard select:focus,
+body.using-keyboard [role="button"]:focus,
+body.using-keyboard [role="tab"]:focus,
+body.using-keyboard [tabindex]:focus {
   outline: 2px solid #1D9E75 !important;
   outline-offset: 3px !important;
   border-radius: 6px !important;
-  box-shadow: 0 0 0 4px rgba(29, 158, 117, 0.18) !important;
-  transition: outline 0s, box-shadow 0s !important;
+  box-shadow: 0 0 0 4px rgba(29, 158, 117, 0.2) !important;
 }
 
-/* Inputs/selects: foco interno en ambos modos */
+/* Inputs en modo teclado: borde interno teal */
 body.using-keyboard input:focus,
-body.using-keyboard select:focus,
 body.using-keyboard textarea:focus {
   outline: 2px solid #1D9E75 !important;
   outline-offset: 0 !important;
-  box-shadow: 0 0 0 3px rgba(29, 158, 117, 0.2) !important;
+  box-shadow: 0 0 0 3px rgba(29, 158, 117, 0.15) !important;
 }
 
-/* Sidebar nav items con foco por teclado */
+/* Sidebar nav items — foco con flechas ↑↓ */
 body.using-keyboard .sidebar-nav-item:focus {
   outline: none !important;
   background: rgba(255, 255, 255, 0.14) !important;
@@ -116,79 +165,58 @@ body.using-keyboard .sidebar-nav-item:focus {
   border-radius: 0 !important;
 }
 
-/* ── 5. Scrollbar personalizado ── */
-::-webkit-scrollbar {
-  width: 6px;
-  height: 6px;
-}
-::-webkit-scrollbar-track {
-  background: transparent;
-}
-::-webkit-scrollbar-thumb {
-  background: rgba(0, 0, 0, 0.2);
-  border-radius: 3px;
-}
-::-webkit-scrollbar-thumb:hover {
-  background: rgba(0, 0, 0, 0.35);
-}
-[data-theme="dark"] ::-webkit-scrollbar-thumb {
-  background: rgba(255, 255, 255, 0.15);
-}
-[data-theme="dark"] ::-webkit-scrollbar-thumb:hover {
-  background: rgba(255, 255, 255, 0.25);
-}
+/* ── 6. Scrollbar personalizado ── */
+::-webkit-scrollbar        { width: 5px; height: 5px; }
+::-webkit-scrollbar-track  { background: transparent; }
+::-webkit-scrollbar-thumb  { background: rgba(0,0,0,0.18); border-radius: 3px; }
+::-webkit-scrollbar-thumb:hover { background: rgba(0,0,0,0.32); }
 
-/* ── 6. Selección de texto ── */
+[data-theme="dark"] ::-webkit-scrollbar-thumb       { background: rgba(255,255,255,0.12); }
+[data-theme="dark"] ::-webkit-scrollbar-thumb:hover { background: rgba(255,255,255,0.22); }
+
+/* ── 7. Selección de texto ── */
 ::selection {
   background: rgba(29, 158, 117, 0.25);
   color: inherit;
 }
 
-/* ── 7. Transiciones globales suaves ── */
+/* ── 8. Transiciones suaves en interactivos ── */
 button, a, [role="button"] {
-  transition: opacity 0.15s ease, background 0.15s ease,
-              color 0.15s ease, border-color 0.15s ease;
+  transition: opacity 0.15s ease,
+              background-color 0.15s ease,
+              color 0.15s ease,
+              border-color 0.15s ease,
+              box-shadow 0.15s ease;
 }
 
-/* ── 8. Imágenes responsive ── */
-img, video, svg {
-  max-width: 100%;
-  display: block;
-}
+/* ── 9. Imágenes responsive ── */
+img, video { max-width: 100%; display: block; }
 
-/* ── 9. Responsive — sidebar móvil ── */
-.sidebar-overlay {
-  display: none;
-}
+/* ── 10. Responsive — sidebar móvil ── */
+.sidebar-overlay { display: none; }
+.mobile-header   { display: none; }
 
 @media (max-width: 768px) {
   .sidebar-overlay {
     display: block !important;
     position: fixed;
     inset: 0;
-    background: rgba(0, 0, 0, 0.5);
+    background: rgba(0,0,0,0.5);
     z-index: 99;
     backdrop-filter: blur(2px);
   }
   .sidebar-mobile {
     position: fixed !important;
-    top: 0;
-    left: 0;
+    inset: 0 auto 0 0;
     height: 100vh;
     z-index: 100;
     transform: translateX(-100%);
-    transition: transform 0.25s cubic-bezier(0.4, 0, 0.2, 1);
-    box-shadow: 4px 0 24px rgba(0, 0, 0, 0.4);
+    transition: transform 0.25s cubic-bezier(0.4,0,0.2,1);
+    box-shadow: 4px 0 24px rgba(0,0,0,0.4);
   }
-  .sidebar-mobile.open {
-    transform: translateX(0) !important;
-  }
-  .mobile-header {
-    display: flex !important;
-  }
-  .main-content {
-    padding: 60px 16px 16px !important;
-  }
+  .sidebar-mobile.open { transform: translateX(0) !important; }
+  .mobile-header       { display: flex !important; }
+  .main-content        { padding: 60px 16px 16px !important; }
 }
 
 @media (min-width: 769px) {
@@ -202,8 +230,8 @@ img, video, svg {
   }
 }
 
-/* ── 10. Print ── */
+/* ── 11. Print ── */
 @media print {
   .sidebar-mobile, .mobile-header { display: none !important; }
-  body { background: white !important; }
+  body { background: white !important; color: black !important; }
 }
