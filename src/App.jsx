@@ -480,19 +480,38 @@ function UsersScreen(props) {
 
 /* ── Theme CSS ── */
 var THEME_CSS = `
-/* Fix cursor en textos y elementos no editables */
-*, *::before, *::after { box-sizing: border-box; }
-p, span, div, label, h1, h2, h3, h4, h5, h6, td, th, li {
-  cursor: default;
+/* ── Fix global: cursor y selección de texto ── */
+*, *::before, *::after {
+  box-sizing: border-box;
 }
-button, a, [role="button"] {
+body {
+  cursor: default !important;
+  user-select: none !important;
+  -webkit-user-select: none !important;
+}
+p, span, div, label, h1, h2, h3, h4, h5, h6, td, th, li, nav, header, footer, section, article {
+  cursor: default !important;
+  user-select: none !important;
+  -webkit-user-select: none !important;
+}
+button, a, [role="button"], [onclick] {
   cursor: pointer !important;
 }
-input, textarea, select {
-  cursor: text;
+input, textarea {
+  cursor: text !important;
+  user-select: text !important;
+  -webkit-user-select: text !important;
 }
-input[type="checkbox"], input[type="radio"] {
-  cursor: pointer;
+select {
+  cursor: pointer !important;
+}
+input[type="checkbox"], input[type="radio"], input[type="file"] {
+  cursor: pointer !important;
+}
+table, tr, thead, tbody {
+  cursor: default !important;
+  user-select: none !important;
+  -webkit-user-select: none !important;
 }
 
 /* Responsive — ocultar sidebar en móvil */
