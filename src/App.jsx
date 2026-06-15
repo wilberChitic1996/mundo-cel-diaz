@@ -2247,7 +2247,7 @@ function App(props) {
           var normalDefs  = (defs||[]).map(function(d){return Object.assign({},d,{price:Number(d.price||0)});});
           var normalClis  = (clis||[]).map(function(c){return Object.assign({},c,{cliCode:c.cli_code,createdAt:c.created_at});});
           var normalReps  = (reps||[]).map(function(r){return Object.assign({},r,{repCode:r.rep_code,clientId:r.client_id,clientName:r.client_name,clientPhone:r.client_phone,clientCli:r.client_cli,problemDesc:r.problem_desc,techName:r.tech_name,estimatedCost:Number(r.estimated_cost||0),promisedDate:r.promised_date,internalNote:r.internal_note,registradoPor:r.registrado_por||{},parts:r.parts||[],createdAt:r.created_at});});
-          setProducts(normalProds.length>0?normalProds:DEMO);
+          setProducts(normalProds);
           setSales(normalSales);
           setAccounts(normalAccs);
           setReturns(normalRets);
@@ -2257,7 +2257,7 @@ function App(props) {
         } catch(e) {
           console.warn("Error cargando del API, usando local:", e);
           setIsOnline(false);
-          var p2 = await db.load(PK, DEMO);
+          var p2 = await db.load(PK, []);
           var s2 = await db.load(SK, []);
           var a2 = await db.load(AK, []);
           var r2 = await db.load(RK, []);
