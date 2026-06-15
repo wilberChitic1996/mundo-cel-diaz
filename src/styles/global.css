@@ -1,22 +1,209 @@
-*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+/* ============================================================
+   MUNDO CEL DIAZ — Global Stylesheet v2.1
+   Sistema de estilos base para aplicativo web profesional.
+   Referencia: Material Design 3, Radix UI, Linear App.
+   ============================================================ */
+
+/* ── 1. Reset base ── */
+*, *::before, *::after {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+
+html {
+  font-size: 16px;
+  -webkit-text-size-adjust: 100%;
+  scroll-behavior: smooth;
+}
 
 body {
-  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-  background: #eceae4;
-  color: #1a1a1a;
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto,
+               "Helvetica Neue", Arial, sans-serif;
+  line-height: 1.5;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  text-rendering: optimizeLegibility;
 }
 
-input, select, button { font-family: inherit; }
-
-input:focus, select:focus {
-  outline: 2px solid #1D9E75;
-  outline-offset: -1px;
+/* ── 2. Cursor por tipo de elemento ── */
+/* Elementos de texto — cursor normal, nunca de escritura */
+body, div, p, span, h1, h2, h3, h4, h5, h6,
+td, th, tr, li, ul, ol, nav, section, article,
+header, footer, aside, main, label, figure, figcaption {
+  cursor: default;
+  user-select: none;
+  -webkit-user-select: none;
 }
 
-::-webkit-scrollbar { width: 5px; height: 5px; }
-::-webkit-scrollbar-thumb { background: rgba(0,0,0,0.15); border-radius: 3px; }
-::-webkit-scrollbar-track { background: transparent; }
+/* Elementos interactivos — cursor pointer */
+button, a, [role="button"], [role="tab"],
+[role="menuitem"], [role="option"],
+summary, [onclick] {
+  cursor: pointer;
+}
 
-input[type=number]::-webkit-inner-spin-button { opacity: 1; }
-select { appearance: auto; }
-tr:hover td { background: rgba(29,158,117,0.04); }
+/* Campos de texto — cursor de escritura y selección permitida */
+input:not([type="checkbox"]):not([type="radio"]):not([type="range"]):not([type="file"]),
+textarea {
+  cursor: text;
+  user-select: text;
+  -webkit-user-select: text;
+}
+
+select,
+input[type="checkbox"],
+input[type="radio"],
+input[type="range"],
+input[type="file"] {
+  cursor: pointer;
+}
+
+/* Texto seleccionable explícito */
+.selectable, p.selectable, span.selectable {
+  user-select: text;
+  -webkit-user-select: text;
+  cursor: text;
+}
+
+/* ── 3. Eliminar caret parpadeante en no-inputs ── */
+/* El caret solo debe verse en campos de escritura real */
+*:not(input):not(textarea):not([contenteditable]) {
+  caret-color: transparent;
+}
+
+/* ── 4. Sistema de foco profesional ──
+   Técnica: detecting-keyboard vs mouse navigation
+   Basado en: https://www.w3.org/WAI/WCAG21/Techniques/css/C15
+   - Mouse click: sin outline (limpio)
+   - Teclado Tab/flechas: outline visible profesional
+   ────────────────────────────────────── */
+
+/* Reset total de outlines — los manejamos nosotros */
+*:focus {
+  outline: none;
+}
+
+/* MODO MOUSE: sin ningún indicador visual de foco */
+body.using-mouse *:focus {
+  outline: none !important;
+  box-shadow: none !important;
+}
+
+/* MODO TECLADO: indicador de foco visible y profesional */
+body.using-keyboard *:focus-visible {
+  outline: 2px solid #1D9E75 !important;
+  outline-offset: 3px !important;
+  border-radius: 6px !important;
+  box-shadow: 0 0 0 4px rgba(29, 158, 117, 0.18) !important;
+  transition: outline 0s, box-shadow 0s !important;
+}
+
+/* Inputs/selects: foco interno en ambos modos */
+body.using-keyboard input:focus,
+body.using-keyboard select:focus,
+body.using-keyboard textarea:focus {
+  outline: 2px solid #1D9E75 !important;
+  outline-offset: 0 !important;
+  box-shadow: 0 0 0 3px rgba(29, 158, 117, 0.2) !important;
+}
+
+/* Sidebar nav items con foco por teclado */
+body.using-keyboard .sidebar-nav-item:focus {
+  outline: none !important;
+  background: rgba(255, 255, 255, 0.14) !important;
+  box-shadow: inset 3px 0 0 #1D9E75 !important;
+  border-radius: 0 !important;
+}
+
+/* ── 5. Scrollbar personalizado ── */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+::-webkit-scrollbar-thumb {
+  background: rgba(0, 0, 0, 0.2);
+  border-radius: 3px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: rgba(0, 0, 0, 0.35);
+}
+[data-theme="dark"] ::-webkit-scrollbar-thumb {
+  background: rgba(255, 255, 255, 0.15);
+}
+[data-theme="dark"] ::-webkit-scrollbar-thumb:hover {
+  background: rgba(255, 255, 255, 0.25);
+}
+
+/* ── 6. Selección de texto ── */
+::selection {
+  background: rgba(29, 158, 117, 0.25);
+  color: inherit;
+}
+
+/* ── 7. Transiciones globales suaves ── */
+button, a, [role="button"] {
+  transition: opacity 0.15s ease, background 0.15s ease,
+              color 0.15s ease, border-color 0.15s ease;
+}
+
+/* ── 8. Imágenes responsive ── */
+img, video, svg {
+  max-width: 100%;
+  display: block;
+}
+
+/* ── 9. Responsive — sidebar móvil ── */
+.sidebar-overlay {
+  display: none;
+}
+
+@media (max-width: 768px) {
+  .sidebar-overlay {
+    display: block !important;
+    position: fixed;
+    inset: 0;
+    background: rgba(0, 0, 0, 0.5);
+    z-index: 99;
+    backdrop-filter: blur(2px);
+  }
+  .sidebar-mobile {
+    position: fixed !important;
+    top: 0;
+    left: 0;
+    height: 100vh;
+    z-index: 100;
+    transform: translateX(-100%);
+    transition: transform 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+    box-shadow: 4px 0 24px rgba(0, 0, 0, 0.4);
+  }
+  .sidebar-mobile.open {
+    transform: translateX(0) !important;
+  }
+  .mobile-header {
+    display: flex !important;
+  }
+  .main-content {
+    padding: 60px 16px 16px !important;
+  }
+}
+
+@media (min-width: 769px) {
+  .sidebar-overlay { display: none !important; }
+  .mobile-header   { display: none !important; }
+  .sidebar-mobile  {
+    position: sticky !important;
+    transform: none !important;
+    box-shadow: none !important;
+    transition: none !important;
+  }
+}
+
+/* ── 10. Print ── */
+@media print {
+  .sidebar-mobile, .mobile-header { display: none !important; }
+  body { background: white !important; }
+}
