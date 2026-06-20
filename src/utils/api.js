@@ -47,6 +47,11 @@ export const authAPI = {
   },
   logout: function() { clearLocalSession(); },
   getSession: getLocalSession,
+
+  // ── Recuperación de contraseña (endpoints públicos, sin JWT) ──
+  findUser:      function(email)                      { return api.post('/auth/find-user', { email }); },
+  verifyAnswer:  function(email, answer)              { return api.post('/auth/verify-answer', { email, answer }); },
+  resetPassword: function(email, answer, newPassword) { return api.post('/auth/reset-password', { email, answer, newPassword }); },
 };
 
 // ── Productos ─────────────────────────────────────────

@@ -160,17 +160,30 @@ function LoginScreen(props) {
   async function doFindUser(){
     setRecErr("");
     if(!recEmail.trim()){setRecErr("Ingresá tu email.");return;}
-    var users=await db.load(UK,[]);
-    var user=(users||[]).find(function(u){return u.email.toLowerCase()===recEmail.trim().toLowerCase()&&u.active;});
-    if(!user){setRecErr("No se encontró una cuenta activa con ese email.");return;}
-    if(!user.secQuestion){setRecErr("Esta cuenta no tiene pregunta de seguridad configurada. Contactá al administrador del sistema.");return;}
-    setRecUser(user);
-    setRecMode("question");
+    try {
+      var res=await authAPI.findUser(recEmail.trim());
+      setRecUser({email:recEmail.trim().toLowerCase(),name:res.name,secQuestion:res.secQuestion,source:"api"});
+      setRecMode("question");
+    } catch(e) {
+      var em=(e&&e.error)?e.error:"";
+      if(em&&em!=="Error de conexion"){setRecErr(em);return;}
+      var users=await db.load(UK,[]);
+      var user=(users||[]).find(function(u){return u.email.toLowerCase()===recEmail.trim().toLowerCase()&&u.active;});
+      if(!user){setRecErr("No se encontró una cuenta activa con ese email.");return;}
+      if(!user.secQuestion){setRecErr("Esta cuenta no tiene pregunta de seguridad configurada. Contactá al administrador del sistema.");return;}
+      setRecUser(Object.assign({},user,{source:"local"}));
+      setRecMode("question");
+    }
   }
 
   async function doVerifyAnswer(){
     setRecErr("");
     if(!recAnswer.trim()){setRecErr("Ingresá la respuesta.");return;}
+    if(recUser&&recUser.source==="api"){
+      try{ await authAPI.verifyAnswer(recUser.email,recAnswer.trim()); setRecMode("newpass"); }
+      catch(e){ setRecErr((e&&e.error)?e.error:"Respuesta incorrecta."); }
+      return;
+    }
     var ansHash=await hashPass(recAnswer.trim().toLowerCase());
     if(ansHash!==recUser.secAnswerHash){setRecErr("Respuesta incorrecta.");return;}
     setRecMode("newpass");
@@ -180,6 +193,11 @@ function LoginScreen(props) {
     setRecErr("");
     if(!newPass||newPass.length<8){setRecErr("La contraseña debe tener mínimo 8 caracteres.");return;}
     if(newPass!==newPass2){setRecErr("Las contraseñas no coinciden.");return;}
+    if(recUser&&recUser.source==="api"){
+      try{ await authAPI.resetPassword(recUser.email,recAnswer.trim(),newPass); setRecOk("¡Contraseña actualizada! Ya podés iniciar sesión."); setRecMode("done"); }
+      catch(e){ setRecErr((e&&e.error)?e.error:"No se pudo actualizar la contraseña."); }
+      return;
+    }
     var newHash=await hashPass(newPass);
     var users=await db.load(UK,[]);
     var updated=users.map(function(u){return u.id===recUser.id?Object.assign({},u,{passwordHash:newHash}):u;});
@@ -382,11 +400,11 @@ function UsersScreen(props) {
     var secQuestion=fSecQ||(editUser?editUser.secQuestion:"");
     if(editUser){
       setUsers(function(p){return p.map(function(u){return u.id===editUser.id?Object.assign({},u,{name:fName.trim(),email:fEmail.trim(),role:fRole,passwordHash:hash,secQuestion:secQuestion,secAnswerHash:secAnswerHash}):u;});});
-      try{ var upd={name:fName.trim(),email:fEmail.trim(),role:fRole,active:editUser.active}; if(fPass)upd.password=fPass; await usersAPI.update(editUser.id,upd); }catch(e){ console.warn("Sync Supabase user update:",e); }
+      try{ var upd={name:fName.trim(),email:fEmail.trim(),role:fRole,active:editUser.active,secQuestion:fSecQ}; if(fPass)upd.password=fPass; if(fSecA)upd.secAnswer=fSecA; await usersAPI.update(editUser.id,upd); }catch(e){ console.warn("Sync Supabase user update:",e); }
       showFlash("✓ Usuario actualizado","ok");
     } else {
       setUsers(function(p){return p.concat([{id:gid(),name:fName.trim(),email:fEmail.trim(),passwordHash:hash,role:fRole,active:true,createdAt:new Date().toISOString(),secQuestion:secQuestion,secAnswerHash:secAnswerHash}]);});
-      try{ await usersAPI.create({name:fName.trim(),email:fEmail.trim(),password:fPass,role:fRole}); }catch(e){ console.warn("Sync Supabase user create:",e); }
+      try{ await usersAPI.create({name:fName.trim(),email:fEmail.trim(),password:fPass,role:fRole,secQuestion:fSecQ,secAnswer:fSecA}); }catch(e){ console.warn("Sync Supabase user create:",e); }
       showFlash("✓ Usuario creado","ok");
     }
     resetForm();
