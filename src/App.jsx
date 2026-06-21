@@ -645,7 +645,7 @@ function ProductForm(props) {
   var _e=useState(""); var err=_e[0]; var setErr=_e[1];
   function set(k,v){ setForm(function(f){ var n=Object.assign({},f); n[k]=v; return n; }); }
   function doSave(){
-    if(!form.code||!form.code.trim()||!form.name||!form.name.trim()){setErr("Código y Nombre son obligatorios");return;}
+    if(!form.name||!form.name.trim()){setErr("El nombre es obligatorio");return;}
     onSave(Object.assign({},form,{price:parseFloat(form.price)||0,cost:parseFloat(form.cost)||0,stock:parseInt(form.stock)||0,minStock:parseInt(form.minStock)||0}));
   }
   return (
