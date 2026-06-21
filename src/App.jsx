@@ -1251,6 +1251,7 @@ function POSScreen(props) {
 /* ── Cuentas ── */
 function AccountsScreen(props) {
   var accounts=props.accounts; var pendingAccs=props.pendingAccs;
+  var products=props.products||[]; var session=props.session||{};
   var totalPend=props.totalPend; var addPayment=props.addPayment; var showFlash=props.showFlash;
   var _f=useState("activas"); var filter=_f[0]; var setFilter=_f[1];
   var _s=useState(null); var selAcc=_s[0]; var setSelAcc=_s[1];
@@ -1277,7 +1278,7 @@ function AccountsScreen(props) {
     if(!acc){setSelAcc(null);return null;}
     return (
         <div>
-          <div style={{display:"flex",gap:10,marginBottom:16,alignItems:"center"}}><button style={mB("gray")} onClick={function(){setSelAcc(null);setPmtAmount("");setPmtNote("");setPmtErr("");}}>← Volver</button><button style={mB("teal")} onClick={function(){printVoucher(acc,{estado:acc.status==="pagado"?"pagado":acc.status==="parcial"?"parcial":"pendiente",pagado:acc.paid,saldo:acc.balance});}}>🖨 Imprimir constancia</button></div>
+          <div style={{display:"flex",gap:10,marginBottom:16,alignItems:"center"}}><button style={mB("gray")} onClick={function(){setSelAcc(null);setPmtAmount("");setPmtNote("");setPmtErr("");}}>← Volver</button><button style={mB("teal")} onClick={function(){printVoucher(acc,{estado:acc.status==="pagado"?"pagado":acc.status==="parcial"?"parcial":"pendiente",pagado:acc.paid,saldo:acc.balance,usuario:session.name,usuarioRole:session.role,products:products,payments:acc.payments});}}>🖨 Imprimir constancia</button></div>
           <div style={sC}>
             <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start",marginBottom:20}}>
               <div>
@@ -1887,10 +1888,12 @@ function printVoucher(sale, opts){
   else if(_E==='parcial'){_sello=(opts.abonoHoy!=null)?'CONSTANCIA DE ABONO':'ABONO - SALDO PENDIENTE';_selloCss='background:#FAEEDA;color:#633806;border:2px solid #E65100;';}
   else if(_E==='pagado'||_E==='cancelacion'){_sello=(opts.abonoHoy!=null)?'CANCELADO - ULTIMO ABONO':'CUENTA CANCELADA';_selloCss='background:#EAF3DE;color:#27500A;border:2px solid #2E7D32;';}
   var _docLabel=_E?'Comprobante de Cuenta':'Comprobante de Venta';
+  var _pmap={}; (opts.products||[]).forEach(function(pp){_pmap[pp.code]=pp.shelf;});
     var itemsHTML=sale.items.map(function(it){
       var hasDisc=it.originalPrice&&it.price<it.originalPrice;
+      var _shelf=it.shelf||_pmap[it.code]||'—';
       return '<tr>'+
-        '<td style="padding:7px 10px;border-bottom:1px solid #eee;font-size:12px;font-weight:600;">'+it.name+'<br><span style="font-family:monospace;font-size:10px;color:#888;">SKU: '+it.code+' &nbsp;·&nbsp; Estant.: '+(it.shelf||'—')+'</span>'+
+        '<td style="padding:7px 10px;border-bottom:1px solid #eee;font-size:12px;font-weight:600;">'+it.name+'<br><span style="font-family:monospace;font-size:10px;color:#888;">SKU: '+it.code+' &nbsp;·&nbsp; Estant.: '+_shelf+'</span>'+
         (hasDisc?'<br><span style="font-size:10px;color:#E65100;">Descuento aplicado por: '+it.discountBy+'</span>':'')+'</td>'+
         '<td style="padding:7px 10px;border-bottom:1px solid #eee;text-align:center;font-size:12px;">'+it.qty+'</td>'+
         '<td style="padding:7px 10px;border-bottom:1px solid #eee;text-align:right;font-size:12px;">'+
@@ -1976,8 +1979,8 @@ function printVoucher(sale, opts){
       '</div>'+
       '<div class="info-block">'+
         '<div class="label">Atendido por</div>'+
-        '<div class="val">'+(sale.registradoPor?sale.registradoPor.name:'—')+'</div>'+
-        (sale.registradoPor?'<div class="val-sub">'+(sale.registradoPor.role==='admin'?'Administrador':sale.registradoPor.role==='cajero'?'Cajero':'Auditor')+'</div>':'')+
+        '<div class="val">'+((sale.registradoPor&&sale.registradoPor.name)?sale.registradoPor.name:(opts.usuario||'—'))+'</div>'+
+        '<div class="val-sub">'+(function(){var _r=(sale.registradoPor&&sale.registradoPor.role)?sale.registradoPor.role:(opts.usuarioRole||'');return _r==='admin'?'Administrador':_r==='cajero'?'Cajero':_r==='auditor'?'Auditor':'';})()+'</div>'+
       '</div>'+
     '</div>'+
 
@@ -2005,6 +2008,7 @@ function printVoucher(sale, opts){
     '<div class="totals-row"><span>Pagado acumulado:</span><span>Q '+Number(opts.pagado||0).toFixed(2)+'</span></div>'+
     '<div class="totals-row" style="background:'+(Number(opts.saldo||0)>0?'#E24B4A':'#2E7D32')+';color:#fff;font-weight:700;"><span>SALDO:</span><span>Q '+Number(opts.saldo||0).toFixed(2)+'</span></div>'+
     '</div></div>':'')+
+    (opts.payments&&opts.payments.length?'<div style="margin:0 0 18px;"><div style="font-size:12px;font-weight:700;color:#1a2535;margin:0 0 6px;border-bottom:2px solid #1D9E75;padding-bottom:4px;">HISTORIAL DE ABONOS</div><table style="width:100%;border-collapse:collapse;font-size:11px;"><thead><tr style="background:#f0f0f0;"><th style="padding:5px 8px;text-align:left;">Fecha</th><th style="padding:5px 8px;text-align:left;">Metodo</th><th style="padding:5px 8px;text-align:left;">Nota</th><th style="padding:5px 8px;text-align:right;">Monto</th></tr></thead><tbody>'+opts.payments.map(function(_p){return '<tr><td style="padding:5px 8px;border-bottom:1px solid #eee;">'+new Date(_p.date).toLocaleDateString("es-GT",{day:"2-digit",month:"2-digit",year:"numeric"})+' '+new Date(_p.date).toLocaleTimeString("es-GT",{hour:"2-digit",minute:"2-digit"})+'</td><td style="padding:5px 8px;border-bottom:1px solid #eee;">'+(_p.method||'-')+'</td><td style="padding:5px 8px;border-bottom:1px solid #eee;color:#666;">'+(_p.note||'-')+'</td><td style="padding:5px 8px;border-bottom:1px solid #eee;text-align:right;font-weight:700;color:#1D9E75;">Q '+Number(_p.amount).toFixed(2)+'</td></tr>';}).join('')+'</tbody></table></div>':'')+
     '<div class="footer">'+
       '<div class="footer-left">'+
         '<strong>Mundo Cel Diaz</strong><br>'+
@@ -2030,13 +2034,15 @@ function printVoucher(sale, opts){
 
 function HistoryScreen(props) {
   var sales=props.sales; var selectedSale=props.selectedSale; var setSelectedSale=props.setSelectedSale;
+  var accounts=props.accounts||[]; var returns=props.returns||[]; var products=props.products||[]; var session=props.session||{};
+  var _hf=useState("todos"); var hfilter=_hf[0]; var setHfilter=_hf[1];
 
   if(selectedSale){
     return (
         <div>
           <div style={{display:"flex",gap:10,marginBottom:16}}>
             <button style={mB("gray")} onClick={function(){setSelectedSale(null);}}>← Volver</button>
-            <button style={mB("teal")} onClick={function(){printVoucher(selectedSale);}}>🖨 Imprimir / PDF</button>
+            <button style={mB("teal")} onClick={function(){printVoucher(selectedSale,{usuario:session.name,usuarioRole:session.role,products:products});}}>🖨 Imprimir / PDF</button>
           </div>
           <div style={sC}>
             <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start",marginBottom:20}}>
@@ -2081,29 +2087,68 @@ function HistoryScreen(props) {
         </div>
     );
   }
-  var wk=Date.now();
-  var semana=sales.filter(function(s){return (wk-new Date(s.date).getTime())<7*86400000;});
+  var movs=[];
+  sales.forEach(function(s){movs.push({k:"v"+s.id,date:s.date,tipo:"Venta",color:"teal",cliente:s.client,metodo:s.method,atendio:(s.registradoPor&&s.registradoPor.name)?s.registradoPor.name:"—",monto:Number(s.total),signo:1,kind:"sale",obj:s});});
+  accounts.forEach(function(a){
+    movs.push({k:"a"+a.id,date:a.date,tipo:"Venta a credito",color:"purple",cliente:a.client,metodo:"Credito",atendio:(a.registradoPor&&a.registradoPor.name)?a.registradoPor.name:"—",monto:Number(a.total),signo:1,kind:"credito",obj:a});
+    var _ac=0;
+    (a.payments||[]).forEach(function(p){
+      _ac+=Number(p.amount);
+      var _sd=Math.max(0,Number(a.total)-_ac);
+      var _fin=_sd<=0.009;
+      movs.push({k:"p"+(p.id||(a.id+_ac)),date:p.date,tipo:_fin?"Cancelacion":"Abono",color:_fin?"green":"amber",cliente:a.client,metodo:p.method,atendio:(p.registradoPor&&p.registradoPor.name)?p.registradoPor.name:"—",monto:Number(p.amount),signo:1,kind:"abono",obj:a,pdata:{estado:_fin?"pagado":"parcial",abonoHoy:Number(p.amount),pagado:_ac,saldo:_sd}});
+    });
+  });
+  returns.forEach(function(r){if(Number(r.refundAmount)>0){movs.push({k:"r"+r.id,date:r.date,tipo:"Devolucion",color:"red",cliente:r.client,metodo:r.refundMethod,atendio:(r.registradoPor&&r.registradoPor.name)?r.registradoPor.name:"—",monto:Number(r.refundAmount),signo:-1,kind:"devolucion",obj:r});}});
+  movs.sort(function(a,b){return new Date(b.date)-new Date(a.date);});
+  var fmovs=hfilter==="todos"?movs:movs.filter(function(m){return m.kind===hfilter;});
+  var totEnt=movs.filter(function(m){return m.signo>0;}).reduce(function(x,m){return x+m.monto;},0);
+  var totSal=movs.filter(function(m){return m.signo<0;}).reduce(function(x,m){return x+m.monto;},0);
+  function imprimirMov(m){
+    if(m.kind==="sale")printVoucher(m.obj,{usuario:session.name,usuarioRole:session.role,products:products});
+    else if(m.kind==="credito")printVoucher(m.obj,{estado:m.obj.status==="pagado"?"pagado":m.obj.status==="parcial"?"parcial":"pendiente",pagado:m.obj.paid,saldo:m.obj.balance,usuario:session.name,usuarioRole:session.role,products:products,payments:m.obj.payments});
+    else if(m.kind==="abono")printVoucher(m.obj,{estado:m.pdata.estado,abonoHoy:m.pdata.abonoHoy,pagado:m.pdata.pagado,saldo:m.pdata.saldo,usuario:session.name,usuarioRole:session.role,products:products,payments:m.obj.payments});
+  }
+  var hfilters=[["todos","Todos"],["sale","Ventas"],["credito","Creditos"],["abono","Abonos"],["devolucion","Devoluciones"]];
   return (
       <div>
         <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:20}}>
-          <p style={H1}>📋 Historial de Ventas</p>
-          {sales.length>0&&<div style={{fontSize:13,color:"#666"}}>{semana.length} esta semana · {Q(semana.reduce(function(s,x){return s+x.total;},0))}</div>}
+          <p style={H1}>📋 Historial de Movimientos</p>
+          <div style={{fontSize:13,color:"#666"}}>{movs.length} movimientos</div>
+        </div>
+        <div style={{display:"grid",gridTemplateColumns:"repeat(3,1fr)",gap:14,marginBottom:18}}>
+          <MetricBox label="Entradas (ventas + abonos)" value={Q(totEnt)} color={TEAL}/>
+          <MetricBox label="Salidas (devoluciones)" value={Q(totSal)} color="#E24B4A"/>
+          <MetricBox label="Movimientos totales" value={movs.length} color="#378ADD"/>
+        </div>
+        <div style={Object.assign({},sC,{marginBottom:14})}>
+          <div style={{display:"flex",gap:8,flexWrap:"wrap"}}>
+            {hfilters.map(function(pair){
+              return <button key={pair[0]} style={Object.assign({},mB(hfilter===pair[0]?"teal":"gray"),{padding:"6px 14px"})} onClick={function(){setHfilter(pair[0]);}}>{pair[1]}</button>;
+            })}
+          </div>
         </div>
         <div style={sC}>
-          {sales.length===0?<p style={{textAlign:"center",color:"#999",padding:48}}>Sin ventas registradas</p>:(
+          {fmovs.length===0?<p style={{textAlign:"center",color:"#999",padding:48}}>Sin movimientos en esta categoria</p>:(
               <table style={{width:"100%",borderCollapse:"collapse"}}>
-                <thead><tr>{["Fecha","Hora","Cliente","Artículos","Método","Total","Atendió",""].map(function(h){return <th key={h} style={sTH}>{h}</th>;})}</tr></thead>
+                <thead><tr>{["Fecha","Hora","Tipo","Cliente","Metodo","Atendio","Monto",""].map(function(h){return <th key={h} style={sTH}>{h}</th>;})}</tr></thead>
                 <tbody>
-                {sales.map(function(s){
+                {fmovs.map(function(m){
+                  var clickable=m.kind==="sale";
                   return (
-                      <tr key={s.id} style={{cursor:"pointer"}} onClick={function(){setSelectedSale(s);}}>
-                        <td style={sTD}>{fmtD(s.date)}</td><td style={sTD}>{fmtT(s.date)}</td>
-                        <td style={Object.assign({},sTD,{fontWeight:500})}>{s.client}</td>
-                        <td style={Object.assign({},sTD,{color:"#666"})}>{s.items.length} art.</td>
-                        <td style={sTD}><span style={mBg("teal")}>{s.method}</span></td>
-                        <td style={Object.assign({},sTD,{fontWeight:700,color:TEAL})}>{Q(s.total)}</td>
-                        <td style={Object.assign({},sTD,{fontSize:12,color:"#666"})}>{s.registradoPor?s.registradoPor.name:"—"}</td>
-                        <td style={Object.assign({},sTD,{color:"#999",fontSize:12})}>Ver →</td>
+                      <tr key={m.k} style={{cursor:clickable?"pointer":"default"}} onClick={clickable?function(){setSelectedSale(m.obj);}:undefined}>
+                        <td style={sTD}>{fmtD(m.date)}</td>
+                        <td style={sTD}>{fmtT(m.date)}</td>
+                        <td style={sTD}><span style={mBg(m.color)}>{m.tipo}</span></td>
+                        <td style={Object.assign({},sTD,{fontWeight:500})}>{m.cliente}</td>
+                        <td style={Object.assign({},sTD,{fontSize:12,color:"#666"})}>{m.metodo}</td>
+                        <td style={Object.assign({},sTD,{fontSize:12,color:"#666"})}>{m.atendio}</td>
+                        <td style={Object.assign({},sTD,{fontWeight:700,color:m.signo<0?"#E24B4A":TEAL})}>{m.signo<0?"- ":"+ "}{Q(m.monto)}</td>
+                        <td style={sTD}>
+                          {m.kind==="devolucion"
+                            ?<span style={{fontSize:12,color:"#bbb"}}>—</span>
+                            :<button style={Object.assign({},mB("blue"),{padding:"4px 10px",fontSize:11})} onClick={function(e){e.stopPropagation();imprimirMov(m);}}>🖨 Imprimir</button>}
+                        </td>
                       </tr>
                   );
                 })}
@@ -2952,12 +2997,12 @@ function App(props) {
           {view==="dashboard"&&canAccess(session.role,"dashboard")&&<DashboardScreen sales={sales} todaySales={todaySales} pendingAccs={pendingAccs} totalPend={totalPend} products={products} top5={top5} setSelectedSale={setSelSale} setView={setView} accounts={accounts} returns={returns} repairs={repairs}/>}
           {view==="pos"      &&canAccess(session.role,"pos")&&<POSScreen products={products} filteredPOS={filteredPOS} cart={cart} posQ={posQ} setPosQ={setPosQ} payMethod={payMethod} setPayMethod={setPayMethod} payType={payType} setPayType={setPayType} cashIn={cashIn} setCashIn={setCashIn} initialPay={initialPay} setInitialPay={setInitialPay} clientName={clientName} setClientName={setClientName} selectedClientId={selectedClientId} setSelectedClientId={setSelectedClientId} saleNote={saleNote} setSaleNote={setSaleNote} cartTotal={cartTotal} vuelto={vuelto} initPaidVal={initPaidVal} addToCart={addToCart} changeQty={changeQty} removeFromCart={removeFromCart} applyDiscount={applyDiscount} checkout={checkout} resetPOS={resetPOS} flash={flash} clients={clients} accounts={accounts}/>}
           {view==="caja"     &&canAccess(session.role,"caja")&&<CajaScreen sales={sales} accounts={accounts} returns={returns}/>}
-          {view==="accounts" &&canAccess(session.role,"accounts")&&<AccountsScreen accounts={accounts} pendingAccs={pendingAccs} totalPend={totalPend} addPayment={addPayment} showFlash={showFlash}/>}
+          {view==="accounts" &&canAccess(session.role,"accounts")&&<AccountsScreen accounts={accounts} pendingAccs={pendingAccs} totalPend={totalPend} addPayment={addPayment} showFlash={showFlash} products={products} session={session}/>}
           {view==="returns"  &&canAccess(session.role,"returns")&&<ReturnsScreen returns={returns} products={products} onProcess={processReturn} showFlash={showFlash} clients={clients} sales={sales}/>}
           {view==="defective"&&canAccess(session.role,"defective")&&<DefectiveScreen defectives={defectives} onUpdateStatus={updateDefectiveStatus} onReingress={reingresarDefective}/>}
           {view==="products" &&canAccess(session.role,"products")&&<ProductsScreen products={products} saveProduct={saveProduct} deleteProduct={deleteProduct} importProducts={importProducts}/>}
           {view==="inventory"&&canAccess(session.role,"inventory")&&<InventoryScreen products={products}/>}
-          {view==="history"  &&canAccess(session.role,"history")&&<HistoryScreen sales={sales} selectedSale={selSale} setSelectedSale={setSelSale}/>}
+          {view==="history"  &&canAccess(session.role,"history")&&<HistoryScreen sales={sales} selectedSale={selSale} setSelectedSale={setSelSale} accounts={accounts} returns={returns} products={products} session={session}/>}
           {view==="cuadres"  &&canAccess(session.role,"cuadres")&&<CuadresScreen sales={sales} accounts={accounts} returns={returns} products={products} repairs={repairs} session={session}/>}
           {view==="backup"   &&canAccess(session.role,"backup")&&<BackupScreen products={products} sales={sales} accounts={accounts} returns={returns} defectives={defectives} clients={clients} repairs={repairs} onExportJSON={exportJSON} onExportExcel={exportExcel} onImport={importData}/>}
           {view==="users"    &&canAccess(session.role,"users")&&<UsersScreen session={session} showFlash={showFlash}/>}
