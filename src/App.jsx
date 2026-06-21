@@ -373,7 +373,7 @@ function UsersScreen(props) {
           var merged=apiUsers.map(function(au){
             var local=(u||[]).find(function(lu){return lu.email.toLowerCase()===au.email.toLowerCase();});
             return {id:au.id,name:au.name,email:au.email,role:au.role,active:au.active,
-              passwordHash:local?local.passwordHash:"",secQuestion:local?local.secQuestion:"",
+              passwordHash:local?local.passwordHash:"",secQuestion:au.sec_question||(local?local.secQuestion:""),
               secAnswerHash:local?local.secAnswerHash:"",lastLogin:au.last_login||null,
               createdAt:au.created_at||new Date().toISOString()};
           });
