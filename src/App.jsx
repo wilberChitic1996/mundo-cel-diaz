@@ -2483,8 +2483,8 @@ function App(props) {
             repairsAPI.getAll(),
           ]);
           var normalProds = (prods||[]).map(function(p){return Object.assign({},p,{id:p.id,code:p.code,name:p.name,category:p.category||'',shelf:p.shelf||'',price:Number(p.price),cost:Number(p.cost),stock:Number(p.stock),unit:p.unit||'uni'});});
-          var normalSales = (sls||[]).map(function(s){return Object.assign({},s,{items:s.sale_items||[],total:Number(s.total),date:s.created_at});});
-          var normalAccs  = (accs||[]).map(function(a){return Object.assign({},a,{items:a.account_items||[],payments:(a.account_payments||[]).map(function(_pp){return Object.assign({},_pp,{date:_pp.date||_pp.created_at,amount:Number(_pp.amount),registradoPor:_pp.registrado_por||_pp.registradoPor||null});}),total:Number(a.total),paid:Number(a.paid),balance:Number(a.balance),date:a.created_at});});
+          var normalSales = (sls||[]).map(function(s){return Object.assign({},s,{items:s.sale_items||[],total:Number(s.total),date:s.created_at,registradoPor:s.registrado_por||null});});
+          var normalAccs  = (accs||[]).map(function(a){return Object.assign({},a,{items:a.account_items||[],payments:(a.account_payments||[]).map(function(_pp){return Object.assign({},_pp,{date:_pp.date||_pp.created_at,amount:Number(_pp.amount),registradoPor:_pp.registrado_por||_pp.registradoPor||null});}),total:Number(a.total),paid:Number(a.paid),balance:Number(a.balance),date:a.created_at,registradoPor:a.registrado_por||null});});
           var normalRets  = (rets||[]).map(function(r){return Object.assign({},r,{items:r.return_items||[],refundAmount:Number(r.refund_amount),itemCondition:r.item_condition,refundMethod:r.refund_method,date:r.created_at});});
           var normalDefs  = (defs||[]).map(function(d){return Object.assign({},d,{price:Number(d.price||0)});});
           var normalClis  = (clis||[]).map(function(c){return Object.assign({},c,{cliCode:c.cli_code,createdAt:c.created_at});});
@@ -2655,7 +2655,7 @@ function App(props) {
         try {
           await salesAPI.create({client:client,total:cartTotal,method:payMethod,items:cart});
           var freshSales = await salesAPI.getAll();
-          var ns = (freshSales||[]).map(function(s){return Object.assign({},s,{items:s.sale_items||[],total:Number(s.total),date:s.created_at});});
+          var ns = (freshSales||[]).map(function(s){return Object.assign({},s,{items:s.sale_items||[],total:Number(s.total),date:s.created_at,registradoPor:s.registrado_por||null});});
           setSales(ns);
         } catch(e){ console.warn("Error API venta:",e); setSales(function(p){return [Object.assign({},base)].concat(p);}); }
       } else {
@@ -2672,7 +2672,7 @@ function App(props) {
         try{
           await salesAPI.create({client:client,total:cartTotal,method:payMethod,items:cart,payType:payType,initialPay:paid});
           var freshAccs = await accountsAPI.getAll();
-          var na=(freshAccs||[]).map(function(a){return Object.assign({},a,{items:a.account_items||[],payments:(a.account_payments||[]).map(function(_pp){return Object.assign({},_pp,{date:_pp.date||_pp.created_at,amount:Number(_pp.amount),registradoPor:_pp.registrado_por||_pp.registradoPor||null});}),total:Number(a.total),paid:Number(a.paid),balance:Number(a.balance),date:a.created_at});});
+          var na=(freshAccs||[]).map(function(a){return Object.assign({},a,{items:a.account_items||[],payments:(a.account_payments||[]).map(function(_pp){return Object.assign({},_pp,{date:_pp.date||_pp.created_at,amount:Number(_pp.amount),registradoPor:_pp.registrado_por||_pp.registradoPor||null});}),total:Number(a.total),paid:Number(a.paid),balance:Number(a.balance),date:a.created_at,registradoPor:a.registrado_por||null});});
           setAccounts(na);
         }catch(e){
           console.warn("Error API cuenta:",e);
@@ -2693,7 +2693,7 @@ function App(props) {
       try{
         await accountsAPI.addPayment(accountId,{amount:amount,method:method||'Efectivo',note:note||''});
         var freshAccs2 = await accountsAPI.getAll();
-        var na2=(freshAccs2||[]).map(function(a){return Object.assign({},a,{items:a.account_items||[],payments:(a.account_payments||[]).map(function(_pp){return Object.assign({},_pp,{date:_pp.date||_pp.created_at,amount:Number(_pp.amount),registradoPor:_pp.registrado_por||_pp.registradoPor||null});}),total:Number(a.total),paid:Number(a.paid),balance:Number(a.balance),date:a.created_at});});
+        var na2=(freshAccs2||[]).map(function(a){return Object.assign({},a,{items:a.account_items||[],payments:(a.account_payments||[]).map(function(_pp){return Object.assign({},_pp,{date:_pp.date||_pp.created_at,amount:Number(_pp.amount),registradoPor:_pp.registrado_por||_pp.registradoPor||null});}),total:Number(a.total),paid:Number(a.paid),balance:Number(a.balance),date:a.created_at,registradoPor:a.registrado_por||null});});
         setAccounts(na2);
       }catch(e){
         console.warn("Error API addPayment:",e);
