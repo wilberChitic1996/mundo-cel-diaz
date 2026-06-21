@@ -1307,7 +1307,12 @@ function AccountsScreen(props) {
                     <thead><tr>{["Fecha","Monto","Método","Nota","Registrado por"].map(function(h){return <th key={h} style={sTH}>{h}</th>;})}</tr></thead>
                     <tbody>
                     {acc.payments.map(function(p,i){
-                      return <tr key={i}><td style={sTD}>{fmtD(p.date)} {fmtT(p.date)}</td><td style={Object.assign({},sTD,{fontWeight:700,color:TEAL})}>{Q(p.amount)}</td><td style={sTD}><span style={mBg("teal")}>{p.method}</span></td><td style={Object.assign({},sTD,{color:"#666"})}>{p.note||"—"}</td><td style={Object.assign({},sTD,{color:"#666",fontSize:12})}>{p.registradoPor?p.registradoPor.name:"—"}</td></tr>;
+                      return <tr key={i}>
+                        <td style={sTD}>{fmtD(p.date)} {fmtT(p.date)}</td>
+                        <td style={Object.assign({},sTD,{fontWeight:700,color:TEAL})}>{Q(p.amount)}</td>
+                        <td style={sTD}><span style={mBg("teal")}>{p.method}</span></td>
+                        <td style={Object.assign({},sTD,{color:"#666"})}>{p.note||"—"}</td>
+                      </tr>;
                     })}
                     </tbody>
                   </table>
