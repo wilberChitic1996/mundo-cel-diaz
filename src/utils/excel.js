@@ -116,3 +116,64 @@ export function exportToExcel({ products, sales, accounts, returns }) {
   XLSX.writeFile(wb, filename)
   return filename
 }
+
+/**
+ * Exporta una plantilla de ejemplo para importar productos
+ * Muestra la estructura correcta de columnas
+ */
+export function exportProductTemplate() {
+  const wb = XLSX.utils.book_new()
+  const now = new Date()
+
+  // Crear hoja con instrucciones
+  const wsInstructions = XLSX.utils.aoa_to_sheet([
+    ['PLANTILLA DE IMPORTACIÓN DE PRODUCTOS - MUNDO CEL DIAZ'],
+    [],
+    ['INSTRUCCIONES:'],
+    ['1. Completa la información en la hoja "Productos" con tus productos'],
+    ['2. Respeta exactamente los nombres de las columnas'],
+    ['3. Los campos obligatorios son: Nombre'],
+    ['4. Puedes usar "Nombre" o "Name" (el sistema reconoce ambas)'],
+    ['5. Para unidades de servicio, coloca "serv" en la columna Unidad'],
+    [],
+    ['COLUMNAS DISPONIBLES (nombres flexibles):'],
+    ['Nombre, Product, Producto = Nombre del producto (OBLIGATORIO)'],
+    ['Categoría, Category, Categoria = Categoría del producto'],
+    ['Precio, Price = Precio de venta'],
+    ['Costo, Cost, Costo = Costo del producto'],
+    ['Stock, Cantidad = Cantidad en stock'],
+    ['Estantería, Shelf = Ubicación en estantería'],
+    ['Unidad, Unit = "uni" (por defecto) o "serv" para servicios'],
+    ['Stock Mínimo, Min Stock, Minimo = Límite de stock (por defecto 5)'],
+  ])
+  XLSX.utils.book_append_sheet(wb, wsInstructions, 'Instrucciones')
+
+  // Crear hoja con ejemplos
+  const wsProductos = XLSX.utils.aoa_to_sheet([
+    ['Nombre', 'Categoría', 'Precio', 'Costo', 'Stock', 'Estantería', 'Unidad', 'Stock Mínimo'],
+    ['Samsung Galaxy A12', 'Celulares', 1500, 900, 5, 'A1', 'uni', 3],
+    ['Funda de silicona negra', 'Accesorios', 50, 15, 20, 'B2', 'uni', 10],
+    ['Cable USB-C', 'Cables', 80, 20, 15, 'B3', 'uni', 8],
+    ['Protector de pantalla', 'Accesorios', 45, 10, 30, 'C1', 'uni', 15],
+    ['Reparación de pantalla', 'Servicios', 250, 0, 0, 'Mostrador', 'serv', 0],
+  ])
+
+  // Establecer anchos de columna
+  wsProductos['!cols'] = [
+    {wch: 25}, // Nombre
+    {wch: 15}, // Categoría
+    {wch: 12}, // Precio
+    {wch: 10}, // Costo
+    {wch: 8},  // Stock
+    {wch: 12}, // Estantería
+    {wch: 10}, // Unidad
+    {wch: 15}  // Stock Mínimo
+  ]
+
+  XLSX.utils.book_append_sheet(wb, wsProductos, 'Productos')
+
+  // Guardar archivo
+  const filename = `Plantilla_Productos_MundoCelDiaz.xlsx`
+  XLSX.writeFile(wb, filename)
+  return filename
+}
