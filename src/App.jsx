@@ -1259,12 +1259,16 @@ function AccountsScreen(props) {
   var _m=useState("Efectivo"); var pmtMethod=_m[0]; var setPmtMethod=_m[1];
   var _n=useState(""); var pmtNote=_n[0]; var setPmtNote=_n[1];
   var _r=useState(""); var pmtErr=_r[0]; var setPmtErr=_r[1];
+  var _cq=useState(""); var clientQ=_cq[0]; var setClientQ=_cq[1];
   var totalCob=accounts.reduce(function(s,a){return s+a.paid;},0);
   var filtered=accounts.filter(function(a){
+    if(clientQ){return (a.client||"").toLowerCase().indexOf(clientQ.toLowerCase())>=0;}
     if(filter==="todas")return true;
     if(filter==="activas")return a.status!=="pagado";
     return a.status===filter;
   });
+  var clienteSaldo=filtered.reduce(function(s,a){return s+(a.balance||0);},0);
+  var clientePagado=filtered.reduce(function(s,a){return s+(a.paid||0);},0);
   function doPayment(acc){
     var amt=parseFloat(pmtAmount);
     if(!amt||amt<=0){setPmtErr("Ingresá un monto válido");return;}
@@ -1354,11 +1358,23 @@ function AccountsScreen(props) {
           <MetricBox label="Cuentas activas" value={pendingAccs.length} color="#378ADD"/>
         </div>
         <div style={Object.assign({},sC,{marginBottom:14})}>
-          <div style={{display:"flex",gap:8,flexWrap:"wrap"}}>
-            {[["activas","Activas"],["pendiente","Pendientes"],["parcial","Con abono"],["pagado","Pagadas"],["todas","Todas"]].map(function(pair){
-              return <button key={pair[0]} style={Object.assign({},mB(filter===pair[0]?"teal":"gray"),{padding:"6px 14px"})} onClick={function(){setFilter(pair[0]);}}>{pair[1]}</button>;
-            })}
-          </div>
+          <input style={Object.assign({},sI,{marginBottom:12})} placeholder="🔍  Buscar cuentas por cliente..." value={clientQ} onChange={function(e){setClientQ(e.target.value);}}/>
+          {!clientQ&&(
+            <div style={{display:"flex",gap:8,flexWrap:"wrap"}}>
+              {[["activas","Activas"],["pendiente","Pendientes"],["parcial","Con abono"],["pagado","Pagadas"],["todas","Todas"]].map(function(pair){
+                return <button key={pair[0]} style={Object.assign({},mB(filter===pair[0]?"teal":"gray"),{padding:"6px 14px"})} onClick={function(){setFilter(pair[0]);}}>{pair[1]}</button>;
+              })}
+            </div>
+          )}
+          {clientQ&&filtered.length>0&&(
+            <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",flexWrap:"wrap",gap:12,background:"#f9f8f5",borderRadius:8,padding:"12px 16px"}}>
+              <div style={{fontSize:14}}><b>{filtered.length}</b> cuenta(s) de <b>{clientQ}</b></div>
+              <div style={{display:"flex",gap:24,fontSize:14}}>
+                <span style={{color:TEAL}}>Pagado: <b>{Q(clientePagado)}</b></span>
+                <span style={{color:clienteSaldo>0?"#E24B4A":TEAL}}>Saldo total: <b>{Q(clienteSaldo)}</b></span>
+              </div>
+            </div>
+          )}
         </div>
         <div style={sC}>
           {filtered.length===0?<p style={{textAlign:"center",color:"#999",padding:40}}>Sin cuentas en esta categoría</p>:(
@@ -1374,7 +1390,7 @@ function AccountsScreen(props) {
                         <td style={Object.assign({},sTD,{color:TEAL,fontWeight:500})}>{Q(a.paid)}</td>
                         <td style={Object.assign({},sTD,{fontWeight:700,color:a.balance>0?"#E24B4A":TEAL})}>{Q(a.balance)}</td>
                         <td style={sTD}><span style={mBg(a.status==="pagado"?"green":a.status==="parcial"?"amber":"red")}>{a.status==="pagado"?"✓ Pagado":a.status==="parcial"?"Abono parcial":"Pendiente"}</span></td>
-                        <td style={Object.assign({},sTD,{color:"#999",fontSize:12})}>Ver →</td>
+                        <td style={sTD}><button style={Object.assign({},mB("teal"),{padding:"4px 10px",fontSize:11})} onClick={function(e){e.stopPropagation();setSelAcc(a.id);}}>💳 Atender →</button></td>
                       </tr>
                   );
                 })}
