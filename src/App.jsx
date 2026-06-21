@@ -2036,6 +2036,7 @@ function HistoryScreen(props) {
   var sales=props.sales; var selectedSale=props.selectedSale; var setSelectedSale=props.setSelectedSale;
   var accounts=props.accounts||[]; var returns=props.returns||[]; var products=props.products||[]; var session=props.session||{};
   var _hf=useState("todos"); var hfilter=_hf[0]; var setHfilter=_hf[1];
+  var _ho=useState("desc"); var horder=_ho[0]; var setHorder=_ho[1];
 
   if(selectedSale){
     return (
@@ -2088,19 +2089,19 @@ function HistoryScreen(props) {
     );
   }
   var movs=[];
-  sales.forEach(function(s){movs.push({k:"v"+s.id,date:s.date,tipo:"Venta",color:"teal",cliente:s.client,metodo:s.method,atendio:(s.registradoPor&&s.registradoPor.name)?s.registradoPor.name:"—",monto:Number(s.total),signo:1,kind:"sale",obj:s});});
+  sales.forEach(function(s){movs.push({k:"v"+s.id,date:s.date,tipo:"Venta",color:"teal",cliente:s.client,metodo:s.method,atendio:(s.registradoPor&&s.registradoPor.name)?s.registradoPor.name:(session.name||"—"),monto:Number(s.total),signo:1,kind:"sale",obj:s});});
   accounts.forEach(function(a){
-    movs.push({k:"a"+a.id,date:a.date,tipo:"Venta a credito",color:"purple",cliente:a.client,metodo:"Credito",atendio:(a.registradoPor&&a.registradoPor.name)?a.registradoPor.name:"—",monto:Number(a.total),signo:1,kind:"credito",obj:a});
+    movs.push({k:"a"+a.id,date:a.date,tipo:"Venta a credito",color:"purple",cliente:a.client,metodo:"Credito",atendio:(a.registradoPor&&a.registradoPor.name)?a.registradoPor.name:(session.name||"—"),monto:Number(a.total),signo:1,kind:"credito",obj:a});
     var _ac=0;
     (a.payments||[]).forEach(function(p){
       _ac+=Number(p.amount);
       var _sd=Math.max(0,Number(a.total)-_ac);
       var _fin=_sd<=0.009;
-      movs.push({k:"p"+(p.id||(a.id+_ac)),date:p.date,tipo:_fin?"Cancelacion":"Abono",color:_fin?"green":"amber",cliente:a.client,metodo:p.method,atendio:(p.registradoPor&&p.registradoPor.name)?p.registradoPor.name:"—",monto:Number(p.amount),signo:1,kind:"abono",obj:a,pdata:{estado:_fin?"pagado":"parcial",abonoHoy:Number(p.amount),pagado:_ac,saldo:_sd}});
+      movs.push({k:"p"+(p.id||(a.id+_ac)),date:p.date,tipo:_fin?"Cancelacion":"Abono",color:_fin?"green":"amber",cliente:a.client,metodo:p.method,atendio:(p.registradoPor&&p.registradoPor.name)?p.registradoPor.name:(session.name||"—"),monto:Number(p.amount),signo:1,kind:"abono",obj:a,pdata:{estado:_fin?"pagado":"parcial",abonoHoy:Number(p.amount),pagado:_ac,saldo:_sd}});
     });
   });
   returns.forEach(function(r){if(Number(r.refundAmount)>0){movs.push({k:"r"+r.id,date:r.date,tipo:"Devolucion",color:"red",cliente:r.client,metodo:r.refundMethod,atendio:(r.registradoPor&&r.registradoPor.name)?r.registradoPor.name:"—",monto:Number(r.refundAmount),signo:-1,kind:"devolucion",obj:r});}});
-  movs.sort(function(a,b){return new Date(b.date)-new Date(a.date);});
+  movs.sort(function(a,b){return horder==="desc"?(new Date(b.date)-new Date(a.date)):(new Date(a.date)-new Date(b.date));});
   var fmovs=hfilter==="todos"?movs:movs.filter(function(m){return m.kind===hfilter;});
   var totEnt=movs.filter(function(m){return m.signo>0;}).reduce(function(x,m){return x+m.monto;},0);
   var totSal=movs.filter(function(m){return m.signo<0;}).reduce(function(x,m){return x+m.monto;},0);
@@ -2122,10 +2123,13 @@ function HistoryScreen(props) {
           <MetricBox label="Movimientos totales" value={movs.length} color="#378ADD"/>
         </div>
         <div style={Object.assign({},sC,{marginBottom:14})}>
-          <div style={{display:"flex",gap:8,flexWrap:"wrap"}}>
-            {hfilters.map(function(pair){
-              return <button key={pair[0]} style={Object.assign({},mB(hfilter===pair[0]?"teal":"gray"),{padding:"6px 14px"})} onClick={function(){setHfilter(pair[0]);}}>{pair[1]}</button>;
-            })}
+          <div style={{display:"flex",gap:8,flexWrap:"wrap",alignItems:"center",justifyContent:"space-between"}}>
+            <div style={{display:"flex",gap:8,flexWrap:"wrap"}}>
+              {hfilters.map(function(pair){
+                return <button key={pair[0]} style={Object.assign({},mB(hfilter===pair[0]?"teal":"gray"),{padding:"6px 14px"})} onClick={function(){setHfilter(pair[0]);}}>{pair[1]}</button>;
+              })}
+            </div>
+            <button style={Object.assign({},mB("gray"),{padding:"6px 14px",whiteSpace:"nowrap"})} onClick={function(){setHorder(horder==="desc"?"asc":"desc");}}>{horder==="desc"?"↓ Recientes primero":"↑ Antiguos primero"}</button>
           </div>
         </div>
         <div style={sC}>
@@ -2480,7 +2484,7 @@ function App(props) {
           ]);
           var normalProds = (prods||[]).map(function(p){return Object.assign({},p,{id:p.id,code:p.code,name:p.name,category:p.category||'',shelf:p.shelf||'',price:Number(p.price),cost:Number(p.cost),stock:Number(p.stock),unit:p.unit||'uni'});});
           var normalSales = (sls||[]).map(function(s){return Object.assign({},s,{items:s.sale_items||[],total:Number(s.total),date:s.created_at});});
-          var normalAccs  = (accs||[]).map(function(a){return Object.assign({},a,{items:a.account_items||[],payments:a.account_payments||[],total:Number(a.total),paid:Number(a.paid),balance:Number(a.balance),date:a.created_at});});
+          var normalAccs  = (accs||[]).map(function(a){return Object.assign({},a,{items:a.account_items||[],payments:(a.account_payments||[]).map(function(_pp){return Object.assign({},_pp,{date:_pp.date||_pp.created_at,amount:Number(_pp.amount),registradoPor:_pp.registrado_por||_pp.registradoPor||null});}),total:Number(a.total),paid:Number(a.paid),balance:Number(a.balance),date:a.created_at});});
           var normalRets  = (rets||[]).map(function(r){return Object.assign({},r,{items:r.return_items||[],refundAmount:Number(r.refund_amount),itemCondition:r.item_condition,refundMethod:r.refund_method,date:r.created_at});});
           var normalDefs  = (defs||[]).map(function(d){return Object.assign({},d,{price:Number(d.price||0)});});
           var normalClis  = (clis||[]).map(function(c){return Object.assign({},c,{cliCode:c.cli_code,createdAt:c.created_at});});
@@ -2668,7 +2672,7 @@ function App(props) {
         try{
           await salesAPI.create({client:client,total:cartTotal,method:payMethod,items:cart,payType:payType,initialPay:paid});
           var freshAccs = await accountsAPI.getAll();
-          var na=(freshAccs||[]).map(function(a){return Object.assign({},a,{items:a.account_items||[],payments:a.account_payments||[],total:Number(a.total),paid:Number(a.paid),balance:Number(a.balance),date:a.created_at});});
+          var na=(freshAccs||[]).map(function(a){return Object.assign({},a,{items:a.account_items||[],payments:(a.account_payments||[]).map(function(_pp){return Object.assign({},_pp,{date:_pp.date||_pp.created_at,amount:Number(_pp.amount),registradoPor:_pp.registrado_por||_pp.registradoPor||null});}),total:Number(a.total),paid:Number(a.paid),balance:Number(a.balance),date:a.created_at});});
           setAccounts(na);
         }catch(e){
           console.warn("Error API cuenta:",e);
@@ -2689,7 +2693,7 @@ function App(props) {
       try{
         await accountsAPI.addPayment(accountId,{amount:amount,method:method||'Efectivo',note:note||''});
         var freshAccs2 = await accountsAPI.getAll();
-        var na2=(freshAccs2||[]).map(function(a){return Object.assign({},a,{items:a.account_items||[],payments:a.account_payments||[],total:Number(a.total),paid:Number(a.paid),balance:Number(a.balance),date:a.created_at});});
+        var na2=(freshAccs2||[]).map(function(a){return Object.assign({},a,{items:a.account_items||[],payments:(a.account_payments||[]).map(function(_pp){return Object.assign({},_pp,{date:_pp.date||_pp.created_at,amount:Number(_pp.amount),registradoPor:_pp.registrado_por||_pp.registradoPor||null});}),total:Number(a.total),paid:Number(a.paid),balance:Number(a.balance),date:a.created_at});});
         setAccounts(na2);
       }catch(e){
         console.warn("Error API addPayment:",e);
