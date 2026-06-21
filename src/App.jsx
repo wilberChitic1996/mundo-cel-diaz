@@ -1277,7 +1277,7 @@ function AccountsScreen(props) {
     if(!acc){setSelAcc(null);return null;}
     return (
         <div>
-          <button style={Object.assign({},mB("gray"),{marginBottom:16})} onClick={function(){setSelAcc(null);setPmtAmount("");setPmtNote("");setPmtErr("");}}>← Volver</button>
+          <div style={{display:"flex",gap:10,marginBottom:16,alignItems:"center"}}><button style={mB("gray")} onClick={function(){setSelAcc(null);setPmtAmount("");setPmtNote("");setPmtErr("");}}>← Volver</button><button style={mB("teal")} onClick={function(){printVoucher(acc,{estado:acc.status==="pagado"?"pagado":acc.status==="parcial"?"parcial":"pendiente",pagado:acc.paid,saldo:acc.balance});}}>🖨 Imprimir constancia</button></div>
           <div style={sC}>
             <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start",marginBottom:20}}>
               <div>
@@ -1879,10 +1879,14 @@ function InventoryScreen(props) {
 }
 
 /* ── Historial ── */
-function HistoryScreen(props) {
-  var sales=props.sales; var selectedSale=props.selectedSale; var setSelectedSale=props.setSelectedSale;
-
-  function printVoucher(sale){
+function printVoucher(sale, opts){
+  opts=opts||{};
+  var _E=opts.estado||'';
+  var _sello='',_selloCss='';
+  if(_E==='pendiente'){_sello='PENDIENTE DE PAGO';_selloCss='background:#FCEBEB;color:#791F1F;border:2px solid #E24B4A;';}
+  else if(_E==='parcial'){_sello=(opts.abonoHoy!=null)?'CONSTANCIA DE ABONO':'ABONO - SALDO PENDIENTE';_selloCss='background:#FAEEDA;color:#633806;border:2px solid #E65100;';}
+  else if(_E==='pagado'||_E==='cancelacion'){_sello=(opts.abonoHoy!=null)?'CANCELADO - ULTIMO ABONO':'CUENTA CANCELADA';_selloCss='background:#EAF3DE;color:#27500A;border:2px solid #2E7D32;';}
+  var _docLabel=_E?'Comprobante de Cuenta':'Comprobante de Venta';
     var itemsHTML=sale.items.map(function(it){
       var hasDisc=it.originalPrice&&it.price<it.originalPrice;
       return '<tr>'+
@@ -1945,7 +1949,7 @@ function HistoryScreen(props) {
         '<p class="sub">Reparación y Venta de Celulares · Guatemala</p>'+
       '</div>'+
       '<div class="venta-num">'+
-        '<div class="label">Comprobante de Venta</div>'+
+        '<div class="label">'+_docLabel+'</div>'+
         '<div class="num"># '+ventaNum+'</div>'+
       '</div>'+
       '<div style="text-align:center;margin-top:4px;">'+
@@ -1954,6 +1958,7 @@ function HistoryScreen(props) {
       '</div>'+
     '</div>'+
 
+    (_sello?'<div style="text-align:center;margin:0 0 16px;padding:10px;border-radius:8px;font-size:17px;font-weight:900;letter-spacing:2px;'+_selloCss+'">'+_sello+'</div>':'')+
     '<div class="info-grid">'+
       '<div class="info-block">'+
         '<div class="label">Cliente</div>'+
@@ -1994,6 +1999,12 @@ function HistoryScreen(props) {
       '<div class="totals-row"><span>TOTAL:</span><span>Q '+Number(sale.total).toFixed(2)+'</span></div>'+
     '</div></div>'+
 
+    (_E?'<div class="totals" style="margin-top:-10px;"><div class="totals-box" style="width:280px;">'+
+    '<div class="totals-row"><span>Total cuenta:</span><span>Q '+Number(sale.total).toFixed(2)+'</span></div>'+
+    (opts.abonoHoy!=null?'<div class="totals-row" style="color:#E65100;"><span>Abono de hoy:</span><span>+ Q '+Number(opts.abonoHoy).toFixed(2)+'</span></div>':'')+
+    '<div class="totals-row"><span>Pagado acumulado:</span><span>Q '+Number(opts.pagado||0).toFixed(2)+'</span></div>'+
+    '<div class="totals-row" style="background:'+(Number(opts.saldo||0)>0?'#E24B4A':'#2E7D32')+';color:#fff;font-weight:700;"><span>SALDO:</span><span>Q '+Number(opts.saldo||0).toFixed(2)+'</span></div>'+
+    '</div></div>':'')+
     '<div class="footer">'+
       '<div class="footer-left">'+
         '<strong>Mundo Cel Diaz</strong><br>'+
@@ -2015,6 +2026,10 @@ function HistoryScreen(props) {
     w.document.write(html+'<scr'+'ipt src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></scr'+'ipt><scr'+'ipt>window.onload=function(){try{new QRCode(document.getElementById("qrv"),{text:'+JSON.stringify(qrTxt)+',width:90,height:90,colorDark:"#1a2535",colorLight:"#fff"});}catch(e){}setTimeout(function(){window.print();},800);};</scr'+'ipt>');
     w.document.close();
   }
+
+
+function HistoryScreen(props) {
+  var sales=props.sales; var selectedSale=props.selectedSale; var setSelectedSale=props.setSelectedSale;
 
   if(selectedSale){
     return (
