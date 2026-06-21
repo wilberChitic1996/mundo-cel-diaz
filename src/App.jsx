@@ -2764,7 +2764,7 @@ function App(props) {
           var saved=await productsAPI.create({
             name:prod.name,category:prod.category||"",shelf:prod.shelf||"",
             price:prod.price,cost:prod.cost||0,stock:prod.stock||0,
-            minStock:prod.minStock||5,unit:prod.unit||"uni"
+            unit:prod.unit||"uni"
           });
           setProducts(function(p){return p.concat([Object.assign({},prod,{id:saved.id,code:saved.code})]);});
         } else {
