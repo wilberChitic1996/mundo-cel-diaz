@@ -1725,19 +1725,26 @@ function ProductsScreen(props) {
       try {
         var wb=XLSX.read(e.target.result,{type:"binary"});
         var ws=wb.Sheets[wb.SheetNames[0]];
-        var rows=XLSX.utils.sheet_to_json(ws,{defval:""});
-        var valid=rows.filter(function(r){return r.name&&String(r.name).trim();});
-        if(valid.length===0){setImportMsg("❌ No se encontraron productos válidos. Verificá que usás la plantilla correcta.");setImporting(false);return;}
-        var prods=valid.map(function(r){return {
-          name:String(r.name||"").trim(),
-          category:String(r.category||"").trim(),
-          shelf:String(r.shelf||"").trim(),
-          price:parseFloat(r.price)||0,
-          cost:parseFloat(r.cost)||0,
-          stock:parseInt(r.stock)||0,
-          minStock:parseInt(r.minStock||r.min_stock||5)||5,
-          unit:String(r.unit||"uni").trim().toLowerCase()==="serv"?"serv":"uni",
-        };});
+        function _norm(s){return String(s==null?"":s).trim().toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g,"");}
+        var aoa=XLSX.utils.sheet_to_json(ws,{header:1,defval:""});
+        var hRow=-1,headers=[];
+        for(var _i=0;_i<aoa.length;_i++){
+          var _r=(aoa[_i]||[]).map(_norm);
+          if(_r.some(function(c){return c.indexOf("nombre")>=0||c==="name";})){hRow=_i;headers=_r;break;}
+        }
+        function _col(){for(var a=0;a<arguments.length;a++){for(var h=0;h<headers.length;h++){if(headers[h]&&headers[h].indexOf(arguments[a])>=0)return h;}}return -1;}
+        function _g(row,idx){return (idx>=0&&row)?row[idx]:"";}
+        var prods=[];
+        if(hRow>=0){
+          var _ci={name:_col("nombre","name","producto","descripcion"),category:_col("categoria","category","rubro"),shelf:_col("estanteria","shelf","ubicacion"),price:_col("precio venta","precio de venta","precio","price"),cost:_col("costo","cost","coste"),stock:_col("stock","existencia","cantidad"),unit:_col("unidad","unit","medida")};
+          for(var _d=hRow+1;_d<aoa.length;_d++){
+            var _row=aoa[_d]||[];
+            var _nm=String(_g(_row,_ci.name)||"").trim();
+            if(!_nm)continue;
+            prods.push({name:_nm,category:String(_g(_row,_ci.category)||"").trim(),shelf:String(_g(_row,_ci.shelf)||"").trim(),price:parseFloat(_g(_row,_ci.price))||0,cost:parseFloat(_g(_row,_ci.cost))||0,stock:parseInt(_g(_row,_ci.stock))||0,minStock:5,unit:String(_g(_row,_ci.unit)||"uni").trim().toLowerCase()==="serv"?"serv":"uni"});
+          }
+        }
+        if(prods.length===0){setImportMsg("\u274c No se encontraron productos v\u00e1lidos. Verific\u00e1 que us\u00e1s la plantilla correcta.");setImporting(false);return;}
         importProducts(prods,function(ok,count){
           setImporting(false);
           setImportMsg(ok?"✅ "+count+" productos importados correctamente":"❌ Error al importar. Intentá de nuevo.");
