@@ -13,6 +13,37 @@ const DFK  = "mnpos-defective-v1";
 const CK   = "mnpos-clients-v1";
 
 const gid  = () => Date.now().toString(36) + Math.random().toString(36).slice(2,6);
+
+// ── WhatsApp helpers ──
+function limpiarTel(tel){
+  if(!tel)return "";
+  var t=String(tel).replace(/\D/g,"");
+  // Guatemala: 8 dígitos sin código → agregar 502
+  if(t.length===8)return "502"+t;
+  // Ya tiene código de país
+  if(t.length>8)return t;
+  return t;
+}
+function waBoletaVenta(sale){
+  var items=(sale.items||[]).map(function(i){return "  • "+i.name+" x"+i.qty+" — Q"+Number(i.price*i.qty).toFixed(2);}).join("\n");
+  return "✅ *MUNDO CEL DIAZ*\nTecnología · Accesorios · Reparaciones · Guatemala\n\n📋 *Boleta de compra*\n📅 "+fmtD(sale.date)+"\n👤 "+sale.client+"\n\n*Productos:*\n"+items+"\n\n💰 *Total: Q"+Number(sale.total).toFixed(2)+"*\nMétodo: "+(sale.method||"Efectivo")+"\n\n¡Gracias por su compra! 🙏";
+}
+function waRecordatorio(acc){
+  return "Hola *"+acc.client+"*, le saludamos de *MUNDO CEL DIAZ*.\n\nLe recordamos que tiene un saldo pendiente de *Q"+Number(acc.balance).toFixed(2)+"* de su compra del "+fmtD(acc.date||acc.created_at)+".\n\nTotal de la compra: Q"+Number(acc.total).toFixed(2)+"\nYa abonado: Q"+Number(acc.paid).toFixed(2)+"\n*Saldo pendiente: Q"+Number(acc.balance).toFixed(2)+"*\n\nPor favor comuníquese con nosotros para coordinar su pago. ¡Gracias! 🙏";
+}
+function abrirWA(tel, mensaje){
+  var t=limpiarTel(tel);
+  var url=t
+    ?"https://wa.me/"+t+"?text="+encodeURIComponent(mensaje)
+    :"https://wa.me/?text="+encodeURIComponent(mensaje);
+  window.open(url,"_blank","noopener");
+}
+function pedirTelYEnviar(nombre, mensaje, onTelSaved){
+  var tel=window.prompt("📱 Número de WhatsApp de "+nombre+"\n(8 dígitos Guatemala, ej: 55551234)\nDejar vacío para abrir sin número:");
+  if(tel===null)return; // canceló
+  if(onTelSaved&&tel.trim())onTelSaved(tel.trim());
+  abrirWA(tel.trim(), mensaje);
+}
 const Q    = function(n){ return "Q " + Number(n).toFixed(2); };
 const fmtD = function(d){ return new Date(d).toLocaleDateString("es-GT",{day:"2-digit",month:"short",year:"numeric"}); };
 const fmtT = function(d){ return new Date(d).toLocaleTimeString("es-GT",{hour:"2-digit",minute:"2-digit"}); };
@@ -1457,9 +1488,17 @@ function AccountsScreen(props) {
   if(selAcc){
     var acc=accounts.find(function(a){return a.id===selAcc;});
     if(!acc){setSelAcc(null);return null;}
+    var accTel=(props.clients&&props.clients.find(function(c){return c.id===acc.clientId;})||{}).phone||"";
     return (
         <div>
-          <div style={{display:"flex",gap:10,marginBottom:16,alignItems:"center"}}><button style={mB("gray")} onClick={function(){setSelAcc(null);setPmtAmount("");setPmtNote("");setPmtErr("");}}>← Volver</button><button style={mB("teal")} onClick={function(){printVoucher(acc,{estado:acc.status==="pagado"?"pagado":acc.status==="parcial"?"parcial":"pendiente",pagado:acc.paid,saldo:acc.balance,usuario:session.name,usuarioRole:session.role,products:products,payments:acc.payments});}}>🖨 Imprimir constancia</button></div>
+          <div style={{display:"flex",gap:10,marginBottom:16,alignItems:"center",flexWrap:"wrap"}}>
+            <button style={mB("gray")} onClick={function(){setSelAcc(null);setPmtAmount("");setPmtNote("");setPmtErr("");}}>← Volver</button>
+            <button style={mB("teal")} onClick={function(){printVoucher(acc,{estado:acc.status==="pagado"?"pagado":acc.status==="parcial"?"parcial":"pendiente",pagado:acc.paid,saldo:acc.balance,usuario:session.name,usuarioRole:session.role,products:products,payments:acc.payments});}}>🖨 Imprimir constancia</button>
+            {acc.status!=="pagado"&&<button style={Object.assign({},mB("green"),{background:"#25D366"})} onClick={function(){
+              var msg=waRecordatorio(acc);
+              if(accTel){abrirWA(accTel,msg);}else{pedirTelYEnviar(acc.client,msg,null);}
+            }}>💬 Recordatorio WhatsApp</button>}
+          </div>
           <div style={sC}>
             <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start",marginBottom:20}}>
               <div>
@@ -1567,7 +1606,17 @@ function AccountsScreen(props) {
                         <td style={Object.assign({},sTD,{color:TEAL,fontWeight:500})}>{Q(a.paid)}</td>
                         <td style={Object.assign({},sTD,{fontWeight:700,color:a.balance>0?"#E24B4A":TEAL})}>{Q(a.balance)}</td>
                         <td style={sTD}><span style={mBg(a.status==="pagado"?"green":a.status==="parcial"?"amber":"red")}>{a.status==="pagado"?"✓ Pagado":a.status==="parcial"?"Abono parcial":"Pendiente"}</span></td>
-                        <td style={sTD}><button style={Object.assign({},mB("teal"),{padding:"4px 10px",fontSize:11})} onClick={function(e){e.stopPropagation();setSelAcc(a.id);}}>💳 Atender →</button></td>
+                        <td style={sTD}>
+                          <div style={{display:"flex",gap:6,flexWrap:"wrap"}}>
+                            <button style={Object.assign({},mB("teal"),{padding:"4px 10px",fontSize:11})} onClick={function(e){e.stopPropagation();setSelAcc(a.id);}}>💳 Atender →</button>
+                            {a.status!=="pagado"&&<button style={Object.assign({},mB("green"),{background:"#25D366",padding:"4px 10px",fontSize:11})} onClick={function(e){
+                              e.stopPropagation();
+                              var tel=(props.clients&&props.clients.find(function(c){return c.id===a.clientId;})||{}).phone||"";
+                              var msg=waRecordatorio(a);
+                              if(tel){abrirWA(tel,msg);}else{pedirTelYEnviar(a.client,msg,null);}
+                            }}>💬</button>}
+                          </div>
+                        </td>
                       </tr>
                   );
                 })}
@@ -2228,16 +2277,21 @@ function printVoucher(sale, opts){
 
 function HistoryScreen(props) {
   var sales=props.sales; var selectedSale=props.selectedSale; var setSelectedSale=props.setSelectedSale;
-  var accounts=props.accounts||[]; var returns=props.returns||[]; var products=props.products||[]; var session=props.session||{};
+  var accounts=props.accounts||[]; var returns=props.returns||[]; var products=props.products||[]; var session=props.session||{}; var clients=props.clients||[];
   var _hf=useState("todos"); var hfilter=_hf[0]; var setHfilter=_hf[1];
   var _ho=useState("desc"); var horder=_ho[0]; var setHorder=_ho[1];
 
   if(selectedSale){
     return (
         <div>
-          <div style={{display:"flex",gap:10,marginBottom:16}}>
+          <div style={{display:"flex",gap:10,marginBottom:16,flexWrap:"wrap"}}>
             <button style={mB("gray")} onClick={function(){setSelectedSale(null);}}>← Volver</button>
             <button style={mB("teal")} onClick={function(){printVoucher(selectedSale,{usuario:session.name,usuarioRole:session.role,products:products});}}>🖨 Imprimir / PDF</button>
+            <button style={Object.assign({},mB("green"),{background:"#25D366"})} onClick={function(){
+              var tel=selectedSale.clientPhone||(selectedSale.clientId&&props.clients&&(props.clients.find(function(c){return c.id===selectedSale.clientId;})||{}).phone)||"";
+              var msg=waBoletaVenta(selectedSale);
+              if(tel){abrirWA(tel,msg);}else{pedirTelYEnviar(selectedSale.client,msg,null);}
+            }}>💬 WhatsApp</button>
           </div>
           <div style={sC}>
             <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start",marginBottom:20}}>
@@ -2346,7 +2400,15 @@ function HistoryScreen(props) {
                         <td style={sTD}>
                           {m.kind==="devolucion"
                             ?<span style={{fontSize:12,color:"#bbb"}}>—</span>
-                            :<button style={Object.assign({},mB("blue"),{padding:"4px 10px",fontSize:11})} onClick={function(e){e.stopPropagation();imprimirMov(m);}}>🖨 Imprimir</button>}
+                            :<div style={{display:"flex",gap:6}}>
+                              <button style={Object.assign({},mB("blue"),{padding:"4px 10px",fontSize:11})} onClick={function(e){e.stopPropagation();imprimirMov(m);}}>🖨</button>
+                              {m.kind==="sale"&&<button style={Object.assign({},mB("green"),{background:"#25D366",padding:"4px 10px",fontSize:11})} onClick={function(e){
+                                e.stopPropagation();
+                                var tel=(clients.find(function(c){return c.id===m.obj.clientId;})||{}).phone||"";
+                                var msg=waBoletaVenta(m.obj);
+                                if(tel){abrirWA(tel,msg);}else{pedirTelYEnviar(m.obj.client,msg,null);}
+                              }}>💬</button>}
+                            </div>}
                         </td>
                       </tr>
                   );
@@ -3223,12 +3285,12 @@ function App(props) {
           {view==="dashboard"&&canAccess(session.role,"dashboard")&&<DashboardScreen sales={sales} todaySales={todaySales} pendingAccs={pendingAccs} totalPend={totalPend} products={products} top5={top5} setSelectedSale={setSelSale} setView={setView} accounts={accounts} returns={returns} repairs={repairs}/>}
           {view==="pos"      &&canAccess(session.role,"pos")&&<POSScreen products={products} filteredPOS={filteredPOS} cart={cart} posQ={posQ} setPosQ={setPosQ} payMethod={payMethod} setPayMethod={setPayMethod} payType={payType} setPayType={setPayType} cashIn={cashIn} setCashIn={setCashIn} initialPay={initialPay} setInitialPay={setInitialPay} clientName={clientName} setClientName={setClientName} selectedClientId={selectedClientId} setSelectedClientId={setSelectedClientId} saleNote={saleNote} setSaleNote={setSaleNote} cartTotal={cartTotal} vuelto={vuelto} initPaidVal={initPaidVal} addToCart={addToCart} changeQty={changeQty} removeFromCart={removeFromCart} applyDiscount={applyDiscount} checkout={checkout} resetPOS={resetPOS} flash={flash} clients={clients} accounts={accounts}/>}
           {view==="caja"     &&canAccess(session.role,"caja")&&<CajaScreen sales={sales} accounts={accounts} returns={returns}/>}
-          {view==="accounts" &&canAccess(session.role,"accounts")&&<AccountsScreen accounts={accounts} pendingAccs={pendingAccs} totalPend={totalPend} addPayment={addPayment} showFlash={showFlash} products={products} session={session}/>}
+          {view==="accounts" &&canAccess(session.role,"accounts")&&<AccountsScreen accounts={accounts} pendingAccs={pendingAccs} totalPend={totalPend} addPayment={addPayment} showFlash={showFlash} products={products} session={session} clients={clients}/>}
           {view==="returns"  &&canAccess(session.role,"returns")&&<ReturnsScreen returns={returns} products={products} onProcess={processReturn} showFlash={showFlash} clients={clients} sales={sales}/>}
           {view==="defective"&&canAccess(session.role,"defective")&&<DefectiveScreen defectives={defectives} onUpdateStatus={updateDefectiveStatus} onReingress={reingresarDefective}/>}
           {view==="products" &&canAccess(session.role,"products")&&<ProductsScreen products={products} saveProduct={saveProduct} deleteProduct={deleteProduct} importProducts={importProducts}/>}
           {view==="inventory"&&canAccess(session.role,"inventory")&&<InventoryScreen products={products}/>}
-          {view==="history"  &&canAccess(session.role,"history")&&<HistoryScreen sales={sales} selectedSale={selSale} setSelectedSale={setSelSale} accounts={accounts} returns={returns} products={products} session={session}/>}
+          {view==="history"  &&canAccess(session.role,"history")&&<HistoryScreen sales={sales} selectedSale={selSale} setSelectedSale={setSelSale} accounts={accounts} returns={returns} products={products} session={session} clients={clients}/>}
           {view==="cuadres"  &&canAccess(session.role,"cuadres")&&<CuadresScreen sales={sales} accounts={accounts} returns={returns} products={products} repairs={repairs} session={session}/>}
           {view==="backup"   &&canAccess(session.role,"backup")&&<BackupScreen products={products} sales={sales} accounts={accounts} returns={returns} defectives={defectives} clients={clients} repairs={repairs} onExportJSON={exportJSON} onExportExcel={exportExcel} onImport={importData}/>}
           {view==="users"    &&canAccess(session.role,"users")&&<UsersScreen session={session} showFlash={showFlash}/>}

@@ -64,6 +64,11 @@ y dime en qué quedamos. Luego pregúntame qué trabajamos hoy.
 - [x] Límite de descuentos por rol (cajero max 20%, admin sin límite) — error claro si se excede
 - [x] Idempotency key en ventas (evitar ventas duplicadas si falla la red)
 
+### Pendiente WhatsApp (para cuando se quiera pagar API)
+- [ ] Recordatorios automáticos por fecha de vencimiento (cron job backend)
+- [ ] Integración UltraMsg/Twilio para envío automático sin intervención del cajero
+- [ ] Pantalla de configuración: días de anticipación, mensaje personalizable, activar/desactivar
+
 ### Prioridad ALTA — Funcionalidad de negocio
 - [ ] IVA configurable en boletas (esperar hasta implementar facturación)
 - [ ] Cuentas por cobrar con fecha de vencimiento + reporte de aging (30/60/90 días) — pendiente consultar con cliente
@@ -129,3 +134,12 @@ Vender el sistema como POS especializado para tiendas de celulares y reparacione
 - **API /api/audit**: endpoint GET solo para admin, con filtros por tipo de registro, acción y usuario. Paginación de 50/página
 - **AuditScreen**: pantalla nueva en el frontend (solo admin), con tabla paginada, filtros y detalle legible de cada evento
 - **Nav**: ítem "Auditoría 🔍" agregado al sidebar (visible solo para admin via PERMS)
+
+### Sesión 3 (continuación) — 22 junio 2026
+**Lo que se hizo:**
+- **WhatsApp manual (wa.me, gratis)**: botón 💬 en Historial de ventas y Cuentas por cobrar
+- En Historial: botón 💬 en cada venta (lista y detalle) — envía boleta formateada
+- En Cuentas: botón 💬 en cada cuenta pendiente (lista y detalle) — envía recordatorio de pago
+- Si el cliente tiene teléfono guardado → abre WhatsApp directo; si no → pide el número en el momento
+- Número de 8 dígitos guatemaltecos se convierte automáticamente a formato internacional (+502)
+- Pendiente automático (requiere API de pago): ver sección "Pendiente WhatsApp"
