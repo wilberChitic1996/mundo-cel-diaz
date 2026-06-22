@@ -515,6 +515,9 @@ var THEME_CSS = `
   --border-row: rgba(0,0,0,0.05);
   --bg-table-head: #f5f4f0;
   --bg-alt: #f5f4f0;
+  --bg-row: transparent;
+  --bg-error: #FDECEA;
+  --text-error: #791F1F;
   --shadow: rgba(0,0,0,0.05);
 }
 [data-theme="dark"] {
@@ -532,6 +535,9 @@ var THEME_CSS = `
   --border-row: rgba(255,255,255,0.04);
   --bg-table-head: #1f2e42;
   --bg-alt: #1f2e42;
+  --bg-row: transparent;
+  --bg-error: #3d1f1f;
+  --text-error: #f4a0a0;
   --shadow: rgba(0,0,0,0.3);
 }
 `;
@@ -3323,7 +3329,7 @@ function AuditScreen(props){
         </div>
       </div>
 
-      {err&&<div style={{background:"#FDECEA",color:"#791F1F",padding:"10px 14px",borderRadius:8,marginBottom:12}}>{err}</div>}
+      {err&&<div style={{background:"var(--bg-error,#FDECEA)",color:"var(--text-error,#791F1F)",padding:"10px 14px",borderRadius:8,marginBottom:12}}>{err}</div>}
 
       <div style={Object.assign({},sC,{padding:0,overflow:"hidden"})}>
         <div className="t-resp">
@@ -3334,8 +3340,8 @@ function AuditScreen(props){
               </tr>
             </thead>
             <tbody>
-              {loading&&<tr><td colSpan={6} style={{padding:24,textAlign:"center",color:"#888"}}>Cargando…</td></tr>}
-              {!loading&&logs.length===0&&<tr><td colSpan={6} style={{padding:24,textAlign:"center",color:"#888"}}>Sin registros</td></tr>}
+              {loading&&<tr><td colSpan={6} style={{padding:24,textAlign:"center",color:"var(--text-secondary,#888)"}}>Cargando…</td></tr>}
+              {!loading&&logs.length===0&&<tr><td colSpan={6} style={{padding:24,textAlign:"center",color:"var(--text-secondary,#888)"}}>Sin registros</td></tr>}
               {!loading&&logs.map(function(log){
                 var c=AUDIT_COLORS[log.action]||"gray";
                 var detail="";
@@ -3347,13 +3353,13 @@ function AuditScreen(props){
                   else if(log.action==="usuario_creado"||log.action==="usuario_editado")detail=(log.details.name||"")+(log.details.role?" — "+(log.details.role):"");
                 }
                 return(
-                  <tr key={log.id} style={{background:"var(--bg-row,#fff)"}}>
-                    <td style={sTD}><div>{fmtD(log.created_at)}</div><div style={{fontSize:12,color:"#888"}}>{fmtT(log.created_at)}</div></td>
+                  <tr key={log.id} style={{background:"var(--bg-row,transparent)"}}>
+                    <td style={sTD}><div>{fmtD(log.created_at)}</div><div style={{fontSize:12,color:"var(--text-secondary,#888)"}}>{fmtT(log.created_at)}</div></td>
                     <td style={sTD}>{log.user_name||"—"}</td>
                     <td style={sTD}><span style={mBg(log.user_role==="admin"?"teal":log.user_role==="cajero"?"blue":"purple")}>{ROLE_LABEL[log.user_role]||log.user_role||"—"}</span></td>
                     <td style={sTD}><span style={mBg(c)}>{AUDIT_ACTIONS[log.action]||log.action}</span></td>
                     <td style={sTD}>{log.entity_type||"—"}</td>
-                    <td style={Object.assign({},sTD,{maxWidth:280,fontSize:12,color:"#555"})}>{detail||JSON.stringify(log.details||{}).slice(0,80)}</td>
+                    <td style={Object.assign({},sTD,{maxWidth:280,fontSize:12,color:"var(--text-secondary,#666)"})}>{detail||JSON.stringify(log.details||{}).slice(0,80)}</td>
                   </tr>
                 );
               })}
@@ -3363,7 +3369,7 @@ function AuditScreen(props){
         {totalPages>1&&(
           <div style={{display:"flex",justifyContent:"center",gap:8,padding:"12px 16px",borderTop:"1px solid var(--border-table,rgba(0,0,0,0.08))"}}>
             <button style={mB("gray")} disabled={page<=1} onClick={function(){load(page-1);}}>‹ Anterior</button>
-            <span style={{alignSelf:"center",fontSize:13,color:"#888"}}>Pág. {page} / {totalPages} ({total} registros)</span>
+            <span style={{alignSelf:"center",fontSize:13,color:"var(--text-secondary,#888)"}}>Pág. {page} / {totalPages} ({total} registros)</span>
             <button style={mB("gray")} disabled={page>=totalPages} onClick={function(){load(page+1);}}>Siguiente ›</button>
           </div>
         )}
