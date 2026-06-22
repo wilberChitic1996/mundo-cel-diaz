@@ -673,26 +673,23 @@ var THEME_CSS = `
 class ErrorBoundary extends React.Component {
   constructor(props){
     super(props);
-    this.state={hasError:false,error:null,stack:""};
+    this.state={hasError:false,error:null};
   }
   static getDerivedStateFromError(error){
     return {hasError:true,error:error};
   }
   componentDidCatch(error,info){
     console.error("[ErrorBoundary]",error,info);
-    this.setState({stack:(info&&info.componentStack)||""});
   }
   render(){
     if(this.state.hasError){
-      var msg=this.state.error?((this.state.error.message||String(this.state.error))+(this.state.error.stack?("\n\n"+this.state.error.stack):"")):"Error desconocido";
       return (
-        <div style={{minHeight:"100vh",display:"flex",alignItems:"center",justifyContent:"center",background:"#f5f4f0",padding:16,boxSizing:"border-box"}}>
-          <div style={{background:"#fff",borderRadius:16,padding:"28px 24px",maxWidth:520,width:"100%",textAlign:"center",boxShadow:"0 8px 32px rgba(0,0,0,0.12)"}}>
+        <div style={{minHeight:"100vh",display:"flex",alignItems:"center",justifyContent:"center",background:"#f5f4f0"}}>
+          <div style={{background:"#fff",borderRadius:16,padding:"36px 40px",maxWidth:460,width:"90%",textAlign:"center",boxShadow:"0 8px 32px rgba(0,0,0,0.12)"}}>
             <div style={{fontSize:48,marginBottom:12}}>⚠️</div>
             <p style={{fontSize:18,fontWeight:700,margin:"0 0 8px",color:"#1a1a1a"}}>Ocurrió un error inesperado</p>
-            <p style={{fontSize:13,color:"#666",margin:"0 0 16px",lineHeight:1.6}}>Tomá una captura de este recuadro y enviála para corregirlo:</p>
-            <pre style={{textAlign:"left",background:"#1e1e1e",color:"#ff8a80",fontSize:11,lineHeight:1.5,padding:12,borderRadius:8,overflow:"auto",maxHeight:240,whiteSpace:"pre-wrap",wordBreak:"break-word"}}>{msg}{this.state.stack?("\n--- componentes ---"+this.state.stack):""}</pre>
-            <button onClick={function(){window.location.reload();}} style={{marginTop:16,padding:"12px 28px",borderRadius:8,border:"none",background:"#1D9E75",color:"#fff",fontSize:14,cursor:"pointer",fontWeight:700}}>
+            <p style={{fontSize:13,color:"#666",margin:"0 0 24px",lineHeight:1.6}}>La pantalla no pudo cargarse correctamente. Podés intentar recargar la página.</p>
+            <button onClick={function(){window.location.reload();}} style={{padding:"12px 28px",borderRadius:8,border:"none",background:"#1D9E75",color:"#fff",fontSize:14,cursor:"pointer",fontWeight:700}}>
               🔄 Recargar página
             </button>
           </div>
@@ -2495,6 +2492,23 @@ function HistoryScreen(props) {
   var _hf=useState("todos"); var hfilter=_hf[0]; var setHfilter=_hf[1];
   var _ho=useState("desc"); var horder=_ho[0]; var setHorder=_ho[1];
 
+  var movs=[];
+  sales.forEach(function(s){movs.push({k:"v"+s.id,date:s.date,tipo:"Venta",color:"teal",cliente:s.client,metodo:s.method,atendio:(s.registradoPor&&s.registradoPor.name)?s.registradoPor.name:(session.name||"—"),monto:Number(s.total),signo:1,kind:"sale",obj:s});});
+  accounts.forEach(function(a){
+    movs.push({k:"a"+a.id,date:a.date,tipo:"Venta a credito",color:"purple",cliente:a.client,metodo:"Credito",atendio:(a.registradoPor&&a.registradoPor.name)?a.registradoPor.name:(session.name||"—"),monto:Number(a.total),signo:1,kind:"credito",obj:a});
+    var _ac=0;
+    (a.payments||[]).forEach(function(p){
+      _ac+=Number(p.amount);
+      var _sd=Math.max(0,Number(a.total)-_ac);
+      var _fin=_sd<=0.009;
+      movs.push({k:"p"+(p.id||(a.id+_ac)),date:p.date,tipo:_fin?"Cancelacion":"Abono",color:_fin?"green":"amber",cliente:a.client,metodo:p.method,atendio:(p.registradoPor&&p.registradoPor.name)?p.registradoPor.name:(session.name||"—"),monto:Number(p.amount),signo:1,kind:"abono",obj:a,pdata:{estado:_fin?"pagado":"parcial",abonoHoy:Number(p.amount),pagado:_ac,saldo:_sd}});
+    });
+  });
+  returns.forEach(function(r){if(Number(r.refundAmount)>0){movs.push({k:"r"+r.id,date:r.date,tipo:"Devolucion",color:"red",cliente:r.client,metodo:r.refundMethod,atendio:(r.registradoPor&&r.registradoPor.name)?r.registradoPor.name:"—",monto:Number(r.refundAmount),signo:-1,kind:"devolucion",obj:r});}});
+  movs.sort(function(a,b){return horder==="desc"?(new Date(b.date)-new Date(a.date)):(new Date(a.date)-new Date(b.date));});
+  var fmovs=hfilter==="todos"?movs:movs.filter(function(m){return m.kind===hfilter;});
+  var histPag=usePaginator(fmovs,25);
+
   if(selectedSale){
     return (
         <div>
@@ -2551,22 +2565,7 @@ function HistoryScreen(props) {
         </div>
     );
   }
-  var movs=[];
-  sales.forEach(function(s){movs.push({k:"v"+s.id,date:s.date,tipo:"Venta",color:"teal",cliente:s.client,metodo:s.method,atendio:(s.registradoPor&&s.registradoPor.name)?s.registradoPor.name:(session.name||"—"),monto:Number(s.total),signo:1,kind:"sale",obj:s});});
-  accounts.forEach(function(a){
-    movs.push({k:"a"+a.id,date:a.date,tipo:"Venta a credito",color:"purple",cliente:a.client,metodo:"Credito",atendio:(a.registradoPor&&a.registradoPor.name)?a.registradoPor.name:(session.name||"—"),monto:Number(a.total),signo:1,kind:"credito",obj:a});
-    var _ac=0;
-    (a.payments||[]).forEach(function(p){
-      _ac+=Number(p.amount);
-      var _sd=Math.max(0,Number(a.total)-_ac);
-      var _fin=_sd<=0.009;
-      movs.push({k:"p"+(p.id||(a.id+_ac)),date:p.date,tipo:_fin?"Cancelacion":"Abono",color:_fin?"green":"amber",cliente:a.client,metodo:p.method,atendio:(p.registradoPor&&p.registradoPor.name)?p.registradoPor.name:(session.name||"—"),monto:Number(p.amount),signo:1,kind:"abono",obj:a,pdata:{estado:_fin?"pagado":"parcial",abonoHoy:Number(p.amount),pagado:_ac,saldo:_sd}});
-    });
-  });
-  returns.forEach(function(r){if(Number(r.refundAmount)>0){movs.push({k:"r"+r.id,date:r.date,tipo:"Devolucion",color:"red",cliente:r.client,metodo:r.refundMethod,atendio:(r.registradoPor&&r.registradoPor.name)?r.registradoPor.name:"—",monto:Number(r.refundAmount),signo:-1,kind:"devolucion",obj:r});}});
-  movs.sort(function(a,b){return horder==="desc"?(new Date(b.date)-new Date(a.date)):(new Date(a.date)-new Date(b.date));});
-  var fmovs=hfilter==="todos"?movs:movs.filter(function(m){return m.kind===hfilter;});
-  var histPag=usePaginator(fmovs,25);
+
   var totEnt=movs.filter(function(m){return m.signo>0;}).reduce(function(x,m){return x+m.monto;},0);
   var totSal=movs.filter(function(m){return m.signo<0;}).reduce(function(x,m){return x+m.monto;},0);
   function imprimirMov(m){
