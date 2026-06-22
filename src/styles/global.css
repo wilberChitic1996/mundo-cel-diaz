@@ -180,33 +180,22 @@ body.using-keyboard .sidebar-nav-item:focus {
 [data-theme="dark"] ::-webkit-scrollbar-thumb:hover { background: rgba(255,255,255,0.22); }
 
 /* ── Modo oscuro: tablas transparentes ──
-   Evita que celdas hereden fondo blanco del navegador o de estilos inline */
+   Solo fondo, nunca color — el color lo manejan los estilos inline con var(--text-primary) */
 [data-theme="dark"] table,
 [data-theme="dark"] thead,
 [data-theme="dark"] tbody,
 [data-theme="dark"] tfoot,
 [data-theme="dark"] tr,
-[data-theme="dark"] th,
 [data-theme="dark"] td {
   background-color: transparent !important;
-  color: var(--text-primary, #e8eaed) !important;
 }
 
-/* Excepciones: badges y spans con color explícito dentro de celdas */
-[data-theme="dark"] td span[style*="background"],
-[data-theme="dark"] th span[style*="background"] {
-  color: inherit !important;
-}
-
-/* Header de tabla */
 [data-theme="dark"] thead th {
   background-color: var(--bg-table-head, #1f2e42) !important;
-  color: var(--text-secondary, #9aa0ab) !important;
 }
 
-/* Hover en filas */
 [data-theme="dark"] tbody tr:hover td {
-  background-color: var(--bg-hover, rgba(255,255,255,0.04)) !important;
+  background-color: rgba(255,255,255,0.04) !important;
 }
 
 /* ── 7. Selección de texto ── */
