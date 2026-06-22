@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import * as XLSX from 'xlsx';
 import { db } from './utils/db.js';
 import { authAPI, productsAPI, salesAPI, accountsAPI, returnsAPI, defectivesAPI, usersAPI, checkAPI, clientsAPI, repairsAPI } from './utils/api.js';
@@ -679,6 +679,7 @@ function Sidebar(props) {
   var session=props.session||{}; var onLogout=props.onLogout||function(){}; var isOnline=props.isOnline||false;
   var theme=props.theme||"light"; var toggleTheme=props.toggleTheme||function(){};
   var sidebarOpen=props.sidebarOpen||false; var setSidebarOpen=props.setSidebarOpen||function(){};
+  var onSearch=props.onSearch||function(){};
   var NAV = [
     {id:"dashboard", ic:"📊", lb:"Dashboard"},
     {id:"pos",       ic:"🛒", lb:"Nueva Venta"},
@@ -757,6 +758,9 @@ function Sidebar(props) {
               </div>
           )}
           <div style={{padding:"8px 16px"}}>
+            <button onClick={onSearch} style={{width:"100%",padding:"6px 0",borderRadius:6,border:"1px solid rgba(255,255,255,0.15)",background:"rgba(255,255,255,0.05)",color:"rgba(255,255,255,0.6)",cursor:"pointer",fontSize:11,fontWeight:500,marginBottom:6}}>
+              🔍 Buscar <span style={{fontSize:9,opacity:0.5,marginLeft:4}}>Ctrl+K</span>
+            </button>
             <button onClick={toggleTheme} style={{width:"100%",padding:"6px 0",borderRadius:6,border:"1px solid rgba(255,255,255,0.15)",background:"rgba(255,255,255,0.05)",color:"rgba(255,255,255,0.6)",cursor:"pointer",fontSize:11,fontWeight:500,marginBottom:6}}>
               {theme==="light"?"🌙 Modo oscuro":"☀️ Modo claro"}
             </button>
@@ -765,6 +769,95 @@ function Sidebar(props) {
           </div>
         </div>
       </div>
+  );
+}
+
+/* ── Paginador reutilizable ─────────────────────────────────────────── */
+function usePaginator(items, perPage){
+  var _p=useState(1); var page=_p[0]; var setPage=_p[1];
+  var total=Math.ceil(items.length/perPage)||1;
+  var safePage=Math.min(page,total);
+  var paged=items.slice((safePage-1)*perPage, safePage*perPage);
+  function Pager(){
+    if(total<=1)return null;
+    var pages=[];
+    for(var i=1;i<=total;i++)pages.push(i);
+    return (
+      <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",padding:"12px 0",marginTop:8,borderTop:"1px solid rgba(0,0,0,0.07)"}}>
+        <span style={{fontSize:12,color:"#999"}}>{items.length} registros · Pág. {safePage} de {total}</span>
+        <div style={{display:"flex",gap:4}}>
+          <button disabled={safePage<=1} onClick={function(){setPage(1);}} style={Object.assign({},mB("gray"),{padding:"4px 8px",fontSize:11,opacity:safePage<=1?0.4:1})}>«</button>
+          <button disabled={safePage<=1} onClick={function(){setPage(safePage-1);}} style={Object.assign({},mB("gray"),{padding:"4px 8px",fontSize:11,opacity:safePage<=1?0.4:1})}>‹</button>
+          {pages.filter(function(p){return Math.abs(p-safePage)<=2;}).map(function(p){
+            return <button key={p} onClick={function(){setPage(p);}} style={Object.assign({},mB(p===safePage?"teal":"gray"),{padding:"4px 9px",fontSize:11,minWidth:28})}>{p}</button>;
+          })}
+          <button disabled={safePage>=total} onClick={function(){setPage(safePage+1);}} style={Object.assign({},mB("gray"),{padding:"4px 8px",fontSize:11,opacity:safePage>=total?0.4:1})}>›</button>
+          <button disabled={safePage>=total} onClick={function(){setPage(total);}} style={Object.assign({},mB("gray"),{padding:"4px 8px",fontSize:11,opacity:safePage>=total?0.4:1})}>»</button>
+        </div>
+      </div>
+    );
+  }
+  return {paged:paged, Pager:Pager, resetPage:function(){setPage(1);}};
+}
+
+/* ── Búsqueda global ────────────────────────────────────────────────── */
+function GlobalSearch(props){
+  var onClose=props.onClose; var setView=props.setView;
+  var sales=props.sales||[]; var clients=props.clients||[];
+  var products=props.products||[]; var repairs=props.repairs||[];
+  var setSelectedSale=props.setSelectedSale;
+  var _q=useState(""); var q=_q[0]; var setQ=_q[1];
+  var ref=useRef(null);
+  useEffect(function(){if(ref.current)ref.current.focus();},[]);
+  useEffect(function(){
+    function handler(e){if(e.key==="Escape")onClose();}
+    document.addEventListener("keydown",handler);
+    return function(){document.removeEventListener("keydown",handler);};
+  },[]);
+  var ql=q.toLowerCase().trim();
+  var results=[];
+  if(ql.length>=2){
+    clients.filter(function(c){return (c.name||"").toLowerCase().indexOf(ql)>=0||(c.phone||"").indexOf(ql)>=0||(c.cli_code||"").toLowerCase().indexOf(ql)>=0;}).slice(0,4).forEach(function(c){
+      results.push({type:"Cliente",icon:"👤",title:c.name,sub:(c.phone||"")+" · "+c.cli_code,action:function(){setView("clients");onClose();}});
+    });
+    products.filter(function(p){return (p.name||"").toLowerCase().indexOf(ql)>=0||(p.code||"").toLowerCase().indexOf(ql)>=0;}).slice(0,4).forEach(function(p){
+      results.push({type:"Producto",icon:"📦",title:p.name,sub:"Stock: "+p.stock+" · Q"+Number(p.price).toFixed(2),action:function(){setView("products");onClose();}});
+    });
+    sales.filter(function(s){return (s.client||"").toLowerCase().indexOf(ql)>=0;}).slice(0,4).forEach(function(s){
+      results.push({type:"Venta",icon:"🛒",title:s.client,sub:fmtD(s.date)+" · Q"+Number(s.total).toFixed(2),action:function(){if(setSelectedSale)setSelectedSale(s);setView("history");onClose();}});
+    });
+    repairs.filter(function(r){return (r.client_name||"").toLowerCase().indexOf(ql)>=0||(r.brand||"").toLowerCase().indexOf(ql)>=0||(r.model||"").toLowerCase().indexOf(ql)>=0||(r.rep_code||"").toLowerCase().indexOf(ql)>=0;}).slice(0,4).forEach(function(r){
+      results.push({type:"Reparación",icon:"🔧",title:(r.client_name||"")+" — "+r.brand+" "+r.model,sub:r.rep_code+" · "+r.status,action:function(){setView("repairs");onClose();}});
+    });
+  }
+  return (
+    <div style={{position:"fixed",inset:0,background:"rgba(0,0,0,0.55)",zIndex:9999,display:"flex",alignItems:"flex-start",justifyContent:"center",paddingTop:80}} onClick={onClose}>
+      <div style={{background:"#fff",borderRadius:16,boxShadow:"0 20px 60px rgba(0,0,0,0.3)",width:"100%",maxWidth:560,overflow:"hidden"}} onClick={function(e){e.stopPropagation();}}>
+        <div style={{display:"flex",alignItems:"center",gap:12,padding:"14px 18px",borderBottom:"1px solid rgba(0,0,0,0.08)"}}>
+          <span style={{fontSize:18}}>🔍</span>
+          <input ref={ref} style={{flex:1,border:"none",outline:"none",fontSize:16,background:"transparent"}} placeholder="Buscar clientes, productos, ventas, reparaciones..." value={q} onChange={function(e){setQ(e.target.value);}}/>
+          <span style={{fontSize:11,color:"#bbb",background:"#f4f4f4",borderRadius:6,padding:"3px 7px",fontFamily:"monospace"}}>ESC</span>
+        </div>
+        <div style={{maxHeight:380,overflowY:"auto",padding:ql.length>=2?"8px 0":"20px",minHeight:60}}>
+          {ql.length<2&&<p style={{textAlign:"center",color:"#bbb",fontSize:13,margin:0}}>Escribe al menos 2 caracteres para buscar</p>}
+          {ql.length>=2&&results.length===0&&<p style={{textAlign:"center",color:"#bbb",fontSize:13,margin:0,padding:16}}>Sin resultados para "{q}"</p>}
+          {results.map(function(r,i){
+            return (
+              <div key={i} onClick={r.action} style={{display:"flex",alignItems:"center",gap:12,padding:"10px 18px",cursor:"pointer",borderBottom:"1px solid rgba(0,0,0,0.04)"}}
+                onMouseEnter={function(e){e.currentTarget.style.background="#f8f8f8";}}
+                onMouseLeave={function(e){e.currentTarget.style.background="transparent";}}>
+                <span style={{fontSize:20,flexShrink:0}}>{r.icon}</span>
+                <div style={{flex:1,minWidth:0}}>
+                  <div style={{fontWeight:600,fontSize:14,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{r.title}</div>
+                  <div style={{fontSize:12,color:"#888",overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{r.sub}</div>
+                </div>
+                <span style={mBg("teal")}>{r.type}</span>
+              </div>
+            );
+          })}
+        </div>
+      </div>
+    </div>
   );
 }
 
@@ -1327,6 +1420,7 @@ function AccountsScreen(props) {
   });
   var clienteSaldo=filtered.reduce(function(s,a){return s+(a.balance||0);},0);
   var clientePagado=filtered.reduce(function(s,a){return s+(a.paid||0);},0);
+  var accPag=usePaginator(filtered,20);
   function doPayment(acc){
     var amt=parseFloat(pmtAmount);
     if(!amt||amt<=0){setPmtErr("Ingresá un monto válido");return;}
@@ -1439,7 +1533,7 @@ function AccountsScreen(props) {
               <table style={{width:"100%",borderCollapse:"collapse"}}>
                 <thead><tr>{["Fecha","Cliente","Total","Pagado","Saldo","Estado",""].map(function(h){return <th key={h} style={sTH}>{h}</th>;})}</tr></thead>
                 <tbody>
-                {filtered.map(function(a){
+                {accPag.paged.map(function(a){
                   return (
                       <tr key={a.id} style={{cursor:"pointer"}} onClick={function(){setSelAcc(a.id);}}>
                         <td style={sTD}>{fmtD(a.date)}</td>
@@ -1456,6 +1550,7 @@ function AccountsScreen(props) {
               </table>
           )}
         </div>
+        {filtered.length>0&&React.createElement(accPag.Pager)}
       </div>
   );
 }
@@ -2177,6 +2272,7 @@ function HistoryScreen(props) {
   returns.forEach(function(r){if(Number(r.refundAmount)>0){movs.push({k:"r"+r.id,date:r.date,tipo:"Devolucion",color:"red",cliente:r.client,metodo:r.refundMethod,atendio:(r.registradoPor&&r.registradoPor.name)?r.registradoPor.name:"—",monto:Number(r.refundAmount),signo:-1,kind:"devolucion",obj:r});}});
   movs.sort(function(a,b){return horder==="desc"?(new Date(b.date)-new Date(a.date)):(new Date(a.date)-new Date(b.date));});
   var fmovs=hfilter==="todos"?movs:movs.filter(function(m){return m.kind===hfilter;});
+  var histPag=usePaginator(fmovs,25);
   var totEnt=movs.filter(function(m){return m.signo>0;}).reduce(function(x,m){return x+m.monto;},0);
   var totSal=movs.filter(function(m){return m.signo<0;}).reduce(function(x,m){return x+m.monto;},0);
   function imprimirMov(m){
@@ -2211,7 +2307,7 @@ function HistoryScreen(props) {
               <table style={{width:"100%",borderCollapse:"collapse"}}>
                 <thead><tr>{["Fecha","Hora","Tipo","Cliente","Metodo","Atendio","Monto",""].map(function(h){return <th key={h} style={sTH}>{h}</th>;})}</tr></thead>
                 <tbody>
-                {fmovs.map(function(m){
+                {histPag.paged.map(function(m){
                   var clickable=m.kind==="sale";
                   return (
                       <tr key={m.k} style={{cursor:clickable?"pointer":"default"}} onClick={clickable?function(){setSelectedSale(m.obj);}:undefined}>
@@ -2234,6 +2330,7 @@ function HistoryScreen(props) {
               </table>
           )}
         </div>
+        {fmovs.length>0&&React.createElement(histPag.Pager)}
       </div>
   );
 }
@@ -2317,6 +2414,7 @@ function ClientsScreen(props) {
     var ql=q.toLowerCase();
     return (c.name||"").toLowerCase().includes(ql)||(c.dpi||"").includes(q.trim())||(c.cliCode||"").toLowerCase().includes(ql)||(c.phone||"").includes(q.trim());
   });
+  var cliPag=usePaginator(filtered,20);
 
   function resetForm(){setFName("");setFDpi("");setFTel("");setFAddr("");setFErr("");setEditCli(null);setShowForm(false);}
 
@@ -2496,7 +2594,7 @@ function ClientsScreen(props) {
           <table style={{width:"100%",borderCollapse:"collapse"}}>
             <thead><tr>{["Código","Nombre","DPI","Teléfono","Compras","Deuda",""].map(function(h){return <th key={h} style={sTH}>{h}</th>;})}</tr></thead>
             <tbody>
-              {filtered.map(function(c){
+              {cliPag.paged.map(function(c){
                 var cliSalesCount=sales.filter(function(s){return s.clientId===c.id||(s.client===c.name&&!s.clientId);}).length;
                 var cliDeuda=accounts.filter(function(a){return (a.clientId===c.id||(a.client===c.name&&!a.clientId))&&a.status!=="pagado";}).reduce(function(s,a){return s+a.balance;},0);
                 var esFrecuente=cliSalesCount>=5||sales.filter(function(s){return s.clientId===c.id||(s.client===c.name&&!s.clientId);}).reduce(function(s,x){return s+x.total;},0)>=1000;
@@ -2518,6 +2616,7 @@ function ClientsScreen(props) {
             </tbody>
           </table>
         )}
+        {filtered.length>0&&React.createElement(cliPag.Pager)}
       </div>
     </div>
   );
@@ -2537,6 +2636,14 @@ function App(props) {
   var _rep=useState([]); var repairs=_rep[0]; var setRepairs=_rep[1];
   var _ld=useState(false); var loaded=_ld[0]; var setLoaded=_ld[1];
   var _on=useState(false); var isOnline=_on[0]; var setIsOnline=_on[1];
+
+  useEffect(function(){
+    function handleGlobalKey(e){
+      if((e.ctrlKey||e.metaKey)&&e.key==="k"){e.preventDefault();setGsOpen(true);}
+    }
+    document.addEventListener("keydown",handleGlobalKey);
+    return function(){document.removeEventListener("keydown",handleGlobalKey);};
+  },[]);
 
   useEffect(function(){
     async function loadAll(){
@@ -2608,6 +2715,7 @@ function App(props) {
   var _v=useState(function(){ return canAccess(session.role,"pos")?"pos":"dashboard"; }); var view=_v[0]; var setView=_v[1];
   var _fl=useState({msg:"",type:"ok"}); var flash=_fl[0]; var setFlash=_fl[1];
   var _ss=useState(null); var selSale=_ss[0]; var setSelSale=_ss[1];
+  var _gs=useState(false); var gsOpen=_gs[0]; var setGsOpen=_gs[1];
 
   // ── Timeout de inactividad ──
   var INACTIVITY_MS = 15 * 60 * 1000; // 15 minutos de inactividad
@@ -3083,7 +3191,8 @@ function App(props) {
           <span style={{color:"#fff",fontWeight:700,fontSize:15,letterSpacing:"-0.3px"}}>MUNDO CEL DIAZ</span>
           <span style={{color:TEAL,fontSize:11,fontWeight:600}}>v2.1</span>
         </div>
-        <Sidebar view={view} setView={setView} cartCount={cart.length} pendingCount={pendingAccs.length} products={products} sales={sales} session={session} onLogout={onLogout} isOnline={isOnline} theme={theme} toggleTheme={toggleTheme} sidebarOpen={sidebarOpen} setSidebarOpen={setSidebarOpen}/>
+        <Sidebar view={view} setView={setView} cartCount={cart.length} pendingCount={pendingAccs.length} products={products} sales={sales} session={session} onLogout={onLogout} isOnline={isOnline} theme={theme} toggleTheme={toggleTheme} sidebarOpen={sidebarOpen} setSidebarOpen={setSidebarOpen} onSearch={function(){setGsOpen(true);}}/>
+        {gsOpen&&<GlobalSearch onClose={function(){setGsOpen(false);}} setView={setView} sales={sales} clients={clients} products={products} repairs={repairs} setSelectedSale={setSelSale}/>}
         <div style={{flex:1,padding:"24px 28px",overflowY:"auto",minWidth:0}} className="main-content">
           {view==="dashboard"&&canAccess(session.role,"dashboard")&&<DashboardScreen sales={sales} todaySales={todaySales} pendingAccs={pendingAccs} totalPend={totalPend} products={products} top5={top5} setSelectedSale={setSelSale} setView={setView} accounts={accounts} returns={returns} repairs={repairs}/>}
           {view==="pos"      &&canAccess(session.role,"pos")&&<POSScreen products={products} filteredPOS={filteredPOS} cart={cart} posQ={posQ} setPosQ={setPosQ} payMethod={payMethod} setPayMethod={setPayMethod} payType={payType} setPayType={setPayType} cashIn={cashIn} setCashIn={setCashIn} initialPay={initialPay} setInitialPay={setInitialPay} clientName={clientName} setClientName={setClientName} selectedClientId={selectedClientId} setSelectedClientId={setSelectedClientId} saleNote={saleNote} setSaleNote={setSaleNote} cartTotal={cartTotal} vuelto={vuelto} initPaidVal={initPaidVal} addToCart={addToCart} changeQty={changeQty} removeFromCart={removeFromCart} applyDiscount={applyDiscount} checkout={checkout} resetPOS={resetPOS} flash={flash} clients={clients} accounts={accounts}/>}
@@ -3211,6 +3320,7 @@ function RepairsScreen(props){
     if(filter==="recibido") return r.status==="recibido";
     return true;
   });
+  var repPag=usePaginator(filtered,15);
 
   var cliResults=fClientQ.trim().length>0?clients.filter(function(c){
     var q=fClientQ.toLowerCase();
@@ -3533,7 +3643,7 @@ function RepairsScreen(props){
           <table style={{width:"100%",borderCollapse:"collapse"}}>
             <thead><tr>{["Orden","Cliente","Dispositivo","Técnico","Estado","Costo","Entrega",""].map(function(h){return <th key={h} style={sTH}>{h}</th>;})}</tr></thead>
             <tbody>
-              {filtered.slice().sort(function(a,b){return new Date(b.createdAt)-new Date(a.createdAt);}).map(function(r){
+              {repPag.paged.slice().sort(function(a,b){return new Date(b.createdAt)-new Date(a.createdAt);}).map(function(r){
                 var info=REP_STATUS[r.status]||{label:r.status,color:"gray"};
                 var vencida=r.promisedDate&&r.status!=="entregado"&&new Date(r.promisedDate+"T23:59:59")<new Date();
                 return (
@@ -3553,6 +3663,7 @@ function RepairsScreen(props){
             </tbody>
           </table>
         )}
+        {filtered.length>0&&React.createElement(repPag.Pager)}
       </div>
     </div>
   );
