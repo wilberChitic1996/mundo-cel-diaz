@@ -111,6 +111,13 @@ export const repairsAPI = {
   remove:       function(id)          { return api.delete('/repairs/' + id); },
 };
 
+// ── Garantías ─────────────────────────────────────────
+export const warrantiesAPI = {
+  getAll:  function()      { return api.get('/warranties'); },
+  create:  function(data)  { return api.post('/warranties', data); },
+  update:  function(id, d) { return api.put('/warranties/' + id, d); },
+};
+
 // ── Auditoría ─────────────────────────────────────────
 export const auditAPI = {
   getAll: function(params) {
