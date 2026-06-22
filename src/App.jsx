@@ -669,6 +669,37 @@ var THEME_CSS = `
 }
 `;
 
+/* ── ErrorBoundary — evita pantalla blanca ante crashes de render ── */
+class ErrorBoundary extends React.Component {
+  constructor(props){
+    super(props);
+    this.state={hasError:false,error:null};
+  }
+  static getDerivedStateFromError(error){
+    return {hasError:true,error:error};
+  }
+  componentDidCatch(error,info){
+    console.error("[ErrorBoundary]",error,info);
+  }
+  render(){
+    if(this.state.hasError){
+      return (
+        <div style={{minHeight:"100vh",display:"flex",alignItems:"center",justifyContent:"center",background:"#f5f4f0"}}>
+          <div style={{background:"#fff",borderRadius:16,padding:"36px 40px",maxWidth:460,width:"90%",textAlign:"center",boxShadow:"0 8px 32px rgba(0,0,0,0.12)"}}>
+            <div style={{fontSize:48,marginBottom:12}}>⚠️</div>
+            <p style={{fontSize:18,fontWeight:700,margin:"0 0 8px",color:"#1a1a1a"}}>Ocurrió un error inesperado</p>
+            <p style={{fontSize:13,color:"#666",margin:"0 0 24px",lineHeight:1.6}}>La pantalla no pudo cargarse correctamente. Podés intentar recargar la página.</p>
+            <button onClick={function(){window.location.reload();}} style={{padding:"12px 28px",borderRadius:8,border:"none",background:"#1D9E75",color:"#fff",fontSize:14,cursor:"pointer",fontWeight:700}}>
+              🔄 Recargar página
+            </button>
+          </div>
+        </div>
+      );
+    }
+    return this.props.children;
+  }
+}
+
 /* ── AppWrapper — controla autenticación ── */
 function AppWrapper() {
   var _s=useState(function(){return getSession();}); var session=_s[0]; var setSession=_s[1];
@@ -745,7 +776,7 @@ function AppWrapper() {
       <style dangerouslySetInnerHTML={{__html:THEME_CSS}}/>
       {!session
         ? <LoginScreen onLogin={function(s){setSession(s);}}/>
-        : <App session={session} onLogout={function(){clearSession();setSession(null);}} theme={theme} toggleTheme={toggleTheme} sidebarOpen={sidebarOpen} setSidebarOpen={setSidebarOpen}/>
+        : <ErrorBoundary><App session={session} onLogout={function(){clearSession();setSession(null);}} theme={theme} toggleTheme={toggleTheme} sidebarOpen={sidebarOpen} setSidebarOpen={setSidebarOpen}/></ErrorBoundary>
       }
     </div>
   );
@@ -2312,7 +2343,7 @@ function printVoucher(sale, opts){
   else if(_E==='pagado'||_E==='cancelacion'){_sello=(opts.abonoHoy!=null)?'CANCELADO - ULTIMO ABONO':'CUENTA CANCELADA';_selloCss='background:#EAF3DE;color:#27500A;border:2px solid #2E7D32;';}
   var _docLabel=_E?'Comprobante de Cuenta':'Comprobante de Venta';
   var _pmap={}; (opts.products||[]).forEach(function(pp){_pmap[pp.code]=pp.shelf;});
-    var itemsHTML=sale.items.map(function(it){
+    var itemsHTML=(sale.items||[]).map(function(it){
       var hasDisc=it.originalPrice&&it.price<it.originalPrice;
       var _shelf=it.shelf||_pmap[it.code]||'—';
       return '<tr>'+
@@ -2326,7 +2357,7 @@ function printVoucher(sale, opts){
       '</tr>';
     }).join("");
 
-    var subtotal=sale.items.reduce(function(s,it){return s+(it.originalPrice||it.price)*it.qty;},0);
+    var subtotal=(sale.items||[]).reduce(function(s,it){return s+(it.originalPrice||it.price)*it.qty;},0);
     var totalDesc=subtotal-sale.total;
     var ventaNum=sale.id.toUpperCase().slice(-8);
     var fecha=new Date(sale.date).toLocaleDateString("es-GT",{day:"2-digit",month:"long",year:"numeric"});
@@ -2491,7 +2522,7 @@ function HistoryScreen(props) {
             <table style={{width:"100%",borderCollapse:"collapse"}}>
               <thead><tr>{["Código","Producto","Cant.","Precio unit.","Subtotal"].map(function(h){return <th key={h} style={sTH}>{h}</th>;})}</tr></thead>
               <tbody>
-              {selectedSale.items.map(function(it,i){
+              {(selectedSale.items||[]).map(function(it,i){
                 var hasDisc=it.originalPrice&&it.price<it.originalPrice;
                 return <tr key={i}>
                   <td style={Object.assign({},sTD,{fontFamily:"monospace",fontSize:12})}>{it.code}</td>
@@ -3981,6 +4012,8 @@ function RepairsScreen(props){
   var _fparts=useState([]); var fParts=_fparts[0]; var setFParts=_fparts[1];
   var _ferr=useState(""); var fErr=_ferr[0]; var setFErr=_ferr[1];
   var _cdrop=useState(false); var showCliDrop=_cdrop[0]; var setShowCliDrop=_cdrop[1];
+  var _pq=useState(""); var partQ=_pq[0]; var setPartQ=_pq[1];
+  var _pshow=useState(false); var showPartPicker=_pshow[0]; var setShowPartPicker=_pshow[1];
 
   // Filtros de lista
   var filtered=repairs.filter(function(r){
@@ -4013,6 +4046,19 @@ function RepairsScreen(props){
       });
     }
   }
+  function addPartObj(p){
+    setFParts(function(prev){
+      var ex=prev.find(function(x){return x.code===p.code;});
+      if(ex) return prev.map(function(x){return x.code===p.code?Object.assign({},x,{qty:x.qty+1}):x;});
+      return prev.concat([{code:p.code,name:p.name,price:p.price,qty:1}]);
+    });
+  }
+  var partResults=products.filter(function(p){
+    if(p.unit==="serv") return false;
+    if(!partQ.trim()) return true;
+    var ql=partQ.toLowerCase();
+    return (p.name||"").toLowerCase().includes(ql)||(p.code||"").toLowerCase().includes(ql)||(p.category||"").toLowerCase().includes(ql);
+  }).slice(0,30);
 
   function removePart(code){ setFParts(function(prev){return prev.filter(function(x){return x.code!==code;});}); }
 
@@ -4020,6 +4066,7 @@ function RepairsScreen(props){
     setFClientQ("");setFClientId(null);setFClientName("");setFClientPhone("");
     setFBrand("");setFModel("");setFImei("");setFProblem("");setFDiag("");
     setFTech("");setFCost("");setFDate("");setFNote("");setFParts([]);setFErr("");
+    setPartQ("");setShowPartPicker(false);
   }
 
   function closeForm(){
@@ -4257,11 +4304,38 @@ function RepairsScreen(props){
           {/* Repuestos */}
           <p style={{fontWeight:600,fontSize:13,color:"#555",margin:"0 0 10px",borderBottom:"1px solid #eee",paddingBottom:6}}>🔩 Repuestos del inventario (opcional)</p>
           <div style={{marginBottom:14}}>
-            <div style={{display:"flex",gap:8,marginBottom:8}}>
-              <input id="partCodeInp" style={Object.assign({},sI,{flex:1})} placeholder="Ingresá el código del producto (ej: B001) y presioná Enter"
-                onKeyDown={function(e){if(e.key==="Enter"){addPart(e.target.value);e.target.value="";}}}/>
-              <button style={mB("gray")} onClick={function(){var inp=document.getElementById("partCodeInp");if(inp){addPart(inp.value);inp.value="";}}}>+ Agregar</button>
+            {/* Buscador de productos */}
+            <div style={{marginBottom:8,position:"relative"}}>
+              <input style={Object.assign({},sI,{paddingRight:90})} placeholder="🔍 Buscar repuesto por nombre, código o categoría..."
+                value={partQ}
+                onChange={function(e){setPartQ(e.target.value);setShowPartPicker(true);}}
+                onFocus={function(){setShowPartPicker(true);}}
+                onBlur={function(){setTimeout(function(){setShowPartPicker(false);},200);}}
+              />
+              {partQ&&<span style={{position:"absolute",right:10,top:"50%",transform:"translateY(-50%)",fontSize:12,color:"#999",cursor:"pointer"}} onMouseDown={function(){setPartQ("");setShowPartPicker(false);}}>✕ limpiar</span>}
+              {showPartPicker&&(
+                <div style={{position:"absolute",top:"100%",left:0,right:0,background:"#fff",border:"1px solid rgba(0,0,0,0.15)",borderRadius:8,boxShadow:"0 6px 20px rgba(0,0,0,0.12)",zIndex:200,marginTop:2,maxHeight:240,overflowY:"auto"}}>
+                  {partResults.length===0?<div style={{padding:"10px 14px",fontSize:13,color:"#999"}}>Sin productos en inventario</div>:
+                  partResults.map(function(p){
+                    var ya=fParts.find(function(x){return x.code===p.code;});
+                    return (
+                      <div key={p.code} onMouseDown={function(){addPartObj(p);setPartQ("");}} style={{padding:"9px 14px",cursor:"pointer",borderBottom:"1px solid #f0f0f0",display:"flex",justifyContent:"space-between",alignItems:"center",background:ya?"#F0FDF4":"#fff"}}>
+                        <div>
+                          <span style={{fontWeight:600,fontSize:13}}>{p.name}</span>
+                          <span style={{fontSize:11,color:"#999",marginLeft:8,fontFamily:"monospace"}}>{p.code}</span>
+                          {p.category&&<span style={{fontSize:11,color:"#aaa",marginLeft:6}}>{p.category}</span>}
+                        </div>
+                        <div style={{textAlign:"right",flexShrink:0,marginLeft:12}}>
+                          <div style={{fontSize:13,fontWeight:700,color:TEAL}}>Q {Number(p.price).toFixed(2)}</div>
+                          <div style={{fontSize:11,color:p.stock>0?"#666":"#E24B4A"}}>Stock: {p.stock} {ya?"· ✓ ya agregado":""}</div>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
             </div>
+            {/* Lista de repuestos agregados */}
             {fParts.length>0&&(
               <table style={{width:"100%",borderCollapse:"collapse"}}>
                 <thead><tr>{["Código","Repuesto","Cant.","Precio",""].map(function(h){return <th key={h} style={sTH}>{h}</th>;})}</tr></thead>
@@ -4269,13 +4343,20 @@ function RepairsScreen(props){
                   {fParts.map(function(p){return <tr key={p.code}>
                     <td style={Object.assign({},sTD,{fontFamily:"monospace",fontSize:12})}>{p.code}</td>
                     <td style={Object.assign({},sTD,{fontWeight:500})}>{p.name}</td>
-                    <td style={sTD}>{p.qty}</td>
+                    <td style={sTD}>
+                      <div style={{display:"flex",alignItems:"center",gap:6}}>
+                        <button style={{border:"1px solid #ddd",borderRadius:4,width:22,height:22,cursor:"pointer",background:"#fff",fontSize:14,display:"flex",alignItems:"center",justifyContent:"center"}} onMouseDown={function(e){e.preventDefault();setFParts(function(prev){return prev.map(function(x){return x.code===p.code&&x.qty>1?Object.assign({},x,{qty:x.qty-1}):x;});});}}>−</button>
+                        <span style={{minWidth:20,textAlign:"center",fontWeight:600}}>{p.qty}</span>
+                        <button style={{border:"1px solid #ddd",borderRadius:4,width:22,height:22,cursor:"pointer",background:"#fff",fontSize:14,display:"flex",alignItems:"center",justifyContent:"center"}} onMouseDown={function(e){e.preventDefault();setFParts(function(prev){return prev.map(function(x){return x.code===p.code?Object.assign({},x,{qty:x.qty+1}):x;});});}}>+</button>
+                      </div>
+                    </td>
                     <td style={Object.assign({},sTD,{color:TEAL})}>Q {Number(p.price).toFixed(2)}</td>
-                    <td style={sTD}><span onClick={function(){removePart(p.code);}} style={{cursor:"pointer",color:"#E24B4A",fontSize:16}}>×</span></td>
+                    <td style={sTD}><span onClick={function(){removePart(p.code);}} style={{cursor:"pointer",color:"#E24B4A",fontSize:16,padding:"0 4px"}}>×</span></td>
                   </tr>;})}
                 </tbody>
               </table>
             )}
+            {fParts.length===0&&<p style={{fontSize:12,color:"#bbb",margin:"8px 0 0"}}>No se han agregado repuestos aún.</p>}
           </div>
 
           {/* Nota interna */}
