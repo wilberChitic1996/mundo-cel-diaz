@@ -705,6 +705,24 @@ function AppWrapper() {
   var _s=useState(function(){return getSession();}); var session=_s[0]; var setSession=_s[1];
   var _th=useState(function(){return localStorage.getItem("mnpos-theme")||"light";}); var theme=_th[0]; var setTheme=_th[1];
   var _sb=useState(false); var sidebarOpen=_sb[0]; var setSidebarOpen=_sb[1];
+  var _pi=useState(false); var showInstall=_pi[0]; var setShowInstall=_pi[1];
+
+  useEffect(function(){
+    if(window.__pwaInstallPrompt) setShowInstall(true);
+    function onReady(){ setShowInstall(true); }
+    window.addEventListener('pwa-install-ready', onReady);
+    window.addEventListener('appinstalled', function(){ setShowInstall(false); });
+    return function(){ window.removeEventListener('pwa-install-ready', onReady); };
+  },[]);
+
+  function installPWA(){
+    if(!window.__pwaInstallPrompt) return;
+    window.__pwaInstallPrompt.prompt();
+    window.__pwaInstallPrompt.userChoice.then(function(r){
+      if(r.outcome==='accepted') setShowInstall(false);
+      window.__pwaInstallPrompt=null;
+    });
+  }
 
   function toggleTheme(){
     var next=theme==="light"?"dark":"light";
@@ -774,6 +792,17 @@ function AppWrapper() {
   return (
     <div data-theme={theme} style={{minHeight:"100vh"}}>
       <style dangerouslySetInnerHTML={{__html:THEME_CSS}}/>
+      {showInstall&&(
+        <div style={{position:"fixed",bottom:16,left:"50%",transform:"translateX(-50%)",zIndex:9999,background:"#1a2535",color:"#fff",borderRadius:14,padding:"12px 18px",display:"flex",alignItems:"center",gap:12,boxShadow:"0 8px 32px rgba(0,0,0,0.35)",maxWidth:360,width:"calc(100% - 32px)",boxSizing:"border-box"}}>
+          <img src="/icon-192.png" alt="" style={{width:36,height:36,borderRadius:8,flexShrink:0}}/>
+          <div style={{flex:1,minWidth:0}}>
+            <p style={{margin:0,fontWeight:700,fontSize:13}}>Instalar MCD POS</p>
+            <p style={{margin:0,fontSize:11,opacity:0.7}}>Acceso rápido desde tu pantalla de inicio</p>
+          </div>
+          <button onClick={installPWA} style={{background:"#1D9E75",color:"#fff",border:"none",borderRadius:8,padding:"8px 14px",fontSize:12,fontWeight:700,cursor:"pointer",flexShrink:0}}>Instalar</button>
+          <button onClick={function(){setShowInstall(false);}} style={{background:"transparent",color:"rgba(255,255,255,0.5)",border:"none",fontSize:18,cursor:"pointer",padding:"0 4px",flexShrink:0}}>✕</button>
+        </div>
+      )}
       {!session
         ? <LoginScreen onLogin={function(s){setSession(s);}}/>
         : <ErrorBoundary><App session={session} onLogout={function(){clearSession();setSession(null);}} theme={theme} toggleTheme={toggleTheme} sidebarOpen={sidebarOpen} setSidebarOpen={setSidebarOpen}/></ErrorBoundary>
