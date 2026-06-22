@@ -2,7 +2,7 @@ import React, { useState, useEffect, useCallback, useRef } from 'react';
 import * as XLSX from 'xlsx';
 import html2canvas from 'html2canvas';
 import { db } from './utils/db.js';
-import { authAPI, productsAPI, salesAPI, accountsAPI, returnsAPI, defectivesAPI, usersAPI, checkAPI, clientsAPI, repairsAPI, auditAPI } from './utils/api.js';
+import { authAPI, productsAPI, salesAPI, accountsAPI, returnsAPI, defectivesAPI, usersAPI, checkAPI, clientsAPI, repairsAPI, auditAPI, warrantiesAPI } from './utils/api.js';
 
 const TEAL = "#1D9E75";
 const NAVY = "#1a2535";
@@ -200,8 +200,8 @@ var UK       = "mnpos-users-v1";
 var SESS_KEY = "mnpos-session-v1";
 
 var PERMS = {
-  admin:   ["dashboard","pos","caja","accounts","returns","defective","products","inventory","history","backup","users","clients","repairs","cuadres","audit"],
-  cajero:  ["dashboard","pos","caja","accounts","returns","history","clients","repairs"],
+  admin:   ["dashboard","pos","caja","accounts","returns","defective","products","inventory","history","backup","users","clients","repairs","cuadres","audit","warranties"],
+  cajero:  ["dashboard","pos","caja","accounts","returns","history","clients","repairs","warranties"],
   auditor: ["dashboard","caja","history","inventory","cuadres"],
 };
 var ROLE_LABEL = { admin:"Administrador", cajero:"Cajero", auditor:"Auditor" };
@@ -825,6 +825,7 @@ function Sidebar(props) {
     {id:"products",  ic:"📦", lb:"Productos"},
     {id:"inventory", ic:"🗄️", lb:"Inventario"},
     {id:"history",   ic:"📋", lb:"Historial"},
+    {id:"warranties", ic:"🛡️", lb:"Garantías"},
     {id:"cuadres",   ic:"📈", lb:"Cuadres"},
     {id:"audit",     ic:"🔍", lb:"Auditoría"},
     {id:"backup",    ic:"💾", lb:"Respaldo"},
@@ -1008,7 +1009,7 @@ function DashboardScreen(props) {
   var products=props.products; var top5=props.top5;
   var setSelectedSale=props.setSelectedSale; var setView=props.setView;
   var accounts=props.accounts; var returns=props.returns;
-  var repairs=props.repairs||[];
+  var repairs=props.repairs||[]; var warranties=props.warranties||[];
   var isMobile=useIsMobile();
 
   var todayRev=todaySales.reduce(function(s,x){return s+x.total;},0);
@@ -1049,17 +1050,35 @@ function DashboardScreen(props) {
   });
   var stockCero=products.filter(function(p){return p.unit!=="serv"&&p.stock===0;});
 
+  // Cuentas vencidas >30 días sin pagar
+  var now=new Date();
+  var cuentasVencidas=pendingAccs.filter(function(a){
+    return (now-new Date(a.date))>30*86400000;
+  });
+
+  // Garantías por vencer en 7 días o ya vencidas
+  var warPorVencer=warranties.filter(function(w){
+    if(w.status==="reclamada") return false;
+    var end=new Date(w.endDate);
+    var diff=(end-now)/(86400000);
+    return diff<=7;
+  });
+
+  var hasAlerts=repsVencidas.length>0||stockCero.length>0||cuentasVencidas.length>0||warPorVencer.length>0;
+
   return (
       <div>
         <p style={H1}>📊 Panel de Control</p>
 
         {/* Alertas críticas arriba */}
-        {(repsVencidas.length>0||stockCero.length>0)&&(
+        {hasAlerts&&(
           <div style={{background:"#FCEBEB",border:"1px solid #F09595",borderRadius:10,padding:"12px 16px",marginBottom:16}}>
             <p style={{fontWeight:700,fontSize:13,color:"#791F1F",margin:"0 0 8px"}}>⚠ Atención requerida</p>
             <div style={{display:"flex",gap:20,flexWrap:"wrap"}}>
               {repsVencidas.length>0&&<span style={{fontSize:13,color:"#791F1F",cursor:"pointer"}} onClick={function(){setView("repairs");}}>🔧 {repsVencidas.length} reparación{repsVencidas.length>1?"es":""} vencida{repsVencidas.length>1?"s":""} sin entregar →</span>}
               {stockCero.length>0&&<span style={{fontSize:13,color:"#791F1F",cursor:"pointer"}} onClick={function(){setView("products");}}>📦 {stockCero.length} producto{stockCero.length>1?"s":""} sin stock →</span>}
+              {cuentasVencidas.length>0&&<span style={{fontSize:13,color:"#791F1F",cursor:"pointer"}} onClick={function(){setView("accounts");}}>💳 {cuentasVencidas.length} cuenta{cuentasVencidas.length>1?"s":""} pendiente{cuentasVencidas.length>1?"s":""} +30 días →</span>}
+              {warPorVencer.length>0&&<span style={{fontSize:13,color:"#791F1F",cursor:"pointer"}} onClick={function(){setView("warranties");}}>🛡️ {warPorVencer.length} garantía{warPorVencer.length>1?"s":""} por vencer →</span>}
             </div>
           </div>
         )}
@@ -1662,14 +1681,48 @@ function AccountsScreen(props) {
         </div>
     );
   }
+  // Aging buckets
+  var agNow=new Date();
+  var aging=[
+    {label:"0 – 30 días",color:"#2E7D32",bg:"#EAF3DE",accs:[]},
+    {label:"31 – 60 días",color:"#E65100",bg:"#FFF3E0",accs:[]},
+    {label:"61 – 90 días",color:"#C62828",bg:"#FDECEA",accs:[]},
+    {label:"+90 días",    color:"#7B1FA2",bg:"#F3E5F5",accs:[]},
+  ];
+  pendingAccs.forEach(function(a){
+    var days=Math.floor((agNow-new Date(a.date))/86400000);
+    if(days<=30) aging[0].accs.push(a);
+    else if(days<=60) aging[1].accs.push(a);
+    else if(days<=90) aging[2].accs.push(a);
+    else aging[3].accs.push(a);
+  });
+
   return (
       <div>
         <p style={H1}>💳 Cuentas por Cobrar</p>
-        <div className="rg-3" style={{display:"grid",gridTemplateColumns:"repeat(3,1fr)",gap:14,marginBottom:20}}>
+        <div className="rg-3" style={{display:"grid",gridTemplateColumns:"repeat(3,1fr)",gap:14,marginBottom:16}}>
           <MetricBox label="Total pendiente" value={Q(totalPend)}       color="#E24B4A"/>
           <MetricBox label="Total cobrado"   value={Q(totalCob)}        color={TEAL}/>
           <MetricBox label="Cuentas activas" value={pendingAccs.length} color="#378ADD"/>
         </div>
+        {/* Aging de cuentas */}
+        {pendingAccs.length>0&&(
+          <div style={Object.assign({},sC,{marginBottom:14})}>
+            <p style={{fontWeight:600,fontSize:14,margin:"0 0 12px"}}>📊 Antigüedad de cuentas</p>
+            <div style={{display:"grid",gridTemplateColumns:"repeat(4,1fr)",gap:10}}>
+              {aging.map(function(b,i){
+                var tot=b.accs.reduce(function(s,a){return s+a.balance;},0);
+                return (
+                  <div key={i} style={{background:b.bg,borderRadius:8,padding:"10px 12px",borderLeft:"4px solid "+b.color}}>
+                    <div style={{fontSize:11,color:b.color,fontWeight:700,marginBottom:4}}>{b.label}</div>
+                    <div style={{fontSize:18,fontWeight:800,color:b.color}}>{b.accs.length}</div>
+                    <div style={{fontSize:12,color:"#666",marginTop:2}}>{Q(tot)}</div>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        )}
         <div style={Object.assign({},sC,{marginBottom:14})}>
           <input style={Object.assign({},sI,{marginBottom:12})} placeholder="🔍  Buscar cuentas por cliente..." value={clientQ} onChange={function(e){setClientQ(e.target.value);}}/>
           {!clientQ&&(
@@ -2838,6 +2891,196 @@ function ClientsScreen(props) {
   );
 }
 
+/* ══════════════════════════════════════
+   GARANTÍAS
+   ══════════════════════════════════════ */
+function WarrantiesScreen(props){
+  var warranties=props.warranties||[]; var sales=props.sales||[]; var repairs=props.repairs||[];
+  var saveWarranty=props.saveWarranty; var updateWarranty=props.updateWarranty;
+  var session=props.session||{};
+
+  var _sel=useState(null); var selWar=_sel[0]; var setSelWar=_sel[1];
+  var _sf=useState(false); var showForm=_sf[0]; var setShowForm=_sf[1];
+  var _fil=useState("todas"); var filter=_fil[0]; var setFilter=_fil[1];
+  var _q=useState(""); var q=_q[0]; var setQ=_q[1];
+
+  // Form state
+  var _fet=useState("repair"); var fEntityType=_fet[0]; var setFEntityType=_fet[1];
+  var _fei=useState(""); var fEntityId=_fei[0]; var setFEntityId=_fei[1];
+  var _fcl=useState(""); var fClient=_fcl[0]; var setFClient=_fcl[1];
+  var _fd=useState(""); var fDesc=_fd[0]; var setFDesc=_fd[1];
+  var _fsm=useState(3); var fMonths=_fsm[0]; var setFMonths=_fsm[1];
+  var _fsd=useState(new Date().toISOString().slice(0,10)); var fStart=_fsd[0]; var setFStart=_fsd[1];
+  var _ferr=useState(""); var fErr=_ferr[0]; var setFErr=_ferr[1];
+
+  var now=new Date();
+
+  var displayed=warranties.filter(function(w){
+    if(filter==="vigente") return w.status==="vigente";
+    if(filter==="vencida") return w.status==="vencida"||new Date(w.endDate)<now;
+    if(filter==="reclamada") return w.status==="reclamada";
+    return true;
+  }).filter(function(w){
+    if(!q) return true;
+    var ql=q.toLowerCase();
+    return (w.client||"").toLowerCase().includes(ql)||(w.description||"").toLowerCase().includes(ql)||(w.entityId||"").toLowerCase().includes(ql);
+  });
+
+  function resetForm(){setFEntityType("repair");setFEntityId("");setFClient("");setFDesc("");setFMonths(3);setFStart(new Date().toISOString().slice(0,10));setFErr("");}
+
+  async function submitWarranty(){
+    if(!fClient.trim()){setFErr("El nombre del cliente es requerido");return;}
+    if(!fDesc.trim()){setFErr("Describí qué cubre la garantía");return;}
+    var start=new Date(fStart+"T00:00:00");
+    var end=new Date(start);
+    end.setMonth(end.getMonth()+parseInt(fMonths,10));
+    await saveWarranty({
+      entityType:fEntityType, entityId:fEntityId.trim()||null,
+      client:fClient.trim(), description:fDesc.trim(),
+      startDate:fStart, endDate:end.toISOString().slice(0,10),
+      months:parseInt(fMonths,10)
+    });
+    resetForm();setShowForm(false);
+  }
+
+  var vigentes=warranties.filter(function(w){return w.status==="vigente"&&new Date(w.endDate)>=now;}).length;
+  var vencidas=warranties.filter(function(w){return w.status==="vencida"||new Date(w.endDate)<now;}).length;
+  var reclamadas=warranties.filter(function(w){return w.status==="reclamada";}).length;
+
+  // Detail view
+  if(selWar){
+    var war=warranties.find(function(w){return w.id===selWar;});
+    if(!war){setSelWar(null);return null;}
+    var warEnd=new Date(war.endDate);
+    var diasRestantes=Math.ceil((warEnd-now)/86400000);
+    var isVigente=war.status!=="reclamada"&&warEnd>=now;
+    return (
+      <div>
+        <div style={{display:"flex",gap:10,marginBottom:16,flexWrap:"wrap"}}>
+          <button style={mB("gray")} onClick={function(){setSelWar(null);}}>← Volver</button>
+          {isVigente&&<button style={mB("amber")} onClick={async function(){await updateWarranty(war.id,{status:"reclamada"});}}>⚠️ Marcar como reclamada</button>}
+          {war.status!=="vigente"&&warEnd>=now&&<button style={mB("teal")} onClick={async function(){await updateWarranty(war.id,{status:"vigente"});}}>✓ Reactivar garantía</button>}
+        </div>
+        <div style={sC}>
+          <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start",marginBottom:16}}>
+            <div>
+              <p style={{fontWeight:800,fontSize:18,margin:"0 0 4px"}}>🛡️ {war.client}</p>
+              <p style={{fontSize:13,color:"#666",margin:"0 0 2px"}}>{war.description}</p>
+              {war.entityType&&war.entityId&&<p style={{fontSize:12,color:TEAL,margin:0,fontFamily:"monospace"}}>{war.entityType==="repair"?"Reparación":"Venta"}: {war.entityId}</p>}
+            </div>
+            <span style={mBg(war.status==="reclamada"?"red":isVigente?"green":"amber")}>{war.status==="reclamada"?"Reclamada":isVigente?"Vigente":"Vencida"}</span>
+          </div>
+          <div style={{display:"grid",gridTemplateColumns:"1fr 1fr 1fr",gap:12,marginBottom:16}}>
+            <div style={{background:"#f9f8f5",borderRadius:8,padding:12}}>
+              <p style={{fontSize:11,color:"#999",textTransform:"uppercase",margin:"0 0 4px"}}>Inicio</p>
+              <p style={{fontWeight:700,margin:0}}>{fmtD(war.startDate)}</p>
+            </div>
+            <div style={{background:"#f9f8f5",borderRadius:8,padding:12}}>
+              <p style={{fontSize:11,color:"#999",textTransform:"uppercase",margin:"0 0 4px"}}>Vencimiento</p>
+              <p style={{fontWeight:700,margin:0}}>{fmtD(war.endDate)}</p>
+            </div>
+            <div style={{background:isVigente?"#EAF3DE":"#FCEBEB",borderRadius:8,padding:12}}>
+              <p style={{fontSize:11,color:"#999",textTransform:"uppercase",margin:"0 0 4px"}}>{diasRestantes>0?"Días restantes":"Vencida hace"}</p>
+              <p style={{fontWeight:800,fontSize:18,color:isVigente?TEAL:"#E24B4A",margin:0}}>{Math.abs(diasRestantes)} días</p>
+            </div>
+          </div>
+          {war.status==="reclamada"&&<div style={{background:"#FCEBEB",borderRadius:8,padding:"10px 14px",border:"1px solid #F09595"}}>
+            <p style={{margin:0,color:"#791F1F",fontSize:13,fontWeight:600}}>⚠️ Esta garantía fue reclamada por el cliente.</p>
+          </div>}
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div>
+      <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:20}}>
+        <p style={H1}>🛡️ Garantías</p>
+        <button style={mB(showForm?"red":"teal")} onClick={function(){if(showForm){resetForm();setShowForm(false);}else{resetForm();setShowForm(true);}}}>
+          {showForm?"✕ Cancelar":"+ Nueva garantía"}
+        </button>
+      </div>
+
+      <div className="rg-3" style={{display:"grid",gridTemplateColumns:"repeat(3,1fr)",gap:14,marginBottom:16}}>
+        <MetricBox label="Vigentes"  value={vigentes}  color={TEAL}/>
+        <MetricBox label="Vencidas"  value={vencidas}  color="#E24B4A"/>
+        <MetricBox label="Reclamadas" value={reclamadas} color="#E65100"/>
+      </div>
+
+      {showForm&&(
+        <div style={Object.assign({},sC,{marginBottom:16,borderColor:TEAL,borderWidth:"1.5px"})}>
+          <p style={{fontWeight:700,margin:"0 0 16px",fontSize:15}}>📋 Nueva Garantía</p>
+          {fErr&&<p style={{color:"#E24B4A",fontSize:13,margin:"0 0 12px"}}>⚠ {fErr}</p>}
+          <div className="form-grid-2" style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:12,marginBottom:12}}>
+            <div><label style={sL}>Tipo</label>
+              <select style={sI} value={fEntityType} onChange={function(e){setFEntityType(e.target.value);}}>
+                <option value="repair">Reparación</option>
+                <option value="sale">Venta</option>
+                <option value="other">Otro</option>
+              </select></div>
+            <div><label style={sL}>N° Orden / Código de referencia</label>
+              <input style={sI} value={fEntityId} placeholder="Ej: REP-001 o V-0042" onChange={function(e){setFEntityId(e.target.value);}}/></div>
+            <div><label style={sL}>Cliente *</label>
+              <input style={sI} value={fClient} placeholder="Nombre del cliente" onChange={function(e){setFClient(e.target.value);}}/></div>
+            <div><label style={sL}>Duración (meses)</label>
+              <select style={sI} value={fMonths} onChange={function(e){setFMonths(e.target.value);}}>
+                <option value={1}>1 mes</option>
+                <option value={3}>3 meses</option>
+                <option value={6}>6 meses</option>
+                <option value={12}>12 meses</option>
+                <option value={24}>24 meses</option>
+              </select></div>
+            <div><label style={sL}>Fecha de inicio</label>
+              <input type="date" style={sI} value={fStart} onChange={function(e){setFStart(e.target.value);}}/></div>
+            <div><label style={sL}>Qué cubre la garantía *</label>
+              <input style={sI} value={fDesc} placeholder="Ej: Pantalla, batería, reparación de placa" onChange={function(e){setFDesc(e.target.value);}}/></div>
+          </div>
+          <button style={mB("teal")} onClick={submitWarranty}>✓ Registrar garantía</button>
+        </div>
+      )}
+
+      <div style={Object.assign({},sC,{marginBottom:14})}>
+        <input style={Object.assign({},sI,{marginBottom:12})} placeholder="🔍  Buscar por cliente, descripción o referencia..." value={q} onChange={function(e){setQ(e.target.value);}}/>
+        <div style={{display:"flex",gap:8,flexWrap:"wrap"}}>
+          {[["todas","Todas"],["vigente","Vigentes"],["vencida","Vencidas"],["reclamada","Reclamadas"]].map(function(p){
+            return <button key={p[0]} style={Object.assign({},mB(filter===p[0]?"teal":"gray"),{padding:"6px 14px"})} onClick={function(){setFilter(p[0]);}}>{p[1]}</button>;
+          })}
+        </div>
+      </div>
+
+      <div style={sC}>
+        {displayed.length===0?<p style={{textAlign:"center",color:"#999",padding:40}}>Sin garantías en esta categoría</p>:(
+          <table style={{width:"100%",borderCollapse:"collapse"}}>
+            <thead><tr>{["Cliente","Descripción","Referencia","Inicio","Vencimiento","Estado",""].map(function(h){return <th key={h} style={sTH}>{h}</th>;})}</tr></thead>
+            <tbody>
+            {displayed.map(function(w){
+              var wEnd=new Date(w.endDate);
+              var dias=Math.ceil((wEnd-now)/86400000);
+              var isVig=w.status!=="reclamada"&&wEnd>=now;
+              return (
+                <tr key={w.id} style={{cursor:"pointer"}} onClick={function(){setSelWar(w.id);}}>
+                  <td style={Object.assign({},sTD,{fontWeight:600})}>{w.client}</td>
+                  <td style={Object.assign({},sTD,{color:"#666",maxWidth:180})}>{w.description}</td>
+                  <td style={Object.assign({},sTD,{fontFamily:"monospace",fontSize:12,color:TEAL})}>{w.entityId||"—"}</td>
+                  <td style={sTD}>{fmtD(w.startDate)}</td>
+                  <td style={sTD}>{fmtD(w.endDate)}</td>
+                  <td style={sTD}>
+                    <span style={mBg(w.status==="reclamada"?"red":isVig?(dias<=7?"amber":"green"):"red")}>
+                      {w.status==="reclamada"?"Reclamada":isVig?(dias<=7?"⚠ "+dias+"d":"✓ Vigente"):"Vencida"}
+                    </span>
+                  </td>
+                  <td style={sTD}><button style={Object.assign({},mB("teal"),{padding:"4px 10px",fontSize:11})} onClick={function(e){e.stopPropagation();setSelWar(w.id);}}>Ver →</button></td>
+                </tr>
+              );
+            })}
+            </tbody>
+          </table>
+        )}
+      </div>
+    </div>
+  );
+}
+
 /* ══ APP ══════════════════════════════════════════════════════════════ */
 function App(props) {
   var session=props.session||{}; var onLogout=props.onLogout||function(){};
@@ -2850,6 +3093,7 @@ function App(props) {
   var _d=useState([]); var defectives=_d[0]; var setDefectives=_d[1];
   var _cl=useState([]); var clients=_cl[0]; var setClients=_cl[1];
   var _rep=useState([]); var repairs=_rep[0]; var setRepairs=_rep[1];
+  var _war=useState([]); var warranties=_war[0]; var setWarranties=_war[1];
   var _ld=useState(false); var loaded=_ld[0]; var setLoaded=_ld[1];
   var _on=useState(false); var isOnline=_on[0]; var setIsOnline=_on[1];
 
@@ -2870,7 +3114,7 @@ function App(props) {
       if(online){
         // Modo online: cargar datos desde el API
         try {
-        var [prods, sls, accs, rets, defs, clis, reps] = await Promise.all([
+        var [prods, sls, accs, rets, defs, clis, reps, wars] = await Promise.all([
             productsAPI.getAll(),
             salesAPI.getAll(),
             accountsAPI.getAll(),
@@ -2878,6 +3122,7 @@ function App(props) {
             defectivesAPI.getAll(),
             clientsAPI.getAll(),
             repairsAPI.getAll(),
+            warrantiesAPI.getAll(),
           ]);
           var normalProds = (prods||[]).map(function(p){return Object.assign({},p,{id:p.id,code:p.code,name:p.name,category:p.category||'',shelf:p.shelf||'',price:Number(p.price),cost:Number(p.cost),stock:Number(p.stock),unit:p.unit||'uni'});});
           var normalSales = (sls||[]).map(function(s){return Object.assign({},s,{items:s.sale_items||[],total:Number(s.total),date:s.created_at,registradoPor:s.registrado_por||null});});
@@ -2893,6 +3138,7 @@ function App(props) {
           setDefectives(normalDefs);
           setClients(normalClis);
           setRepairs(normalReps);
+          setWarranties((wars||[]).map(function(w){return Object.assign({},w,{entityType:w.entity_type,entityId:w.entity_id,startDate:w.start_date,endDate:w.end_date,createdBy:w.created_by});}));
         } catch(e) {
           console.warn("Error cargando del API, usando local:", e);
           setIsOnline(false);
@@ -3262,6 +3508,23 @@ function App(props) {
     showFlash("✅ "+count+" productos importados"+(errors>0?" ("+errors+" con error)":""),"ok");
   }
 
+  async function saveWarranty(data){
+    try{
+      var w=await warrantiesAPI.create(data);
+      setWarranties(function(p){return [Object.assign({},w,{entityType:w.entity_type,entityId:w.entity_id,startDate:w.start_date,endDate:w.end_date})].concat(p);});
+      showFlash("✅ Garantía registrada","ok");
+      return w;
+    }catch(e){ showFlash("Error registrando garantía","error"); }
+  }
+
+  async function updateWarranty(id, data){
+    try{
+      var w=await warrantiesAPI.update(id, data);
+      setWarranties(function(p){return p.map(function(x){return x.id===id?Object.assign({},x,w,{entityType:w.entity_type||x.entityType,entityId:w.entity_id||x.entityId,startDate:w.start_date||x.startDate,endDate:w.end_date||x.endDate}):x;});});
+      showFlash("✅ Garantía actualizada","ok");
+    }catch(e){ showFlash("Error actualizando garantía","error"); }
+  }
+
   async function saveRepair(rep){
     if(isOnline){
       try{
@@ -3412,7 +3675,7 @@ function App(props) {
         <Sidebar view={view} setView={setView} cartCount={cart.length} pendingCount={pendingAccs.length} products={products} sales={sales} session={session} onLogout={onLogout} isOnline={isOnline} theme={theme} toggleTheme={toggleTheme} sidebarOpen={sidebarOpen} setSidebarOpen={setSidebarOpen} onSearch={function(){setGsOpen(true);}}/>
         {gsOpen&&<GlobalSearch onClose={function(){setGsOpen(false);}} setView={setView} sales={sales} clients={clients} products={products} repairs={repairs} setSelectedSale={setSelSale}/>}
         <div style={{flex:1,padding:"clamp(12px,3vw,28px)",overflowY:"auto",minWidth:0}} className="main-content">
-          {view==="dashboard"&&canAccess(session.role,"dashboard")&&<DashboardScreen sales={sales} todaySales={todaySales} pendingAccs={pendingAccs} totalPend={totalPend} products={products} top5={top5} setSelectedSale={setSelSale} setView={setView} accounts={accounts} returns={returns} repairs={repairs}/>}
+          {view==="dashboard"&&canAccess(session.role,"dashboard")&&<DashboardScreen sales={sales} todaySales={todaySales} pendingAccs={pendingAccs} totalPend={totalPend} products={products} top5={top5} setSelectedSale={setSelSale} setView={setView} accounts={accounts} returns={returns} repairs={repairs} warranties={warranties}/>}
           {view==="pos"      &&canAccess(session.role,"pos")&&<POSScreen products={products} filteredPOS={filteredPOS} cart={cart} posQ={posQ} setPosQ={setPosQ} payMethod={payMethod} setPayMethod={setPayMethod} payType={payType} setPayType={setPayType} cashIn={cashIn} setCashIn={setCashIn} initialPay={initialPay} setInitialPay={setInitialPay} clientName={clientName} setClientName={setClientName} selectedClientId={selectedClientId} setSelectedClientId={setSelectedClientId} saleNote={saleNote} setSaleNote={setSaleNote} cartTotal={cartTotal} vuelto={vuelto} initPaidVal={initPaidVal} addToCart={addToCart} changeQty={changeQty} removeFromCart={removeFromCart} applyDiscount={applyDiscount} checkout={checkout} resetPOS={resetPOS} flash={flash} clients={clients} accounts={accounts}/>}
           {view==="caja"     &&canAccess(session.role,"caja")&&<CajaScreen sales={sales} accounts={accounts} returns={returns}/>}
           {view==="accounts" &&canAccess(session.role,"accounts")&&<AccountsScreen accounts={accounts} pendingAccs={pendingAccs} totalPend={totalPend} addPayment={addPayment} showFlash={showFlash} products={products} session={session} clients={clients}/>}
@@ -3425,8 +3688,9 @@ function App(props) {
           {view==="backup"   &&canAccess(session.role,"backup")&&<BackupScreen products={products} sales={sales} accounts={accounts} returns={returns} defectives={defectives} clients={clients} repairs={repairs} onExportJSON={exportJSON} onExportExcel={exportExcel} onImport={importData}/>}
           {view==="users"    &&canAccess(session.role,"users")&&<UsersScreen session={session} showFlash={showFlash}/>}
           {view==="clients"  &&canAccess(session.role,"clients")&&<ClientsScreen clients={clients} sales={sales} accounts={accounts} returns={returns} saveClient={saveClient} session={session} showFlash={showFlash}/>}
-          {view==="repairs"  &&canAccess(session.role,"repairs")&&<RepairsScreen repairs={repairs} clients={clients} products={products} saveRepair={saveRepair} updateRepairStatus={updateRepairStatus} onCobrar={cobrarReparacion} session={session} showFlash={showFlash}/>}
-          {view==="audit"    &&canAccess(session.role,"audit")&&<AuditScreen session={session}/>}
+          {view==="repairs"    &&canAccess(session.role,"repairs")&&<RepairsScreen repairs={repairs} clients={clients} products={products} saveRepair={saveRepair} updateRepairStatus={updateRepairStatus} onCobrar={cobrarReparacion} session={session} showFlash={showFlash} warranties={warranties} saveWarranty={saveWarranty}/>}
+          {view==="warranties" &&canAccess(session.role,"warranties")&&<WarrantiesScreen warranties={warranties} sales={sales} repairs={repairs} updateWarranty={updateWarranty} saveWarranty={saveWarranty} session={session}/>}
+          {view==="audit"      &&canAccess(session.role,"audit")&&<AuditScreen session={session}/>}
         </div>
       </div>
   );
