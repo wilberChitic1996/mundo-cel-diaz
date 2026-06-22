@@ -1965,7 +1965,7 @@ function printVoucher(sale, opts){
       '<div class="brand">'+
         '<h1>MUNDO CEL DIAZ</h1>'+
         '<p>SISTEMA DE GESTIÓN</p>'+
-        '<p class="sub">Reparación y Venta de Celulares · Guatemala</p>'+
+        '<p class="sub">Tecnología · Accesorios · Reparaciones · Guatemala</p>'+
       '</div>'+
       '<div class="venta-num">'+
         '<div class="label">'+_docLabel+'</div>'+
