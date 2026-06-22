@@ -143,3 +143,11 @@ Vender el sistema como POS especializado para tiendas de celulares y reparacione
 - Si el cliente tiene teléfono guardado → abre WhatsApp directo; si no → pide el número en el momento
 - Número de 8 dígitos guatemaltecos se convierte automáticamente a formato internacional (+502)
 - Pendiente automático (requiere API de pago): ver sección "Pendiente WhatsApp"
+
+### Sesión 4 — 22 junio 2026
+**Lo que se hizo:**
+- **Fix imagen boleta WhatsApp**: html2canvas no puede capturar iframes (seguridad del navegador). Se cambió a renderizar el recibo en un `<div>` oculto con estilos inline, html2canvas lo captura correctamente
+- **Comportamiento final WhatsApp + imagen:**
+  - Móvil (Chrome/Safari sobre HTTPS): Web Share API adjunta la imagen PNG directamente al mensaje
+  - Escritorio/Electron: imagen se descarga como `boleta-mundoceldiaz.png` + WhatsApp se abre con texto + aviso al usuario para adjuntarla manualmente
+- **Pendiente (roadmap)**: integración con API de pago (UltraMsg/Twilio) para envío automático con imagen en escritorio

@@ -123,12 +123,17 @@ async function compartirWhatsApp(tel, getMensaje, opts){
         await navigator.share({files:[file],title:"Boleta MUNDO CEL DIAZ",text:mensaje});
         return;
       }
-      // Fallback escritorio: descargar imagen
+      // Fallback escritorio: descargar imagen y avisar al usuario
       var imgUrl=URL.createObjectURL(blob);
       var dl=document.createElement("a");
       dl.href=imgUrl; dl.download="boleta-mundoceldiaz.png";
       document.body.appendChild(dl); dl.click(); document.body.removeChild(dl);
       setTimeout(function(){URL.revokeObjectURL(imgUrl);},5000);
+      abrirWA(tel, mensaje);
+      setTimeout(function(){
+        alert("📎 La imagen de la boleta se descargó.\nAdjúntala manualmente en WhatsApp al abrir el chat.");
+      },800);
+      return;
     }catch(err){
       console.warn("[WA] Error generando imagen:",err);
     }
