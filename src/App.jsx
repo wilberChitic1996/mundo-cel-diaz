@@ -36,7 +36,9 @@ function abrirWA(tel, mensaje){
   var url=t
     ?"https://wa.me/"+t+"?text="+encodeURIComponent(mensaje)
     :"https://wa.me/?text="+encodeURIComponent(mensaje);
-  window.open(url,"_blank","noopener");
+  var a=document.createElement("a");
+  a.href=url; a.target="_blank"; a.rel="noopener noreferrer";
+  document.body.appendChild(a); a.click(); document.body.removeChild(a);
 }
 function pedirTelYEnviar(nombre, mensaje, onTelSaved){
   var tel=window.prompt("📱 Número de WhatsApp de "+nombre+"\n(8 dígitos Guatemala, ej: 55551234)\nDejar vacío para abrir sin número:");
