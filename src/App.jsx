@@ -1204,7 +1204,7 @@ function DashboardScreen(props) {
                       <tr key={s.id} style={{cursor:"pointer"}} onClick={function(){setSelectedSale(s);setView("history");}}>
                         <td style={sTD}>{fmtT(s.date)}</td>
                         <td style={Object.assign({},sTD,{fontWeight:500})}>{s.client}</td>
-                        <td style={Object.assign({},sTD,{color:"#666"})}>{s.items.length} art.</td>
+                        <td style={Object.assign({},sTD,{color:"#666"})}>{(s.items||[]).length} art.</td>
                         <td style={sTD}><span style={mBg("teal")}>{s.method}</span></td>
                         <td style={Object.assign({},sTD,{fontWeight:600,color:TEAL})}>{Q(s.total)}</td>
                       </tr>
@@ -1663,7 +1663,7 @@ function AccountsScreen(props) {
             <table style={{width:"100%",borderCollapse:"collapse",marginBottom:16}}>
               <thead><tr>{["Código","Producto","Cant.","Precio","Subtotal"].map(function(h){return <th key={h} style={sTH}>{h}</th>;})}</tr></thead>
               <tbody>
-              {acc.items.map(function(it,i){
+              {(acc.items||[]).map(function(it,i){
                 return <tr key={i}><td style={Object.assign({},sTD,{fontFamily:"monospace",fontSize:12})}>{it.code}</td><td style={Object.assign({},sTD,{fontWeight:500})}>{it.name}</td><td style={sTD}>{it.qty}</td><td style={sTD}>{Q(it.price)}</td><td style={Object.assign({},sTD,{fontWeight:600,color:TEAL})}>{Q(it.price*it.qty)}</td></tr>;
               })}
               </tbody>
@@ -1843,8 +1843,8 @@ function ReturnsScreen(props) {
     returns.filter(function(r){return r.saleId===s.id;}).forEach(function(r){
       (r.items||[]).forEach(function(it){ returnedQty[it.code]=(returnedQty[it.code]||0)+(it.qty||0); });
     });
-    var totalOriginal=s.items.reduce(function(a,it){return a+it.qty;},0);
-    var totalDevuelto=s.items.reduce(function(a,it){return a+(returnedQty[it.code]||0);},0);
+    var totalOriginal=(s.items||[]).reduce(function(a,it){return a+it.qty;},0);
+    var totalDevuelto=(s.items||[]).reduce(function(a,it){return a+(returnedQty[it.code]||0);},0);
     var fullyReturned=totalDevuelto>=totalOriginal;
     var partiallyReturned=totalDevuelto>0&&!fullyReturned;
     return Object.assign({},s,{returnedQty:returnedQty,fullyReturned:fullyReturned,partiallyReturned:partiallyReturned,totalDevuelto:totalDevuelto,totalOriginal:totalOriginal});
@@ -1862,7 +1862,7 @@ function ReturnsScreen(props) {
     if(s.fullyReturned) return; // no se puede seleccionar — ya devuelta completa
     setSelSale(s);
     // Solo los artículos con qty restante por devolver
-    var items=s.items.map(function(it){
+    var items=(s.items||[]).map(function(it){
       var yaDevuelto=s.returnedQty[it.code]||0;
       var restante=it.qty-yaDevuelto;
       return restante>0?{code:it.code,name:it.name,qty:restante,price:it.price}:null;
@@ -1968,7 +1968,7 @@ function ReturnsScreen(props) {
                         return (
                           <tr key={s.id} style={rowStyle} onClick={function(){pickSale(s);}}>
                             <td style={sTD}>{fmtD(s.date)} {fmtT(s.date)}</td>
-                            <td style={Object.assign({},sTD,{color:"#666"})}>{s.items.length} art.</td>
+                            <td style={Object.assign({},sTD,{color:"#666"})}>{(s.items||[]).length} art.</td>
                             <td style={Object.assign({},sTD,{fontWeight:700,color:TEAL})}>{Q(s.total)}</td>
                             <td style={sTD}><span style={mBg("teal")}>{s.method}</span></td>
                             <td style={sTD}>
@@ -2470,8 +2470,8 @@ function printVoucher(sale, opts){
         'Sistema de Gestión v2.1'+
       '</div>'+
       '<div class="footer-right">'+
-        'Cantidad de artículos: <strong>'+sale.items.reduce(function(s,i){return s+i.qty;},0)+'</strong><br>'+
-        'Líneas de producto: <strong>'+sale.items.length+'</strong><br>'+
+        'Cantidad de artículos: <strong>'+(sale.items||[]).reduce(function(s,i){return s+i.qty;},0)+'</strong><br>'+
+        'Líneas de producto: <strong>'+(sale.items||[]).length+'</strong><br>'+
         'Ref: '+sale.id.slice(0,12).toUpperCase()+
       '</div>'+
     '</div>'+
@@ -2790,7 +2790,7 @@ function ClientsScreen(props) {
             <p style={{fontWeight:600,margin:"0 0 10px",fontSize:14,color:"#E24B4A"}}>⚠ Cuentas pendientes</p>
             {cliAccs.filter(function(a){return a.status!=="pagado";}).map(function(a){
               return <div key={a.id} style={{display:"flex",justifyContent:"space-between",padding:"6px 0",borderBottom:"1px solid rgba(0,0,0,0.05)",fontSize:14}}>
-                <span>{fmtD(a.date)} — {a.items.length} artículos</span>
+                <span>{fmtD(a.date)} — {(a.items||[]).length} artículos</span>
                 <span style={{fontWeight:700,color:"#E24B4A"}}>{Q(a.balance)}</span>
               </div>;
             })}
@@ -3411,7 +3411,7 @@ function App(props) {
   }
 
   async function processReturn(data){
-    var total=data.items.reduce(function(s,i){return s+i.price*i.qty;},0);
+    var total=(data.items||[]).reduce(function(s,i){return s+i.price*i.qty;},0);
     var newId=gid();
     var registradoPor={userId:session.userId,name:session.name,role:session.role};
     var ret=Object.assign({},data,{id:newId,date:new Date().toISOString(),total:total,registradoPor:registradoPor});
@@ -3634,7 +3634,7 @@ function App(props) {
     var totalReemb=returns.filter(function(r){return r.refundAmount>0;}).reduce(function(s,r){return s+r.refundAmount;},0);
     XLSX.utils.book_append_sheet(wb,XLSX.utils.aoa_to_sheet([["MUNDO CEL DIAZ — Reporte v2.1"],["Generado:",fmtD(now)+" "+fmtT(now)],[],["CLIENTES"],["Total clientes",clients.length],[],["VENTAS"],["Total ventas",sales.length],["Ingresos totales (Q)",sales.reduce(function(s,x){return s+x.total;},0)],[],["CUENTAS"],["Cuentas activas",pendAcc.length],["Por cobrar (Q)",pendAcc.reduce(function(s,a){return s+a.balance;},0)],[],["DEVOLUCIONES"],["Total devoluciones",returns.length],["Total reembolsado (Q)",totalReemb],[],["PIEZAS DEFECTUOSAS"],["En revisión",defectives.filter(function(d){return d.status==="defectuoso";}).length],["Dados de baja",defectives.filter(function(d){return d.status==="dado_de_baja";}).length]]),"Resumen");
     XLSX.utils.book_append_sheet(wb,XLSX.utils.aoa_to_sheet([["ID","Fecha","Cliente","Método","Total (Q)"]].concat(sales.map(function(s){return [s.id,fmtD(s.date),s.client,s.method,s.total];}))),"Ventas");
-    XLSX.utils.book_append_sheet(wb,XLSX.utils.aoa_to_sheet([["ID Venta","Fecha","Cliente","Código","Producto","Cant.","Precio","Subtotal"]].concat(sales.reduce(function(arr,s){return arr.concat(s.items.map(function(it){return [s.id,fmtD(s.date),s.client,it.code,it.name,it.qty,it.price,it.price*it.qty];}));},[]))),  "Detalle Ventas");
+    XLSX.utils.book_append_sheet(wb,XLSX.utils.aoa_to_sheet([["ID Venta","Fecha","Cliente","Código","Producto","Cant.","Precio","Subtotal"]].concat(sales.reduce(function(arr,s){return arr.concat((s.items||[]).map(function(it){return [s.id,fmtD(s.date),s.client,it.code,it.name,it.qty,it.price,it.price*it.qty];}));},[]))),  "Detalle Ventas");
     XLSX.utils.book_append_sheet(wb,XLSX.utils.aoa_to_sheet([["ID","Fecha","Cliente","Total","Pagado","Saldo","Estado"]].concat(accounts.map(function(a){return [a.id,fmtD(a.date),a.client,a.total,a.paid,a.balance,a.status];}))),"Cuentas");
     var pmts=accounts.reduce(function(arr,a){return arr.concat((a.payments||[]).map(function(p){return [a.id,a.client,fmtD(p.date),p.amount,p.method,p.note||""];}));},[]);
     XLSX.utils.book_append_sheet(wb,XLSX.utils.aoa_to_sheet([["ID Cuenta","Cliente","Fecha","Monto","Método","Nota"]].concat(pmts)),"Historial Pagos");
@@ -4564,7 +4564,7 @@ function CuadresScreen(props){
       return '<tr><td>'+new Date(s.date).toLocaleDateString("es-GT",{day:"2-digit",month:"short"})+'</td>'+
         '<td>'+new Date(s.date).toLocaleTimeString("es-GT",{hour:"2-digit",minute:"2-digit"})+'</td>'+
         '<td>'+s.client+'</td>'+
-        '<td>'+s.items.length+' art.</td>'+
+        '<td>'+(s.items||[]).length+' art.</td>'+
         '<td><span style="background:#E1F5EE;color:#085041;padding:2px 8px;border-radius:12px;font-size:11px;">'+s.method+'</span></td>'+
         '<td style="text-align:right;font-weight:700;color:#1D9E75;">Q '+Number(s.total).toFixed(2)+'</td></tr>';
     }).join("");
