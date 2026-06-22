@@ -67,75 +67,72 @@ function buildReceiptHTML(sale, opts){
   var saldoHTML="";
   if(opts.estado&&opts.estado!=="")saldoHTML='<tr style="background:#f0f9f5;"><td colspan="3" style="padding:8px 10px;font-weight:700;font-size:13px;">Abonado</td><td style="padding:8px 10px;text-align:right;font-weight:700;font-size:13px;color:#1D9E75;">Q '+Number(opts.pagado||sale.paid||0).toFixed(2)+'</td></tr>'+
     '<tr style="background:#fff0f0;"><td colspan="3" style="padding:8px 10px;font-weight:900;font-size:14px;">Saldo pendiente</td><td style="padding:8px 10px;text-align:right;font-weight:900;font-size:14px;color:#E24B4A;">Q '+Number(opts.saldo||sale.balance||0).toFixed(2)+'</td></tr>';
-  return '<!DOCTYPE html><html><head><meta charset="UTF-8">'+
-    '<style>*{margin:0;padding:0;box-sizing:border-box;}body{font-family:Arial,sans-serif;font-size:12px;background:#fff;width:600px;padding:24px;}'+
-    '.hdr{border-bottom:3px solid #1D9E75;padding-bottom:12px;margin-bottom:16px;display:flex;justify-content:space-between;align-items:flex-start;}'+
-    '.brand h1{font-size:20px;font-weight:900;color:#1a2535;}.brand p{font-size:9px;color:#1D9E75;font-weight:700;letter-spacing:2px;margin-top:2px;}'+
-    '.brand .sub{font-size:9px;color:#999;font-weight:400;letter-spacing:0;margin-top:3px;}'+
-    '.num-doc{text-align:right;}.num-doc .lbl{font-size:9px;color:#999;text-transform:uppercase;}.num-doc .n{font-size:20px;font-weight:900;color:#1D9E75;}'+
-    '.info{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:16px;padding:12px;background:#f8f9fa;border-radius:8px;border-left:4px solid #1D9E75;}'+
-    '.ib .lbl{font-size:9px;color:#999;text-transform:uppercase;letter-spacing:0.8px;margin-bottom:3px;}.ib .val{font-size:12px;font-weight:700;color:#222;}'+
-    'table{width:100%;border-collapse:collapse;margin-bottom:12px;}thead{background:#1a2535;}thead th{padding:8px 10px;color:#fff;font-size:10px;font-weight:700;text-transform:uppercase;}'+
-    'tbody tr:nth-child(even){background:#f9f9f9;}'+
-    '.total-row{display:flex;justify-content:flex-end;margin-bottom:16px;}.total-box{border:1px solid #eee;border-radius:8px;overflow:hidden;min-width:220px;}'+
-    '.tr{display:flex;justify-content:space-between;padding:7px 12px;font-size:12px;border-bottom:1px solid #eee;}.tr:last-child{background:#1D9E75;color:#fff;font-weight:700;font-size:14px;border-bottom:none;}'+
-    '.footer{border-top:2px dashed #ccc;padding-top:12px;font-size:10px;color:#999;display:flex;justify-content:space-between;}'+
-    '.gracias{text-align:center;margin-top:16px;font-size:13px;color:#1D9E75;font-weight:700;letter-spacing:1px;}'+
-    '</style></head><body>'+
-    '<div class="hdr"><div class="brand"><h1>MUNDO CEL DIAZ</h1><p>SISTEMA DE GESTIÓN</p><p class="sub">Tecnología · Accesorios · Reparaciones · Guatemala</p></div>'+
-    '<div class="num-doc"><div class="lbl">'+(opts.estado?"Comprobante de Cuenta":"Comprobante de Venta")+'</div><div class="n"># '+String(sale.id||"").toUpperCase().slice(-8)+'</div></div></div>'+
-    estadoHTML+
-    '<div class="info">'+
-      '<div class="ib"><div class="lbl">Cliente</div><div class="val">'+sale.client+'</div></div>'+
-      '<div class="ib"><div class="lbl">Fecha</div><div class="val">'+fecha+'</div><div style="font-size:10px;color:#666;">'+hora+' hrs</div></div>'+
-      '<div class="ib"><div class="lbl">Método</div><div class="val">'+(sale.method||"Efectivo")+'</div></div>'+
-      '<div class="ib"><div class="lbl">Atendido por</div><div class="val">'+((sale.registradoPor&&sale.registradoPor.name)||opts.usuario||"—")+'</div></div>'+
+  return '<div style="font-family:Arial,sans-serif;font-size:12px;background:#fff;width:600px;padding:24px;box-sizing:border-box;">'+
+    '<div style="border-bottom:3px solid #1D9E75;padding-bottom:12px;margin-bottom:16px;display:flex;justify-content:space-between;align-items:flex-start;">'+
+      '<div><div style="font-size:20px;font-weight:900;color:#1a2535;">MUNDO CEL DIAZ</div>'+
+        '<div style="font-size:9px;color:#1D9E75;font-weight:700;letter-spacing:2px;margin-top:2px;">SISTEMA DE GESTIÓN</div>'+
+        '<div style="font-size:9px;color:#999;margin-top:3px;">Tecnología · Accesorios · Reparaciones · Guatemala</div></div>'+
+      '<div style="text-align:right;"><div style="font-size:9px;color:#999;text-transform:uppercase;">'+(opts.estado?"Comprobante de Cuenta":"Comprobante de Venta")+'</div>'+
+        '<div style="font-size:20px;font-weight:900;color:#1D9E75;"># '+String(sale.id||"").toUpperCase().slice(-8)+'</div></div>'+
     '</div>'+
-    '<table><thead><tr><th style="text-align:left;">Producto</th><th style="text-align:center;">Cant.</th><th style="text-align:right;">Precio</th><th style="text-align:right;">Subtotal</th></tr></thead>'+
-    '<tbody>'+items+saldoHTML+'</tbody></table>'+
-    '<div class="total-row"><div class="total-box"><div class="tr"><span>Total</span><span>Q '+Number(sale.total).toFixed(2)+'</span></div></div></div>'+
-    '<div class="footer"><span>Generado por MUNDO CEL DIAZ POS</span><span>'+fecha+' · '+hora+'</span></div>'+
-    '<div class="gracias">¡Gracias por su compra! 🙏</div>'+
-    '</body></html>';
+    estadoHTML+
+    '<div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:16px;padding:12px;background:#f8f9fa;border-radius:8px;border-left:4px solid #1D9E75;">'+
+      '<div><div style="font-size:9px;color:#999;text-transform:uppercase;letter-spacing:0.8px;margin-bottom:3px;">Cliente</div><div style="font-size:12px;font-weight:700;color:#222;">'+sale.client+'</div></div>'+
+      '<div><div style="font-size:9px;color:#999;text-transform:uppercase;letter-spacing:0.8px;margin-bottom:3px;">Fecha</div><div style="font-size:12px;font-weight:700;color:#222;">'+fecha+'</div><div style="font-size:10px;color:#666;">'+hora+' hrs</div></div>'+
+      '<div><div style="font-size:9px;color:#999;text-transform:uppercase;letter-spacing:0.8px;margin-bottom:3px;">Método</div><div style="font-size:12px;font-weight:700;color:#222;">'+(sale.method||"Efectivo")+'</div></div>'+
+      '<div><div style="font-size:9px;color:#999;text-transform:uppercase;letter-spacing:0.8px;margin-bottom:3px;">Atendido por</div><div style="font-size:12px;font-weight:700;color:#222;">'+((sale.registradoPor&&sale.registradoPor.name)||opts.usuario||"—")+'</div></div>'+
+    '</div>'+
+    '<table style="width:100%;border-collapse:collapse;margin-bottom:12px;">'+
+      '<thead><tr style="background:#1a2535;">'+
+        '<th style="padding:8px 10px;color:#fff;font-size:10px;font-weight:700;text-transform:uppercase;text-align:left;">Producto</th>'+
+        '<th style="padding:8px 10px;color:#fff;font-size:10px;font-weight:700;text-transform:uppercase;text-align:center;">Cant.</th>'+
+        '<th style="padding:8px 10px;color:#fff;font-size:10px;font-weight:700;text-transform:uppercase;text-align:right;">Precio</th>'+
+        '<th style="padding:8px 10px;color:#fff;font-size:10px;font-weight:700;text-transform:uppercase;text-align:right;">Subtotal</th>'+
+      '</tr></thead>'+
+      '<tbody>'+items+saldoHTML+'</tbody>'+
+    '</table>'+
+    '<div style="display:flex;justify-content:flex-end;margin-bottom:16px;">'+
+      '<div style="border:1px solid #eee;border-radius:8px;overflow:hidden;min-width:220px;">'+
+        '<div style="display:flex;justify-content:space-between;padding:7px 12px;font-size:12px;border-bottom:1px solid #eee;"><span>Total</span><span>Q '+Number(sale.total).toFixed(2)+'</span></div>'+
+        '<div style="display:flex;justify-content:space-between;padding:7px 12px;background:#1D9E75;color:#fff;font-weight:700;font-size:14px;"><span>TOTAL</span><span>Q '+Number(sale.total).toFixed(2)+'</span></div>'+
+      '</div>'+
+    '</div>'+
+    '<div style="border-top:2px dashed #ccc;padding-top:12px;font-size:10px;color:#999;display:flex;justify-content:space-between;"><span>Generado por MUNDO CEL DIAZ POS</span><span>'+fecha+' · '+hora+'</span></div>'+
+    '<div style="text-align:center;margin-top:16px;font-size:13px;color:#1D9E75;font-weight:700;letter-spacing:1px;">¡Gracias por su compra!</div>'+
+    '</div>';
 }
 
 async function compartirWhatsApp(tel, getMensaje, opts){
   opts=opts||{};
   var sale=opts.sale;
   var mensaje=getMensaje();
-  // Intentar generar imagen del recibo
   if(sale){
     try{
-      var htmlStr=buildReceiptHTML(sale, opts.receiptOpts||{});
-      // Renderizar en iframe oculto
-      var iframe=document.createElement("iframe");
-      iframe.style.cssText="position:fixed;left:-9999px;top:0;width:650px;height:900px;border:none;background:#fff;";
-      document.body.appendChild(iframe);
-      iframe.contentDocument.open();
-      iframe.contentDocument.write(htmlStr);
-      iframe.contentDocument.close();
-      await new Promise(function(r){setTimeout(r,600);});
-      var canvas=await html2canvas(iframe.contentDocument.body,{scale:2,useCORS:true,backgroundColor:"#ffffff",width:650});
-      document.body.removeChild(iframe);
-      // Convertir a blob
+      // Renderizar recibo en un div oculto (html2canvas no puede capturar iframes)
+      var wrapper=document.createElement("div");
+      wrapper.style.cssText="position:fixed;left:-9999px;top:0;background:#fff;z-index:-1;width:650px;";
+      wrapper.innerHTML=buildReceiptHTML(sale, opts.receiptOpts||{});
+      document.body.appendChild(wrapper);
+      await new Promise(function(r){setTimeout(r,400);});
+      var canvas=await html2canvas(wrapper.firstChild,{scale:2,useCORS:true,backgroundColor:"#ffffff",logging:false});
+      document.body.removeChild(wrapper);
       var blob=await new Promise(function(r){canvas.toBlob(r,"image/png",0.95);});
       var file=new File([blob],"boleta-mundoceldiaz.png",{type:"image/png"});
-      // Intentar Web Share API (funciona en móvil)
+      // Web Share API (móvil — adjunta imagen)
       if(navigator.share&&navigator.canShare&&navigator.canShare({files:[file]})){
         await navigator.share({files:[file],title:"Boleta MUNDO CEL DIAZ",text:mensaje});
         return;
       }
-      // Fallback desktop: descargar imagen
+      // Fallback escritorio: descargar imagen
       var imgUrl=URL.createObjectURL(blob);
-      var a=document.createElement("a");
-      a.href=imgUrl; a.download="boleta-mundoceldiaz.png"; document.body.appendChild(a); a.click();
-      document.body.removeChild(a);
+      var dl=document.createElement("a");
+      dl.href=imgUrl; dl.download="boleta-mundoceldiaz.png";
+      document.body.appendChild(dl); dl.click(); document.body.removeChild(dl);
       setTimeout(function(){URL.revokeObjectURL(imgUrl);},5000);
     }catch(err){
-      console.warn("[WA] html2canvas falló:",err);
+      console.warn("[WA] Error generando imagen:",err);
     }
   }
-  // Siempre abrir WhatsApp con texto (con o sin imagen)
   abrirWA(tel, mensaje);
 }
 const Q    = function(n){ return "Q " + Number(n).toFixed(2); };
