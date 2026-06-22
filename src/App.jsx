@@ -1750,10 +1750,21 @@ function ReturnsScreen(props) {
     return (c.name||"").toLowerCase().includes(q)||(c.dpi||"").includes(cliQ.trim())||(c.cliCode||"").toLowerCase().includes(q);
   }).slice(0,5):[];
 
-  // Ventas del cliente seleccionado
+  // Ventas del cliente seleccionado, con info de devoluciones previas
   var cliSales=selCli?sales.filter(function(s){
     return s.clientId===selCli.id||(s.client===selCli.name&&!s.clientId);
-  }).slice().sort(function(a,b){return new Date(b.date)-new Date(a.date);}):[];
+  }).slice().sort(function(a,b){return new Date(b.date)-new Date(a.date);}).map(function(s){
+    // Calcular qty ya devuelta por código en esta venta
+    var returnedQty={};
+    returns.filter(function(r){return r.saleId===s.id;}).forEach(function(r){
+      (r.items||[]).forEach(function(it){ returnedQty[it.code]=(returnedQty[it.code]||0)+(it.qty||0); });
+    });
+    var totalOriginal=s.items.reduce(function(a,it){return a+it.qty;},0);
+    var totalDevuelto=s.items.reduce(function(a,it){return a+(returnedQty[it.code]||0);},0);
+    var fullyReturned=totalDevuelto>=totalOriginal;
+    var partiallyReturned=totalDevuelto>0&&!fullyReturned;
+    return Object.assign({},s,{returnedQty:returnedQty,fullyReturned:fullyReturned,partiallyReturned:partiallyReturned,totalDevuelto:totalDevuelto,totalOriginal:totalOriginal});
+  }):[];
 
   function pickClient(c){
     setSelCli(c);
@@ -1764,9 +1775,14 @@ function ReturnsScreen(props) {
   }
 
   function pickSale(s){
+    if(s.fullyReturned) return; // no se puede seleccionar — ya devuelta completa
     setSelSale(s);
-    // Pre-llenar items con los productos de esa venta
-    var items=s.items.map(function(it){return {code:it.code,name:it.name,qty:it.qty,price:it.price};});
+    // Solo los artículos con qty restante por devolver
+    var items=s.items.map(function(it){
+      var yaDevuelto=s.returnedQty[it.code]||0;
+      var restante=it.qty-yaDevuelto;
+      return restante>0?{code:it.code,name:it.name,qty:restante,price:it.price}:null;
+    }).filter(Boolean);
     setForm(function(f){return Object.assign({},f,{items:items});});
     setStep("form");
   }
@@ -1861,17 +1877,30 @@ function ReturnsScreen(props) {
               ):(
                 <div style={{maxHeight:240,overflowY:"auto",marginBottom:12}}>
                   <table style={{width:"100%",borderCollapse:"collapse"}}>
-                    <thead><tr>{["Fecha","Artículos","Total","Método",""].map(function(h){return <th key={h} style={sTH}>{h}</th>;})}</tr></thead>
+                    <thead><tr>{["Fecha","Artículos","Total","Método","Estado devolución",""].map(function(h){return <th key={h} style={sTH}>{h}</th>;})}</tr></thead>
                     <tbody>
-                      {cliSales.map(function(s){return (
-                        <tr key={s.id} style={{cursor:"pointer"}} onClick={function(){pickSale(s);}}>
-                          <td style={sTD}>{fmtD(s.date)} {fmtT(s.date)}</td>
-                          <td style={Object.assign({},sTD,{color:"#666"})}>{s.items.length} art.</td>
-                          <td style={Object.assign({},sTD,{fontWeight:700,color:TEAL})}>{Q(s.total)}</td>
-                          <td style={sTD}><span style={mBg("teal")}>{s.method}</span></td>
-                          <td style={Object.assign({},sTD,{color:TEAL,fontSize:12})}>Seleccionar →</td>
-                        </tr>
-                      );})}
+                      {cliSales.map(function(s){
+                        var rowStyle={cursor:s.fullyReturned?"not-allowed":"pointer",opacity:s.fullyReturned?0.5:1};
+                        return (
+                          <tr key={s.id} style={rowStyle} onClick={function(){pickSale(s);}}>
+                            <td style={sTD}>{fmtD(s.date)} {fmtT(s.date)}</td>
+                            <td style={Object.assign({},sTD,{color:"#666"})}>{s.items.length} art.</td>
+                            <td style={Object.assign({},sTD,{fontWeight:700,color:TEAL})}>{Q(s.total)}</td>
+                            <td style={sTD}><span style={mBg("teal")}>{s.method}</span></td>
+                            <td style={sTD}>
+                              {s.fullyReturned
+                                ?<span style={mBg("red")}>✓ Devuelta completa</span>
+                                :s.partiallyReturned
+                                  ?<span style={mBg("amber")}>⚠ Parcial ({s.totalDevuelto}/{s.totalOriginal} arts.)</span>
+                                  :<span style={mBg("green")}>Disponible</span>
+                              }
+                            </td>
+                            <td style={Object.assign({},sTD,{color:s.fullyReturned?"#999":TEAL,fontSize:12})}>
+                              {s.fullyReturned?"No disponible":"Seleccionar →"}
+                            </td>
+                          </tr>
+                        );
+                      })}
                     </tbody>
                   </table>
                 </div>
