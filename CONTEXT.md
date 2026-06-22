@@ -59,16 +59,16 @@ y dime en qué quedamos. Luego pregúntame qué trabajamos hoy.
 ## Pendiente por implementar (roadmap)
 
 ### Prioridad ALTA — Integridad de datos
-- [ ] Idempotency key en ventas (evitar ventas duplicadas si falla la red)
 - [ ] Atomicidad en venta + descuento de stock (todo o nada)
 - [x] Verificar stock disponible justo antes de confirmar venta (evitar stock negativo)
 - [x] Límite de descuentos por rol (cajero max 20%, admin sin límite) — error claro si se excede
+- [x] Idempotency key en ventas (evitar ventas duplicadas si falla la red)
 
 ### Prioridad ALTA — Funcionalidad de negocio
 - [ ] IVA configurable en boletas (esperar hasta implementar facturación)
 - [ ] Cuentas por cobrar con fecha de vencimiento + reporte de aging (30/60/90 días) — pendiente consultar con cliente
 - [ ] Garantías en ventas y reparaciones — pendiente consultar con cliente
-- [ ] Rastro de auditoría (tabla audit_logs: quién cambió qué y cuándo) — pendiente
+- [x] Rastro de auditoría (tabla audit_logs: quién cambió qué y cuándo)
 
 ### Prioridad MEDIA — Crecimiento
 - [x] Paginación en listas grandes (historial 25/pág, cuentas 20/pág, clientes 20/pág, reparaciones 15/pág)
@@ -121,3 +121,11 @@ Vender el sistema como POS especializado para tiendas de celulares y reparacione
 - **Búsqueda global**: modal Ctrl+K que busca clientes, productos, ventas y reparaciones en tiempo real
 - **Paginación**: implementada en Historial (25/pág), Cuentas (20/pág), Clientes (20/pág), Reparaciones (15/pág)
 - **Diseño responsivo completo**: POS con tabs Productos/Carrito en móvil, grillas adaptables (rg-2/rg-3/rg-4), tablas con scroll horizontal, formularios en 1 columna, touch targets de 40-42px, tipografía fluida con clamp()
+
+### Sesión 3 — 22 junio 2026
+**Lo que se hizo:**
+- **Idempotency key**: UUID generado en frontend al hacer checkout, enviado con la venta. Backend verifica unicidad antes de insertar — si ya existe devuelve el registro existente (HTTP 200). Previene ventas duplicadas por doble tap o error de red
+- **Rastro de auditoría (audit_logs)**: tabla nueva en Supabase con índices. Registra quién hizo qué y cuándo en: ventas, cuentas por cobrar, abonos, productos (crear/editar/eliminar), usuarios (crear/editar)
+- **API /api/audit**: endpoint GET solo para admin, con filtros por tipo de registro, acción y usuario. Paginación de 50/página
+- **AuditScreen**: pantalla nueva en el frontend (solo admin), con tabla paginada, filtros y detalle legible de cada evento
+- **Nav**: ítem "Auditoría 🔍" agregado al sidebar (visible solo para admin via PERMS)

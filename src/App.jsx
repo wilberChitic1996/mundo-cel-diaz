@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react';
 import * as XLSX from 'xlsx';
 import { db } from './utils/db.js';
-import { authAPI, productsAPI, salesAPI, accountsAPI, returnsAPI, defectivesAPI, usersAPI, checkAPI, clientsAPI, repairsAPI } from './utils/api.js';
+import { authAPI, productsAPI, salesAPI, accountsAPI, returnsAPI, defectivesAPI, usersAPI, checkAPI, clientsAPI, repairsAPI, auditAPI } from './utils/api.js';
 
 const TEAL = "#1D9E75";
 const NAVY = "#1a2535";
@@ -73,7 +73,7 @@ var UK       = "mnpos-users-v1";
 var SESS_KEY = "mnpos-session-v1";
 
 var PERMS = {
-  admin:   ["dashboard","pos","caja","accounts","returns","defective","products","inventory","history","backup","users","clients","repairs","cuadres"],
+  admin:   ["dashboard","pos","caja","accounts","returns","defective","products","inventory","history","backup","users","clients","repairs","cuadres","audit"],
   cajero:  ["dashboard","pos","caja","accounts","returns","history","clients","repairs"],
   auditor: ["dashboard","caja","history","inventory","cuadres"],
 };
@@ -693,6 +693,7 @@ function Sidebar(props) {
     {id:"inventory", ic:"🗄️", lb:"Inventario"},
     {id:"history",   ic:"📋", lb:"Historial"},
     {id:"cuadres",   ic:"📈", lb:"Cuadres"},
+    {id:"audit",     ic:"🔍", lb:"Auditoría"},
     {id:"backup",    ic:"💾", lb:"Respaldo"},
     {id:"users",     ic:"👥", lb:"Usuarios"},
   ];
@@ -2850,11 +2851,12 @@ function App(props) {
     var registradoPor={userId:session.userId,name:session.name,role:session.role};
     var base={id:gid(),date:new Date().toISOString(),client:client,clientId:selectedClientId||null,items:items,total:cartTotal,method:payMethod,registradoPor:registradoPor,nota:saleNote.trim()||null};
     function deduct(){ setProducts(function(p){return p.map(function(x){var ci=cart.find(function(i){return i.id===x.id;});return ci&&x.unit!=="serv"?Object.assign({},x,{stock:x.stock-ci.qty}):x;}); }); }
+    var idempotencyKey=gid()+"-"+Date.now();
     if(payType==="completo"){
       if(isOnline){
         var ok=false;
         try {
-          await salesAPI.create({client:client,total:cartTotal,method:payMethod,items:cart});
+          await salesAPI.create({client:client,total:cartTotal,method:payMethod,items:cart,idempotencyKey:idempotencyKey});
           var freshSales = await salesAPI.getAll();
           var ns = (freshSales||[]).map(function(s){return Object.assign({},s,{items:s.sale_items||[],total:Number(s.total),date:s.created_at,registradoPor:s.registrado_por||null});});
           setSales(ns);
@@ -2878,7 +2880,7 @@ function App(props) {
       if(isOnline){
         var ok2=false;
         try{
-          await salesAPI.create({client:client,total:cartTotal,method:payMethod,items:cart,payType:payType,initialPay:paid});
+          await salesAPI.create({client:client,total:cartTotal,method:payMethod,items:cart,payType:payType,initialPay:paid,idempotencyKey:idempotencyKey});
           var freshAccs = await accountsAPI.getAll();
           var na=(freshAccs||[]).map(function(a){return Object.assign({},a,{items:a.account_items||[],payments:(a.account_payments||[]).map(function(_pp){return Object.assign({},_pp,{date:_pp.date||_pp.created_at,amount:Number(_pp.amount),registradoPor:_pp.registrado_por||_pp.registradoPor||null});}),total:Number(a.total),paid:Number(a.paid),balance:Number(a.balance),date:a.created_at,registradoPor:a.registrado_por||null});});
           setAccounts(na);
@@ -3226,8 +3228,147 @@ function App(props) {
           {view==="users"    &&canAccess(session.role,"users")&&<UsersScreen session={session} showFlash={showFlash}/>}
           {view==="clients"  &&canAccess(session.role,"clients")&&<ClientsScreen clients={clients} sales={sales} accounts={accounts} returns={returns} saveClient={saveClient} session={session} showFlash={showFlash}/>}
           {view==="repairs"  &&canAccess(session.role,"repairs")&&<RepairsScreen repairs={repairs} clients={clients} products={products} saveRepair={saveRepair} updateRepairStatus={updateRepairStatus} onCobrar={cobrarReparacion} session={session} showFlash={showFlash}/>}
+          {view==="audit"    &&canAccess(session.role,"audit")&&<AuditScreen session={session}/>}
         </div>
       </div>
+  );
+}
+
+/* ══════════════════════════════════════════════════════════════════════
+   MÓDULO AUDITORÍA
+   ══════════════════════════════════════════════════════════════════════ */
+var AUDIT_ACTIONS = {
+  venta_completada: "Venta",
+  cuenta_creada:    "Cuenta por cobrar",
+  abono_registrado: "Abono",
+  producto_creado:  "Producto creado",
+  producto_editado: "Producto editado",
+  producto_eliminado:"Producto eliminado",
+  usuario_creado:   "Usuario creado",
+  usuario_editado:  "Usuario editado",
+};
+var AUDIT_COLORS = {
+  venta_completada:  "teal",
+  cuenta_creada:     "blue",
+  abono_registrado:  "green",
+  producto_creado:   "purple",
+  producto_editado:  "amber",
+  producto_eliminado:"red",
+  usuario_creado:    "purple",
+  usuario_editado:   "amber",
+};
+
+function AuditScreen(props){
+  var session=props.session;
+  var _logs=useState([]); var logs=_logs[0]; var setLogs=_logs[1];
+  var _loading=useState(true); var loading=_loading[0]; var setLoading=_loading[1];
+  var _err=useState(""); var err=_err[0]; var setErr=_err[1];
+  var _page=useState(1); var page=_page[0]; var setPage=_page[1];
+  var _total=useState(0); var total=_total[0]; var setTotal=_total[1];
+  var _entity=useState(""); var entity=_entity[0]; var setEntity=_entity[1];
+  var _action=useState(""); var action=_action[0]; var setAction=_action[1];
+  var _user=useState(""); var userFilter=_user[0]; var setUserFilter=_user[1];
+  var LIMIT=50;
+
+  useEffect(function(){
+    load(1);
+  },[entity,action,userFilter]);
+
+  async function load(p){
+    setLoading(true);setErr("");
+    try{
+      var params={page:p,limit:LIMIT};
+      if(entity)params.entity=entity;
+      if(action)params.action=action;
+      if(userFilter)params.user=userFilter;
+      var res=await auditAPI.getAll(params);
+      setLogs(res.data||[]);
+      setTotal(res.total||0);
+      setPage(p);
+    }catch(e){
+      setErr(e&&e.error?e.error:"Error cargando auditoría");
+    }
+    setLoading(false);
+  }
+
+  var totalPages=Math.max(1,Math.ceil(total/LIMIT));
+
+  return(
+    <div>
+      <h2 style={H1}>🔍 Rastro de Auditoría</h2>
+      <div style={Object.assign({},sC,{marginBottom:16})}>
+        <div style={{display:"flex",gap:10,flexWrap:"wrap",alignItems:"flex-end"}}>
+          <div style={{flex:"1 1 150px"}}>
+            <label style={sL}>Tipo de registro</label>
+            <select value={entity} onChange={function(e){setEntity(e.target.value);}} style={sI}>
+              <option value="">Todos</option>
+              <option value="sale">Ventas</option>
+              <option value="account">Cuentas</option>
+              <option value="product">Productos</option>
+              <option value="user">Usuarios</option>
+            </select>
+          </div>
+          <div style={{flex:"1 1 150px"}}>
+            <label style={sL}>Acción</label>
+            <select value={action} onChange={function(e){setAction(e.target.value);}} style={sI}>
+              <option value="">Todas</option>
+              {Object.keys(AUDIT_ACTIONS).map(function(k){return <option key={k} value={k}>{AUDIT_ACTIONS[k]}</option>;})}
+            </select>
+          </div>
+          <div style={{flex:"1 1 150px"}}>
+            <label style={sL}>Usuario</label>
+            <input style={sI} placeholder="Nombre..." value={userFilter} onChange={function(e){setUserFilter(e.target.value);}}/>
+          </div>
+          <button style={mB("teal")} onClick={function(){load(1);}}>Buscar</button>
+        </div>
+      </div>
+
+      {err&&<div style={{background:"#FDECEA",color:"#791F1F",padding:"10px 14px",borderRadius:8,marginBottom:12}}>{err}</div>}
+
+      <div style={Object.assign({},sC,{padding:0,overflow:"hidden"})}>
+        <div className="t-resp">
+          <table style={{width:"100%",borderCollapse:"collapse"}}>
+            <thead>
+              <tr>
+                {["Fecha/Hora","Usuario","Rol","Acción","Tipo","Detalles"].map(function(h){return <th key={h} style={sTH}>{h}</th>;})}
+              </tr>
+            </thead>
+            <tbody>
+              {loading&&<tr><td colSpan={6} style={{padding:24,textAlign:"center",color:"#888"}}>Cargando…</td></tr>}
+              {!loading&&logs.length===0&&<tr><td colSpan={6} style={{padding:24,textAlign:"center",color:"#888"}}>Sin registros</td></tr>}
+              {!loading&&logs.map(function(log){
+                var c=AUDIT_COLORS[log.action]||"gray";
+                var detail="";
+                if(log.details){
+                  if(log.action==="venta_completada")detail="Cliente: "+(log.details.client||"")+" — Total: Q"+(Number(log.details.total||0).toFixed(2))+" — Método: "+(log.details.method||"");
+                  else if(log.action==="cuenta_creada")detail="Cliente: "+(log.details.client||"")+" — Total: Q"+(Number(log.details.total||0).toFixed(2));
+                  else if(log.action==="abono_registrado")detail="Monto: Q"+(Number(log.details.amount||0).toFixed(2))+" — Saldo: Q"+(Number(log.details.newBalance||0).toFixed(2));
+                  else if(log.action==="producto_creado"||log.action==="producto_editado")detail=(log.details.name||"")+(log.details.price?" — Q"+Number(log.details.price).toFixed(2):"");
+                  else if(log.action==="usuario_creado"||log.action==="usuario_editado")detail=(log.details.name||"")+(log.details.role?" — "+(log.details.role):"");
+                }
+                return(
+                  <tr key={log.id} style={{background:"var(--bg-row,#fff)"}}>
+                    <td style={sTD}><div>{fmtD(log.created_at)}</div><div style={{fontSize:12,color:"#888"}}>{fmtT(log.created_at)}</div></td>
+                    <td style={sTD}>{log.user_name||"—"}</td>
+                    <td style={sTD}><span style={mBg(log.user_role==="admin"?"teal":log.user_role==="cajero"?"blue":"purple")}>{ROLE_LABEL[log.user_role]||log.user_role||"—"}</span></td>
+                    <td style={sTD}><span style={mBg(c)}>{AUDIT_ACTIONS[log.action]||log.action}</span></td>
+                    <td style={sTD}>{log.entity_type||"—"}</td>
+                    <td style={Object.assign({},sTD,{maxWidth:280,fontSize:12,color:"#555"})}>{detail||JSON.stringify(log.details||{}).slice(0,80)}</td>
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
+        </div>
+        {totalPages>1&&(
+          <div style={{display:"flex",justifyContent:"center",gap:8,padding:"12px 16px",borderTop:"1px solid var(--border-table,rgba(0,0,0,0.08))"}}>
+            <button style={mB("gray")} disabled={page<=1} onClick={function(){load(page-1);}}>‹ Anterior</button>
+            <span style={{alignSelf:"center",fontSize:13,color:"#888"}}>Pág. {page} / {totalPages} ({total} registros)</span>
+            <button style={mB("gray")} disabled={page>=totalPages} onClick={function(){load(page+1);}}>Siguiente ›</button>
+          </div>
+        )}
+      </div>
+    </div>
   );
 }
 
