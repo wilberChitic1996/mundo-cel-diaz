@@ -3145,7 +3145,7 @@ function App(props) {
       if(online){
         // Modo online: cargar datos desde el API
         try {
-        var [prods, sls, accs, rets, defs, clis, reps, wars] = await Promise.all([
+        var [prods, sls, accs, rets, defs, clis, reps] = await Promise.all([
             productsAPI.getAll(),
             salesAPI.getAll(),
             accountsAPI.getAll(),
@@ -3153,8 +3153,8 @@ function App(props) {
             defectivesAPI.getAll(),
             clientsAPI.getAll(),
             repairsAPI.getAll(),
-            warrantiesAPI.getAll(),
           ]);
+          var wars = await warrantiesAPI.getAll().catch(function(){return [];});
           var normalProds = (prods||[]).map(function(p){return Object.assign({},p,{id:p.id,code:p.code,name:p.name,category:p.category||'',shelf:p.shelf||'',price:Number(p.price),cost:Number(p.cost),stock:Number(p.stock),unit:p.unit||'uni'});});
           var normalSales = (sls||[]).map(function(s){return Object.assign({},s,{items:s.sale_items||[],total:Number(s.total),date:s.created_at,registradoPor:s.registrado_por||null});});
           var normalAccs  = (accs||[]).map(function(a){return Object.assign({},a,{items:a.account_items||[],payments:(a.account_payments||[]).map(function(_pp){return Object.assign({},_pp,{date:_pp.date||_pp.created_at,amount:Number(_pp.amount),registradoPor:_pp.registrado_por||_pp.registradoPor||null});}),total:Number(a.total),paid:Number(a.paid),balance:Number(a.balance),date:a.created_at,registradoPor:a.registrado_por||null});});
