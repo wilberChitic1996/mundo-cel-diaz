@@ -3666,7 +3666,7 @@ function App(props) {
   var pendingAccs=accounts.filter(function(a){return a.status!=="pagado";});
   var totalPend=pendingAccs.reduce(function(s,a){return s+a.balance;},0);
   var pqs={};
-  sales.forEach(function(s){s.items.forEach(function(i){pqs[i.name]=(pqs[i.name]||0)+i.qty;});});
+  sales.forEach(function(s){(s.items||[]).forEach(function(i){pqs[i.name]=(pqs[i.name]||0)+i.qty;});});
   var top5=Object.keys(pqs).map(function(k){return [k,pqs[k]];}).sort(function(a,b){return b[1]-a[1];}).slice(0,5);
 
   return (
@@ -4535,7 +4535,7 @@ function CuadresScreen(props){
   // Costo y ganancia bruta — descuenta costo de artículos defectuosos devueltos
   var costoVentas=0;
   periodSales.forEach(function(s){
-    s.items.forEach(function(it){
+    (s.items||[]).forEach(function(it){
       var prod=products.find(function(p){return p.id===it.id||p.code===it.code;});
       if(prod&&prod.cost>0) costoVentas+=prod.cost*it.qty;
     });
@@ -4556,7 +4556,7 @@ function CuadresScreen(props){
 
   // Más vendidos del período
   var qtyMap={};
-  periodSales.forEach(function(s){s.items.forEach(function(it){qtyMap[it.name]=(qtyMap[it.name]||0)+it.qty;});});
+  periodSales.forEach(function(s){(s.items||[]).forEach(function(it){qtyMap[it.name]=(qtyMap[it.name]||0)+it.qty;});});
   var top5=Object.keys(qtyMap).map(function(k){return [k,qtyMap[k]];}).sort(function(a,b){return b[1]-a[1];}).slice(0,5);
 
   function printCuadre(){
