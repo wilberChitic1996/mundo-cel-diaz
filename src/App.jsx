@@ -50,7 +50,7 @@ var sL  = {fontSize:13,color:"var(--text-secondary,#666)",marginBottom:4,display
 var sTH = {textAlign:"left",padding:"10px 12px",color:"var(--text-secondary,#666)",fontSize:13,borderBottom:"1px solid var(--border-table,rgba(0,0,0,0.08))",fontWeight:500,background:"var(--bg-table-head,transparent)"};
 var sTD = {padding:"10px 12px",borderBottom:"1px solid var(--border-row,rgba(0,0,0,0.05))",color:"var(--text-primary,#1a1a1a)",fontSize:14};
 var sQB = {cursor:"pointer",background:"#f0efeb",width:26,height:26,borderRadius:5,display:"flex",alignItems:"center",justifyContent:"center",fontSize:16,userSelect:"none",flexShrink:0,border:"1px solid rgba(0,0,0,0.1)"};
-var H1  = {fontSize:22,fontWeight:600,margin:"0 0 20px",color:"var(--text-primary,#1a1a1a)"};
+var H1  = {fontSize:"clamp(17px,4vw,22px)",fontWeight:600,margin:"0 0 16px",color:"var(--text-primary,#1a1a1a)"};
 
 function mB(c) {
   var colors = {teal:TEAL,red:"#E24B4A",blue:"#378ADD",purple:"#7F77DD",gray:"#eeede9",green:"#2E7D32",amber:"#E65100"};
@@ -432,7 +432,7 @@ function UsersScreen(props) {
             <div style={Object.assign({},sC,{marginBottom:16,borderColor:TEAL,borderWidth:"1.5px"})}>
               <p style={{fontWeight:600,margin:"0 0 16px",fontSize:15}}>{editUser?"✏️ Editar usuario":"➕ Nuevo usuario"}</p>
               {fErr&&<p style={{color:"#E24B4A",fontSize:13,margin:"0 0 10px"}}>⚠ {fErr}</p>}
-              <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:12,marginBottom:12}}>
+              <div className="form-grid-2" style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:12,marginBottom:12}}>
                 <div><label style={sL}>Nombre</label><input style={sI} value={fName} placeholder="Nombre completo" onChange={function(e){setFErr("");setFName(e.target.value);}}/></div>
                 <div><label style={sL}>Email</label><input type="email" style={sI} value={fEmail} placeholder="email@ejemplo.com" onChange={function(e){setFErr("");setFEmail(e.target.value);}}/></div>
                 <div><label style={sL}>{editUser?"Nueva contraseña (vacío = no cambiar)":"Contraseña (mín. 8 chars)"}</label><input type="password" style={sI} value={fPass} placeholder="••••••••" onChange={function(e){setFErr("");setFPass(e.target.value);}}/></div>
@@ -461,7 +461,7 @@ function UsersScreen(props) {
               </div>
             </div>
         )}
-        <div style={{display:"grid",gridTemplateColumns:"repeat(3,1fr)",gap:14,marginBottom:20}}>
+        <div className="rg-3" style={{display:"grid",gridTemplateColumns:"repeat(3,1fr)",gap:14,marginBottom:20}}>
           <MetricBox label="Total usuarios"  value={users.length} color={TEAL}/>
           <MetricBox label="Activos"         value={users.filter(function(u){return u.active;}).length} color="#378ADD"/>
           <MetricBox label="Administradores" value={users.filter(function(u){return u.role==="admin";}).length} color="#7F77DD"/>
@@ -652,7 +652,7 @@ function ProductForm(props) {
       <div style={Object.assign({},sC,{marginBottom:16,borderColor:TEAL,borderWidth:"1.5px"})}>
         <p style={{fontWeight:600,margin:"0 0 14px",fontSize:15}}>{product.id?"✏️ Editar":"➕ Nuevo Producto"}</p>
         {err&&<p style={{color:"#E24B4A",fontSize:13,margin:"0 0 10px"}}>⚠ {err}</p>}
-        <div style={{display:"grid",gridTemplateColumns:"repeat(4,1fr)",gap:12,marginBottom:14}}>
+        <div className="rg-4" style={{display:"grid",gridTemplateColumns:"repeat(4,1fr)",gap:12,marginBottom:14}}>
           {FORM_FIELDS.map(function(f){
             return (
                 <div key={f.k}>
@@ -772,6 +772,9 @@ function Sidebar(props) {
   );
 }
 
+/* ── Hook responsive ────────────────────────────────────────────────── */
+function useIsMobile(bp){ bp=bp||768; var _w=useState(function(){return window.innerWidth<=bp;}); var isMobile=_w[0]; var setIsMobile=_w[1]; useEffect(function(){ function h(){setIsMobile(window.innerWidth<=bp);} window.addEventListener("resize",h); return function(){window.removeEventListener("resize",h);}; },[bp]); return isMobile; }
+
 /* ── Paginador reutilizable ─────────────────────────────────────────── */
 function usePaginator(items, perPage){
   var _p=useState(1); var page=_p[0]; var setPage=_p[1];
@@ -872,6 +875,7 @@ function DashboardScreen(props) {
   var setSelectedSale=props.setSelectedSale; var setView=props.setView;
   var accounts=props.accounts; var returns=props.returns;
   var repairs=props.repairs||[];
+  var isMobile=useIsMobile();
 
   var todayRev=todaySales.reduce(function(s,x){return s+x.total;},0);
   var todayStr=new Date().toDateString();
@@ -926,7 +930,7 @@ function DashboardScreen(props) {
           </div>
         )}
 
-        <div style={{display:"grid",gridTemplateColumns:"repeat(4,1fr)",gap:14,marginBottom:16}}>
+        <div className="rg-4" style={{display:"grid",gridTemplateColumns:"repeat(4,1fr)",gap:14,marginBottom:16}}>
           <MetricBox label="Ventas hoy"     value={todaySales.length}                  color={TEAL}/>
           <MetricBox label="Ingresos hoy"   value={Q(todayRev)}                        color="#378ADD"/>
           <MetricBox label="Saldo caja hoy" value={Q(saldoCaja)}                       color={saldoCaja>=0?"#1D9E75":"#E24B4A"}/>
@@ -934,7 +938,7 @@ function DashboardScreen(props) {
         </div>
 
         {/* Reparaciones */}
-        <div style={{display:"grid",gridTemplateColumns:"repeat(3,1fr)",gap:14,marginBottom:16}}>
+        <div className="rg-3" style={{display:"grid",gridTemplateColumns:"repeat(3,1fr)",gap:14,marginBottom:16}}>
           <div onClick={function(){setView("repairs");}} style={Object.assign({},sC,{cursor:"pointer",borderLeft:"4px solid #378ADD"})}>
             <p style={{fontSize:12,color:"#666",margin:"0 0 6px"}}>🔧 Reparaciones activas</p>
             <p style={{fontSize:26,fontWeight:700,margin:0,color:"#378ADD"}}>{repsActivas.length}</p>
@@ -952,7 +956,7 @@ function DashboardScreen(props) {
         </div>
 
         {/* Gráfica ventas últimos 7 días + métodos de pago */}
-        <div style={{display:"grid",gridTemplateColumns:"2fr 1fr",gap:14,marginBottom:16}}>
+        <div className="rg-2" style={{display:"grid",gridTemplateColumns:"2fr 1fr",gap:14,marginBottom:16}}>
           <div style={sC}>
             <p style={{fontWeight:600,margin:"0 0 16px",fontSize:15}}>📈 Ventas últimos 7 días</p>
             <div style={{display:"flex",alignItems:"flex-end",gap:8,height:110}}>
@@ -991,7 +995,7 @@ function DashboardScreen(props) {
           </div>
         </div>
 
-        <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:18,marginBottom:18}}>
+        <div className="rg-2" style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:18,marginBottom:18}}>
           <div style={sC}>
             <p style={{fontWeight:600,margin:"0 0 14px",fontSize:15}}>🏆 Más vendidos</p>
             {top5.length===0?<p style={{color:"#999",fontSize:14}}>Sin ventas aún</p>:top5.map(function(item,i){
@@ -1089,7 +1093,7 @@ function CajaScreen(props) {
           </div>
         </div>
 
-        <div style={{display:"grid",gridTemplateColumns:"repeat(3,1fr)",gap:14,marginBottom:22}}>
+        <div className="rg-3" style={{display:"grid",gridTemplateColumns:"repeat(3,1fr)",gap:14,marginBottom:22}}>
           <MetricBox label="Total entradas (efectivo)"  value={Q(totalEntradas)} color={TEAL}/>
           <MetricBox label="Total salidas (reembolsos)" value={Q(totalSalidas)}  color="#E24B4A"/>
           <MetricBox label="Saldo en caja"              value={Q(saldo)}          color={saldo>=0?TEAL:"#E24B4A"}/>
@@ -1165,6 +1169,10 @@ function POSScreen(props) {
   var _di=useState(null); var discountItemId=_di[0]; var setDiscountItemId=_di[1];
   var _dv=useState(""); var discountVal=_dv[0]; var setDiscountVal=_dv[1];
 
+  // Responsive
+  var isMobile=useIsMobile();
+  var _pt=useState("productos"); var posTab=_pt[0]; var setPosTab=_pt[1];
+
   function applyDiscount(itemId){
     var newPrice=parseFloat(discountVal);
     if(!newPrice||newPrice<=0){setDiscountItemId(null);setDiscountVal("");return;}
@@ -1215,8 +1223,18 @@ function POSScreen(props) {
       <div>
         <p style={H1}>🛒 Nueva Venta</p>
         {flash.msg&&<div style={{background:FC[flash.type]||FC.ok,border:"1px solid "+(FB[flash.type]||FB.ok),borderRadius:8,padding:"10px 16px",marginBottom:14,color:FT[flash.type]||FT.ok,fontSize:14}}>{flash.msg}</div>}
-        <div style={{display:"grid",gridTemplateColumns:"1fr 340px",gap:18}}>
-          <div style={sC}>
+        {isMobile&&(
+          <div style={{display:"flex",gap:0,marginBottom:14,borderRadius:10,overflow:"hidden",border:"1px solid rgba(0,0,0,0.12)"}}>
+            <button onClick={function(){setPosTab("productos");}} style={{flex:1,padding:"11px",fontSize:13,fontWeight:600,border:"none",borderRadius:0,background:posTab==="productos"?TEAL:"#f4f4f4",color:posTab==="productos"?"#fff":"#555",cursor:"pointer"}}>
+              📦 Productos
+            </button>
+            <button onClick={function(){setPosTab("carrito");}} style={{flex:1,padding:"11px",fontSize:13,fontWeight:600,border:"none",borderRadius:0,background:posTab==="carrito"?TEAL:"#f4f4f4",color:posTab==="carrito"?"#fff":"#555",cursor:"pointer",position:"relative"}}>
+              🛒 Carrito {cart.length>0&&<span style={{background:"#E24B4A",color:"#fff",borderRadius:10,fontSize:10,padding:"1px 6px",fontWeight:700,marginLeft:4}}>{cart.length}</span>}
+            </button>
+          </div>
+        )}
+        <div style={isMobile?{}:{display:"grid",gridTemplateColumns:"1fr 340px",gap:18}}>
+          <div style={Object.assign({},sC,isMobile&&posTab!=="productos"?{display:"none"}:{})}>
             <input style={Object.assign({},sI,{marginBottom:14})} placeholder="🔍  Buscar por nombre, código o estantería..."
                    value={posQ} onChange={function(e){setPosQ(e.target.value);}}/>
             <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fill,minmax(148px,1fr))",gap:10,maxHeight:460,overflowY:"auto",paddingRight:2}}>
@@ -1236,7 +1254,7 @@ function POSScreen(props) {
               {filteredPOS.length===0&&<p style={{color:"#999",fontSize:14}}>Sin resultados</p>}
             </div>
           </div>
-          <div style={Object.assign({},sC,{display:"flex",flexDirection:"column"})}>
+          <div style={Object.assign({},sC,{display:"flex",flexDirection:"column"},isMobile&&posTab!=="carrito"?{display:"none"}:{})}>
             <p style={{fontWeight:600,margin:"0 0 14px",fontSize:15}}>Carrito <span style={{fontWeight:400,color:"#999",fontSize:13}}>({cart.length})</span></p>
             {cart.length===0
                 ?<div style={{flex:1,display:"flex",alignItems:"center",justifyContent:"center",color:"#bbb",fontSize:13,textAlign:"center",minHeight:180}}>Seleccioná productos del catálogo</div>
@@ -1479,7 +1497,7 @@ function AccountsScreen(props) {
                 <div style={{background:"#f9f8f5",borderRadius:10,padding:16,border:"1px solid rgba(0,0,0,0.08)"}}>
                   <p style={{fontWeight:600,margin:"0 0 12px",fontSize:14}}>💳 Registrar pago / cuota</p>
                   {pmtErr&&<p style={{color:"#E24B4A",fontSize:13,margin:"0 0 10px"}}>⚠ {pmtErr}</p>}
-                  <div style={{display:"grid",gridTemplateColumns:"1fr 1fr 1fr",gap:12,marginBottom:12}}>
+                  <div className="form-grid-3" style={{display:"grid",gridTemplateColumns:"1fr 1fr 1fr",gap:12,marginBottom:12}}>
                     <div><label style={sL}>Monto (Q)</label>
                       <input type="number" style={sI} value={pmtAmount} placeholder={"Saldo: "+acc.balance.toFixed(2)} onChange={function(e){setPmtErr("");setPmtAmount(e.target.value);}}/></div>
                     <div><label style={sL}>Método</label>
@@ -1504,7 +1522,7 @@ function AccountsScreen(props) {
   return (
       <div>
         <p style={H1}>💳 Cuentas por Cobrar</p>
-        <div style={{display:"grid",gridTemplateColumns:"repeat(3,1fr)",gap:14,marginBottom:20}}>
+        <div className="rg-3" style={{display:"grid",gridTemplateColumns:"repeat(3,1fr)",gap:14,marginBottom:20}}>
           <MetricBox label="Total pendiente" value={Q(totalPend)}       color="#E24B4A"/>
           <MetricBox label="Total cobrado"   value={Q(totalCob)}        color={TEAL}/>
           <MetricBox label="Cuentas activas" value={pendingAccs.length} color="#378ADD"/>
@@ -1745,7 +1763,7 @@ function ReturnsScreen(props) {
 
               {itemsTotal>0&&<div style={{background:"#f5f4f0",borderRadius:8,padding:"8px 14px",marginBottom:14,fontSize:13}}>Valor total de artículos: <b>{Q(itemsTotal)}</b></div>}
 
-              <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:12,marginBottom:14}}>
+              <div className="form-grid-2" style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:12,marginBottom:14}}>
                 <div>
                   <label style={sL}>💰 Estado del artículo devuelto</label>
                   <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:8}}>
@@ -1776,7 +1794,7 @@ function ReturnsScreen(props) {
         </div>
       )}
 
-      <div style={{display:"grid",gridTemplateColumns:"repeat(3,1fr)",gap:14,marginBottom:20}}>
+      <div className="rg-3" style={{display:"grid",gridTemplateColumns:"repeat(3,1fr)",gap:14,marginBottom:20}}>
         <MetricBox label="Total devoluciones"  value={returns.length}       color="#7F77DD"/>
         <MetricBox label="Total reembolsado"   value={Q(totalReembolsado)}  color="#E24B4A"/>
         <MetricBox label="Sin reembolso"       value={totalPendReemb}       color="#666"/>
@@ -1821,7 +1839,7 @@ function DefectiveScreen(props) {
       <div>
         <p style={H1}>🔩 Piezas Defectuosas</p>
         <p style={{fontSize:14,color:"#666",margin:"-12px 0 20px",lineHeight:1.6}}>Artículos retirados del inventario por devoluciones con daño. Podés darlos de baja definitivamente o repararlos y reingresarlos al stock.</p>
-        <div style={{display:"grid",gridTemplateColumns:"repeat(3,1fr)",gap:14,marginBottom:20}}>
+        <div className="rg-3" style={{display:"grid",gridTemplateColumns:"repeat(3,1fr)",gap:14,marginBottom:20}}>
           <MetricBox label="En revisión"       value={totalPiezas} color="#E24B4A"/>
           <MetricBox label="Dados de baja"     value={totalDadas}  color="#666"/>
           <MetricBox label="Reingresados"      value={totalReing}  color={TEAL}/>
@@ -2287,7 +2305,7 @@ function HistoryScreen(props) {
           <p style={H1}>📋 Historial de Movimientos</p>
           <div style={{fontSize:13,color:"#666"}}>{movs.length} movimientos</div>
         </div>
-        <div style={{display:"grid",gridTemplateColumns:"repeat(3,1fr)",gap:14,marginBottom:18}}>
+        <div className="rg-3" style={{display:"grid",gridTemplateColumns:"repeat(3,1fr)",gap:14,marginBottom:18}}>
           <MetricBox label="Entradas (ventas + abonos)" value={Q(totEnt)} color={TEAL}/>
           <MetricBox label="Salidas (devoluciones)" value={Q(totSal)} color="#E24B4A"/>
           <MetricBox label="Movimientos totales" value={movs.length} color="#378ADD"/>
@@ -2476,7 +2494,7 @@ function ClientsScreen(props) {
             </div>
             <button style={Object.assign({},mB("blue"),{padding:"6px 12px",fontSize:12})} onClick={function(){startEdit(cli);setSelCli(null);}}>✏ Editar</button>
           </div>
-          <div style={{display:"grid",gridTemplateColumns:"repeat(4,1fr)",gap:12}}>
+          <div className="rg-4" style={{display:"grid",gridTemplateColumns:"repeat(4,1fr)",gap:12}}>
             <MetricBox label="Total compras"     value={cliSales.length}    color={TEAL}/>
             <MetricBox label="Total comprado"    value={Q(totalComprado)}   color="#378ADD"/>
             <MetricBox label="Deuda pendiente"   value={Q(totalPendiente)}  color={totalPendiente>0?"#E24B4A":TEAL}/>
@@ -2554,7 +2572,7 @@ function ClientsScreen(props) {
         <div style={Object.assign({},sC,{marginBottom:16,borderColor:TEAL,borderWidth:"1.5px"})}>
           <p style={{fontWeight:600,margin:"0 0 14px",fontSize:15}}>{editCli?"✏️ Editar cliente":"➕ Nuevo cliente"}</p>
           {fErr&&<div style={{background:"#FCEBEB",borderRadius:8,padding:"8px 14px",marginBottom:12,color:"#791F1F",fontSize:13}}>⚠ {fErr}</div>}
-          <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:12,marginBottom:14}}>
+          <div className="form-grid-2" style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:12,marginBottom:14}}>
             <div><label style={sL}>Nombre completo *</label><input style={sI} value={fName} placeholder="Nombre del cliente" onChange={function(e){setFErr("");setFName(e.target.value);}}/></div>
             <div>
               <label style={sL}>DPI (13 dígitos, opcional)</label>
@@ -2575,7 +2593,7 @@ function ClientsScreen(props) {
         </div>
       )}
 
-      <div style={{display:"grid",gridTemplateColumns:"repeat(3,1fr)",gap:14,marginBottom:20}}>
+      <div className="rg-3" style={{display:"grid",gridTemplateColumns:"repeat(3,1fr)",gap:14,marginBottom:20}}>
         <MetricBox label="Total clientes"   value={totalClientes} color={TEAL}/>
         <MetricBox label="Con deuda activa" value={conDeuda}      color="#E24B4A"/>
         <MetricBox label="Clientes frecuentes" value={frecuentes} color="#E65100"/>
@@ -3193,7 +3211,7 @@ function App(props) {
         </div>
         <Sidebar view={view} setView={setView} cartCount={cart.length} pendingCount={pendingAccs.length} products={products} sales={sales} session={session} onLogout={onLogout} isOnline={isOnline} theme={theme} toggleTheme={toggleTheme} sidebarOpen={sidebarOpen} setSidebarOpen={setSidebarOpen} onSearch={function(){setGsOpen(true);}}/>
         {gsOpen&&<GlobalSearch onClose={function(){setGsOpen(false);}} setView={setView} sales={sales} clients={clients} products={products} repairs={repairs} setSelectedSale={setSelSale}/>}
-        <div style={{flex:1,padding:"24px 28px",overflowY:"auto",minWidth:0}} className="main-content">
+        <div style={{flex:1,padding:"clamp(12px,3vw,28px)",overflowY:"auto",minWidth:0}} className="main-content">
           {view==="dashboard"&&canAccess(session.role,"dashboard")&&<DashboardScreen sales={sales} todaySales={todaySales} pendingAccs={pendingAccs} totalPend={totalPend} products={products} top5={top5} setSelectedSale={setSelSale} setView={setView} accounts={accounts} returns={returns} repairs={repairs}/>}
           {view==="pos"      &&canAccess(session.role,"pos")&&<POSScreen products={products} filteredPOS={filteredPOS} cart={cart} posQ={posQ} setPosQ={setPosQ} payMethod={payMethod} setPayMethod={setPayMethod} payType={payType} setPayType={setPayType} cashIn={cashIn} setCashIn={setCashIn} initialPay={initialPay} setInitialPay={setInitialPay} clientName={clientName} setClientName={setClientName} selectedClientId={selectedClientId} setSelectedClientId={setSelectedClientId} saleNote={saleNote} setSaleNote={setSaleNote} cartTotal={cartTotal} vuelto={vuelto} initPaidVal={initPaidVal} addToCart={addToCart} changeQty={changeQty} removeFromCart={removeFromCart} applyDiscount={applyDiscount} checkout={checkout} resetPOS={resetPOS} flash={flash} clients={clients} accounts={accounts}/>}
           {view==="caja"     &&canAccess(session.role,"caja")&&<CajaScreen sales={sales} accounts={accounts} returns={returns}/>}
@@ -3422,7 +3440,7 @@ function RepairsScreen(props){
             })}
           </div>
 
-          <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:16,marginBottom:16}}>
+          <div className="form-grid-2" style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:16,marginBottom:16}}>
             <div style={{background:"#f9f8f5",borderRadius:8,padding:14}}>
               <p style={{fontSize:11,color:"#999",textTransform:"uppercase",letterSpacing:"0.8px",margin:"0 0 8px"}}>Cliente</p>
               <p style={{fontWeight:700,fontSize:15,margin:"0 0 2px"}}>{rep.clientName}</p>
@@ -3503,7 +3521,7 @@ function RepairsScreen(props){
 
           {/* Cliente */}
           <p style={{fontWeight:600,fontSize:13,color:"#555",margin:"0 0 10px",borderBottom:"1px solid #eee",paddingBottom:6}}>👤 Datos del cliente</p>
-          <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:12,marginBottom:14}}>
+          <div className="form-grid-2" style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:12,marginBottom:14}}>
             <div>
               <label style={sL}>Buscar cliente registrado</label>
               <div style={{position:"relative"}}>
@@ -3533,7 +3551,7 @@ function RepairsScreen(props){
 
           {/* Dispositivo */}
           <p style={{fontWeight:600,fontSize:13,color:"#555",margin:"0 0 10px",borderBottom:"1px solid #eee",paddingBottom:6}}>📱 Dispositivo</p>
-          <div style={{display:"grid",gridTemplateColumns:"1fr 1fr 1fr",gap:12,marginBottom:14}}>
+          <div className="form-grid-3" style={{display:"grid",gridTemplateColumns:"1fr 1fr 1fr",gap:12,marginBottom:14}}>
             <div>
               <label style={sL}>Marca</label>
               <select style={sI} value={fBrand} onChange={function(e){setFErr("");setFBrand(e.target.value);}}>
@@ -3553,7 +3571,7 @@ function RepairsScreen(props){
 
           {/* Problema y diagnóstico */}
           <p style={{fontWeight:600,fontSize:13,color:"#555",margin:"0 0 10px",borderBottom:"1px solid #eee",paddingBottom:6}}>🔍 Problema y diagnóstico</p>
-          <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:12,marginBottom:14}}>
+          <div className="form-grid-2" style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:12,marginBottom:14}}>
             <div>
               <label style={sL}>Problema reportado por el cliente *</label>
               <textarea style={Object.assign({},sI,{height:72,resize:"vertical"})} value={fProblem} placeholder="¿Qué le pasa al equipo según el cliente?"
@@ -3568,7 +3586,7 @@ function RepairsScreen(props){
 
           {/* Técnico, costo, fecha */}
           <p style={{fontWeight:600,fontSize:13,color:"#555",margin:"0 0 10px",borderBottom:"1px solid #eee",paddingBottom:6}}>⚙️ Asignación y costos</p>
-          <div style={{display:"grid",gridTemplateColumns:"1fr 1fr 1fr",gap:12,marginBottom:14}}>
+          <div className="form-grid-3" style={{display:"grid",gridTemplateColumns:"1fr 1fr 1fr",gap:12,marginBottom:14}}>
             <div>
               <label style={sL}>Técnico asignado</label>
               <input style={sI} value={fTech} placeholder={"Por defecto: "+session.name} onChange={function(e){setFTech(e.target.value);}}/>
@@ -3621,7 +3639,7 @@ function RepairsScreen(props){
       )}
 
       {/* MÉTRICAS */}
-      <div style={{display:"grid",gridTemplateColumns:"repeat(4,1fr)",gap:14,marginBottom:20}}>
+      <div className="rg-4" style={{display:"grid",gridTemplateColumns:"repeat(4,1fr)",gap:14,marginBottom:20}}>
         <MetricBox label="Activas" value={totalActivas} color="#378ADD"/>
         <MetricBox label="Listas para entregar" value={totalListas} color={TEAL}/>
         <MetricBox label="Entregadas" value={totalEntregadas} color="#666"/>
@@ -3892,7 +3910,7 @@ function CuadresScreen(props){
       </div>
 
       {/* Métricas principales */}
-      <div style={{display:"grid",gridTemplateColumns:"repeat(4,1fr)",gap:14,marginBottom:16}}>
+      <div className="rg-4" style={{display:"grid",gridTemplateColumns:"repeat(4,1fr)",gap:14,marginBottom:16}}>
         <MetricBox label="Ventas del período" value={periodSales.length} color="#378ADD"/>
         <MetricBox label="Ingresos ventas" value={Q(totalVentas)} color={TEAL}/>
         <MetricBox label="Abonos cobrados" value={Q(abonosPeriod)} color="#7F77DD"/>

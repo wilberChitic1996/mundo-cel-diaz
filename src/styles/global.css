@@ -221,7 +221,42 @@ img, video { max-width: 100%; display: block; }
   }
   .sidebar-mobile.open { transform: translateX(0) !important; }
   .mobile-header       { display: flex !important; }
-  .main-content        { padding: 60px 16px 16px !important; }
+  .main-content        { padding: 60px 12px 80px !important; }
+
+  /* Grillas responsivas */
+  .rg-4 { grid-template-columns: repeat(2,1fr) !important; }
+  .rg-3 { grid-template-columns: 1fr !important; }
+  .rg-2 { grid-template-columns: 1fr !important; }
+  .rg-2-1 { grid-template-columns: 1fr !important; }
+
+  /* Tablas con scroll horizontal */
+  .t-resp { overflow-x: auto; -webkit-overflow-scrolling: touch; }
+  .t-resp table { min-width: 600px; }
+
+  /* Scroll en todas las tablas en móvil */
+  .main-content table { display: block; overflow-x: auto; -webkit-overflow-scrolling: touch; max-width: 100%; }
+  .main-content table thead, .main-content table tbody, .main-content table tr { width: max-content; }
+  .main-content table th, .main-content table td { white-space: nowrap; }
+
+  /* Cards y formularios */
+  .form-grid-3 { grid-template-columns: 1fr !important; }
+  .form-grid-2 { grid-template-columns: 1fr !important; }
+
+  /* Botones touch-friendly */
+  button { min-height: 40px; }
+  input, select, textarea { min-height: 42px; font-size: 16px !important; }
+
+  /* Tipografía */
+  .h1-title { font-size: 18px !important; }
+}
+
+@media (min-width: 481px) and (max-width: 768px) {
+  .rg-4 { grid-template-columns: repeat(2,1fr) !important; }
+}
+
+@media (max-width: 480px) {
+  .rg-4 { grid-template-columns: repeat(2,1fr) !important; }
+  .main-content { padding: 56px 10px 70px !important; }
 }
 
 @media (min-width: 769px) {
