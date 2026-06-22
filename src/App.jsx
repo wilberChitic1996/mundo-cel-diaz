@@ -2882,7 +2882,7 @@ function App(props) {
           var normalProds = (prods||[]).map(function(p){return Object.assign({},p,{id:p.id,code:p.code,name:p.name,category:p.category||'',shelf:p.shelf||'',price:Number(p.price),cost:Number(p.cost),stock:Number(p.stock),unit:p.unit||'uni'});});
           var normalSales = (sls||[]).map(function(s){return Object.assign({},s,{items:s.sale_items||[],total:Number(s.total),date:s.created_at,registradoPor:s.registrado_por||null});});
           var normalAccs  = (accs||[]).map(function(a){return Object.assign({},a,{items:a.account_items||[],payments:(a.account_payments||[]).map(function(_pp){return Object.assign({},_pp,{date:_pp.date||_pp.created_at,amount:Number(_pp.amount),registradoPor:_pp.registrado_por||_pp.registradoPor||null});}),total:Number(a.total),paid:Number(a.paid),balance:Number(a.balance),date:a.created_at,registradoPor:a.registrado_por||null});});
-          var normalRets  = (rets||[]).map(function(r){return Object.assign({},r,{items:r.return_items||[],refundAmount:Number(r.refund_amount),itemCondition:r.item_condition,refundMethod:r.refund_method,date:r.created_at});});
+          var normalRets  = (rets||[]).map(function(r){return Object.assign({},r,{items:r.return_items||[],refundAmount:Number(r.refund_amount),itemCondition:r.item_condition,refundMethod:r.refund_method,date:r.created_at,saleId:r.sale_id||null});});
           var normalDefs  = (defs||[]).map(function(d){return Object.assign({},d,{price:Number(d.price||0)});});
           var normalClis  = (clis||[]).map(function(c){return Object.assign({},c,{cliCode:c.cli_code,createdAt:c.created_at});});
           var normalReps  = (reps||[]).map(function(r){return Object.assign({},r,{repCode:r.rep_code,clientId:r.client_id,clientName:r.client_name,clientPhone:r.client_phone,clientCli:r.client_cli,problemDesc:r.problem_desc,techName:r.tech_name,estimatedCost:Number(r.estimated_cost||0),promisedDate:r.promised_date,internalNote:r.internal_note,registradoPor:r.registrado_por||{},parts:r.parts||[],createdAt:r.created_at});});
@@ -3143,6 +3143,7 @@ function App(props) {
       try{
         await returnsAPI.create({
           client:data.client,
+          saleId:data.saleId||null,
           reason:data.reason,
           refundMethod:data.refundMethod,
           refundAmount:data.refundAmount,
@@ -3155,7 +3156,7 @@ function App(props) {
           defectivesAPI.getAll(),
           productsAPI.getAll(),
         ]);
-        setReturns((freshRets||[]).map(function(r){return Object.assign({},r,{items:r.return_items||[],refundAmount:Number(r.refund_amount),itemCondition:r.item_condition,refundMethod:r.refund_method,date:r.created_at});}));
+        setReturns((freshRets||[]).map(function(r){return Object.assign({},r,{items:r.return_items||[],refundAmount:Number(r.refund_amount),itemCondition:r.item_condition,refundMethod:r.refund_method,date:r.created_at,saleId:r.sale_id||null});}));
         setDefectives((freshDefs||[]).map(function(d){return Object.assign({},d,{price:Number(d.price||0)});}));
         setProducts((freshProds||[]).map(function(p){return Object.assign({},p,{price:Number(p.price),cost:Number(p.cost),stock:Number(p.stock)});}));
       }catch(e){
