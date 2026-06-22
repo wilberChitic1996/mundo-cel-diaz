@@ -65,13 +65,13 @@ y dime en qué quedamos. Luego pregúntame qué trabajamos hoy.
 - [x] Límite de descuentos por rol (cajero max 20%, admin sin límite) — error claro si se excede
 
 ### Prioridad ALTA — Funcionalidad de negocio
-- [ ] IVA configurable en boletas (tasa configurable desde settings)
-- [ ] Cuentas por cobrar con fecha de vencimiento + reporte de aging (30/60/90 días)
-- [ ] Garantías en ventas y reparaciones (meses, fecha expiración, alertas)
-- [ ] Rastro de auditoría (tabla audit_logs: quién cambió qué y cuándo)
+- [ ] IVA configurable en boletas (esperar hasta implementar facturación)
+- [ ] Cuentas por cobrar con fecha de vencimiento + reporte de aging (30/60/90 días) — pendiente consultar con cliente
+- [ ] Garantías en ventas y reparaciones — pendiente consultar con cliente
+- [ ] Rastro de auditoría (tabla audit_logs: quién cambió qué y cuándo) — pendiente
 
 ### Prioridad MEDIA — Crecimiento
-- [ ] Paginación en listas grandes (ventas, cuentas, historial)
+- [x] Paginación en listas grandes (historial 25/pág, cuentas 20/pág, clientes 20/pág, reparaciones 15/pág)
 - [ ] Soporte multisucursal (branch_id en todas las tablas)
 - [ ] Gestión de turnos de empleados
 - [ ] Comisiones por técnico en reparaciones
@@ -111,3 +111,13 @@ Vender el sistema como POS especializado para tiendas de celulares y reparacione
 - Validación de stock ANTES de registrar venta (si no hay stock suficiente, la venta se rechaza con mensaje claro)
 - Límite de descuento por rol en el backend: cajero tiene máximo 20%, admin sin límite
 - CONTEXT.md creado y mergeado a main para continuidad entre sesiones
+
+### Sesión 2 — 22 junio 2026
+**Lo que se hizo:**
+- **Fix descuento cajero**: backend ahora valida contra precio real en BD (no originalPrice del frontend) — a prueba de manipulación
+- **Fix UX checkout**: cuando el servidor rechaza una venta (descuento no autorizado, stock insuficiente) el frontend muestra mensaje en rojo y cancela. Antes lo guardaba localmente y "desaparecía" al recargar
+- **Subtítulo boletas**: cambiado de "Reparación y Venta de Celulares" a "Tecnología · Accesorios · Reparaciones · Guatemala"
+- **Dashboard mejorado**: gráfica de barras de ventas últimos 7 días + desglose por método de pago (Efectivo/Tarjeta/Transferencia/Mixto)
+- **Búsqueda global**: modal Ctrl+K que busca clientes, productos, ventas y reparaciones en tiempo real
+- **Paginación**: implementada en Historial (25/pág), Cuentas (20/pág), Clientes (20/pág), Reparaciones (15/pág)
+- **Diseño responsivo completo**: POS con tabs Productos/Carrito en móvil, grillas adaptables (rg-2/rg-3/rg-4), tablas con scroll horizontal, formularios en 1 columna, touch targets de 40-42px, tipografía fluida con clamp()
