@@ -61,8 +61,8 @@ y dime en qué quedamos. Luego pregúntame qué trabajamos hoy.
 ### Prioridad ALTA — Integridad de datos
 - [ ] Idempotency key en ventas (evitar ventas duplicadas si falla la red)
 - [ ] Atomicidad en venta + descuento de stock (todo o nada)
-- [ ] Verificar stock disponible justo antes de confirmar venta (evitar stock negativo)
-- [ ] Límite de descuentos por rol (cajero max 10%, admin max 30%) con aprobación
+- [x] Verificar stock disponible justo antes de confirmar venta (evitar stock negativo)
+- [x] Límite de descuentos por rol (cajero max 20%, admin sin límite) — error claro si se excede
 
 ### Prioridad ALTA — Funcionalidad de negocio
 - [ ] IVA configurable en boletas (tasa configurable desde settings)
@@ -105,3 +105,9 @@ Vender el sistema como POS especializado para tiendas de celulares y reparacione
 - PRs creados y mergeados en ambos repos
 - GitHub App de Claude instalada en la cuenta
 - Análisis profesional completo del sistema con roadmap
+
+### Sesión 1 (continuación) — 22 junio 2026
+**Lo que se hizo:**
+- Validación de stock ANTES de registrar venta (si no hay stock suficiente, la venta se rechaza con mensaje claro)
+- Límite de descuento por rol en el backend: cajero tiene máximo 20%, admin sin límite
+- CONTEXT.md creado y mergeado a main para continuidad entre sesiones
