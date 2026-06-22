@@ -3406,24 +3406,42 @@ function App(props) {
    MÓDULO AUDITORÍA
    ══════════════════════════════════════════════════════════════════════ */
 var AUDIT_ACTIONS = {
-  venta_completada: "Venta",
-  cuenta_creada:    "Cuenta por cobrar",
-  abono_registrado: "Abono",
-  producto_creado:  "Producto creado",
-  producto_editado: "Producto editado",
-  producto_eliminado:"Producto eliminado",
-  usuario_creado:   "Usuario creado",
-  usuario_editado:  "Usuario editado",
+  venta_completada:    "Venta",
+  cuenta_creada:       "Cuenta por cobrar",
+  abono_registrado:    "Abono",
+  producto_creado:     "Producto creado",
+  producto_editado:    "Producto editado",
+  producto_eliminado:  "Producto eliminado",
+  usuario_creado:      "Usuario creado",
+  usuario_editado:     "Usuario editado",
+  cliente_creado:      "Cliente creado",
+  cliente_editado:     "Cliente editado",
+  cliente_eliminado:   "Cliente eliminado",
+  reparacion_creada:   "Reparación creada",
+  reparacion_editada:  "Reparación editada",
+  reparacion_estado:   "Estado reparación",
+  reparacion_eliminada:"Reparación eliminada",
+  devolucion_registrada:"Devolución",
+  defectuoso_estado:   "Defectuoso actualizado",
 };
 var AUDIT_COLORS = {
-  venta_completada:  "teal",
-  cuenta_creada:     "blue",
-  abono_registrado:  "green",
-  producto_creado:   "purple",
-  producto_editado:  "amber",
-  producto_eliminado:"red",
-  usuario_creado:    "purple",
-  usuario_editado:   "amber",
+  venta_completada:    "teal",
+  cuenta_creada:       "blue",
+  abono_registrado:    "green",
+  producto_creado:     "purple",
+  producto_editado:    "amber",
+  producto_eliminado:  "red",
+  usuario_creado:      "purple",
+  usuario_editado:     "amber",
+  cliente_creado:      "teal",
+  cliente_editado:     "amber",
+  cliente_eliminado:   "red",
+  reparacion_creada:   "blue",
+  reparacion_editada:  "amber",
+  reparacion_estado:   "teal",
+  reparacion_eliminada:"red",
+  devolucion_registrada:"orange",
+  defectuoso_estado:   "gray",
 };
 
 function AuditScreen(props){
@@ -3474,6 +3492,10 @@ function AuditScreen(props){
               <option value="account">Cuentas</option>
               <option value="product">Productos</option>
               <option value="user">Usuarios</option>
+              <option value="client">Clientes</option>
+              <option value="repair">Reparaciones</option>
+              <option value="return">Devoluciones</option>
+              <option value="defective">Defectuosos</option>
             </select>
           </div>
           <div style={{flex:"1 1 150px"}}>
@@ -3510,22 +3532,29 @@ function AuditScreen(props){
                 var detailNode=null;
                 if(log.details){
                   var d=log.details;
-                  if(log.action==="venta_completada")detail="Cliente: "+(d.client||"")+" — Total: Q"+(Number(d.total||0).toFixed(2))+" — Método: "+(d.method||"");
-                  else if(log.action==="cuenta_creada")detail="Cliente: "+(d.client||"")+" — Total: Q"+(Number(d.total||0).toFixed(2));
-                  else if(log.action==="abono_registrado")detail="Monto: Q"+(Number(d.amount||0).toFixed(2))+" — Saldo restante: Q"+(Number(d.newBalance||0).toFixed(2))+" — Estado: "+(d.newStatus||"");
-                  else if(log.action==="producto_creado")detail=(d.name||"")+" — Código: "+(d.code||"")+" — Precio: Q"+(Number(d.price||0).toFixed(2))+" — Stock: "+(d.stock||0);
-                  else if(log.action==="usuario_creado")detail=(d.name||"")+" — "+(d.email||"")+" — Rol: "+(d.role||"");
-                  else if(log.action==="producto_editado"||log.action==="usuario_editado"){
-                    // Formato diff: { Campo: { antes: X, despues: Y }, _producto/_usuario: nombre }
-                    var nombre=d._producto||d._usuario||"";
+                  // Acciones con texto simple
+                  if(log.action==="venta_completada")detail=(d.cliente||d.client||"")+" — Q"+(Number(d.total||0).toFixed(2))+" — "+(d.metodo||d.method||"")+(d.articulos?" — "+d.articulos:"");
+                  else if(log.action==="cuenta_creada")detail=(d.cliente||d.client||"")+" — Q"+(Number(d.total||0).toFixed(2))+(d.abono_inicial?" — Abono: Q"+Number(d.abono_inicial).toFixed(2):"")+(d.articulos?" — "+d.articulos:"");
+                  else if(log.action==="abono_registrado")detail="Q"+(Number(d.amount||0).toFixed(2))+" ("+( d.method||"Efectivo")+") — Saldo: Q"+(Number(d.newBalance||0).toFixed(2))+" — "+( d.newStatus||"");
+                  else if(log.action==="producto_creado")detail=(d.name||"")+" ["+( d.code||"")+"] — Q"+(Number(d.price||0).toFixed(2))+" — Stock: "+(d.stock||0);
+                  else if(log.action==="producto_eliminado")detail=(d.nombre||"")+" ["+(d.codigo||"")+"]";
+                  else if(log.action==="usuario_creado")detail=(d.name||"")+" — "+(d.email||"")+" — "+(d.role||"");
+                  else if(log.action==="cliente_creado")detail=(d.nombre||"")+" ["+(d.codigo||"")+"]"+(d.telefono&&d.telefono!=="—"?" — Tel: "+d.telefono:"");
+                  else if(log.action==="cliente_eliminado")detail=(d.nombre||"")+" ["+(d.codigo||"")+"]";
+                  else if(log.action==="reparacion_creada")detail="["+(d.codigo||"")+"] "+(d.cliente||"")+" — "+(d.equipo||"")+" — "+(d.problema||"")+(d.tecnico&&d.tecnico!=="—"?" — Técnico: "+d.tecnico:"");
+                  else if(log.action==="reparacion_eliminada")detail="["+(d.codigo||"")+"] "+(d.cliente||"")+" — "+(d.equipo||"");
+                  else if(log.action==="devolucion_registrada")detail=(d.cliente||"")+" — Motivo: "+(d.motivo||"")+" — Condición: "+(d.condicion||"")+(d.reembolso_monto?" — Reembolso: Q"+Number(d.reembolso_monto).toFixed(2):"")+(d.articulos?" — "+d.articulos:"");
+                  // Acciones con diff (antes → después)
+                  else if(["producto_editado","usuario_editado","cliente_editado","reparacion_editada","reparacion_estado","defectuoso_estado"].includes(log.action)){
+                    var nombre=d._producto||d._usuario||d._cliente||d._reparacion||d._articulo||"";
                     var cambios=Object.keys(d).filter(function(k){return k[0]!=="_"&&d[k]&&typeof d[k]==="object"&&d[k].antes!==undefined;});
                     if(cambios.length===0){detail=nombre||"Sin cambios";}
                     else{
-                      detailNode=React.createElement("div",{style:{lineHeight:1.6}},
+                      detailNode=React.createElement("div",{style:{lineHeight:1.7}},
                         nombre?React.createElement("div",{style:{fontWeight:700,marginBottom:4,color:"var(--text-primary,#222)"}},nombre):null,
                         cambios.map(function(campo){
                           return React.createElement("div",{key:campo,style:{display:"flex",gap:6,alignItems:"center",flexWrap:"wrap"}},
-                            React.createElement("span",{style:{fontWeight:600,color:"var(--text-secondary,#666)",minWidth:80}},campo+":"),
+                            React.createElement("span",{style:{fontWeight:600,color:"var(--text-secondary,#666)",minWidth:90}},campo+":"),
                             React.createElement("span",{style:{background:"#FDECEA",color:"#791F1F",borderRadius:4,padding:"1px 6px",fontSize:11}},String(d[campo].antes)),
                             React.createElement("span",{style:{color:"var(--text-secondary,#999)"}},"→"),
                             React.createElement("span",{style:{background:"#EAF3DE",color:"#27500A",borderRadius:4,padding:"1px 6px",fontSize:11}},String(d[campo].despues))
