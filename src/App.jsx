@@ -2176,6 +2176,22 @@ function ProductsScreen(props) {
   var _e=useState(null); var editProd=_e[0]; var setEditProd=_e[1];
   var _im=useState(false); var importing=_im[0]; var setImporting=_im[1];
   var _imMsg=useState(""); var importMsg=_imMsg[0]; var setImportMsg=_imMsg[1];
+  var _ph=useState(null); var priceHistProd=_ph[0]; var setPriceHistProd=_ph[1];
+  var _phd=useState([]); var priceHistData=_phd[0]; var setPriceHistData=_phd[1];
+  var _phl=useState(false); var priceHistLoading=_phl[0]; var setPriceHistLoading=_phl[1];
+
+  function openPriceHist(p){
+    setPriceHistProd(p);
+    setPriceHistData([]);
+    setPriceHistLoading(true);
+    productsAPI.priceHistory(p.id).then(function(data){
+      setPriceHistData(data||[]);
+      setPriceHistLoading(false);
+    }).catch(function(){
+      setPriceHistData([]);
+      setPriceHistLoading(false);
+    });
+  }
 
   function handleImportExcel(file){
     if(!file) return;
@@ -2274,6 +2290,7 @@ function ProductsScreen(props) {
                     <td style={sTD}>
                       <div style={{display:"flex",gap:6}}>
                         <button style={Object.assign({},mB("blue"),{padding:"4px 10px",fontSize:12})} onClick={function(){setEditProd(Object.assign({},p));}}>✏</button>
+                        <button style={Object.assign({},mB("purple"),{padding:"4px 10px",fontSize:12})} onClick={function(){openPriceHist(p);}}>📈</button>
                         <button style={Object.assign({},mB("red"),{padding:"4px 10px",fontSize:12})} onClick={function(){if(window.confirm('¿Eliminar "'+p.name+'"? Esta acción no se puede deshacer.')){deleteProduct(p.id);}}}>🗑</button>
                       </div>
                     </td>
@@ -2284,6 +2301,48 @@ function ProductsScreen(props) {
             </tbody>
           </table>
         </div>
+        {priceHistProd&&(
+          <div style={{position:"fixed",top:0,left:0,width:"100%",height:"100%",background:"rgba(0,0,0,0.5)",zIndex:1000,display:"flex",alignItems:"center",justifyContent:"center",padding:16,boxSizing:"border-box"}}>
+            <div style={{background:"#fff",borderRadius:16,padding:"28px 24px",maxWidth:580,width:"100%",maxHeight:"85vh",overflowY:"auto",boxShadow:"0 20px 60px rgba(0,0,0,0.3)"}}>
+              <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start",marginBottom:20}}>
+                <div>
+                  <p style={{fontWeight:700,fontSize:16,margin:"0 0 4px"}}>📈 Historial de precios</p>
+                  <p style={{fontSize:13,color:"#666",margin:0}}>{priceHistProd.name} <span style={{fontFamily:"monospace",fontSize:11,color:"#999"}}>({priceHistProd.code})</span></p>
+                </div>
+                <button style={mB("gray")} onClick={function(){setPriceHistProd(null);}}>✕ Cerrar</button>
+              </div>
+              <div style={{background:"#f8f8f6",borderRadius:10,padding:"12px 16px",marginBottom:16,display:"flex",justifyContent:"space-between"}}>
+                <span style={{fontSize:13,color:"#666"}}>Precio actual</span>
+                <span style={{fontSize:16,fontWeight:700,color:TEAL}}>{Q(priceHistProd.price)}</span>
+              </div>
+              {priceHistLoading?(
+                <p style={{textAlign:"center",color:"#999",padding:24}}>Cargando...</p>
+              ):priceHistData.length===0?(
+                <p style={{textAlign:"center",color:"#999",padding:24}}>Sin cambios de precio registrados.<br/><span style={{fontSize:12}}>Los cambios quedan registrados a partir de ahora.</span></p>
+              ):(
+                <table style={{width:"100%",borderCollapse:"collapse"}}>
+                  <thead><tr>{["Fecha","Precio anterior","Precio nuevo","Cambio","Usuario"].map(function(h){return <th key={h} style={sTH}>{h}</th>;})}</tr></thead>
+                  <tbody>
+                  {priceHistData.map(function(r,i){
+                    var diff=Number(r.after)-Number(r.before);
+                    var pct=Number(r.before)>0?Math.round(diff/Number(r.before)*100):0;
+                    var up=diff>0;
+                    return (
+                      <tr key={i}>
+                        <td style={Object.assign({},sTD,{fontSize:12})}>{fmtD(r.date)}<br/><span style={{color:"#999",fontSize:11}}>{fmtT(r.date)}</span></td>
+                        <td style={Object.assign({},sTD,{color:"#666"})}>{Q(r.before)}</td>
+                        <td style={Object.assign({},sTD,{fontWeight:600,color:TEAL})}>{Q(r.after)}</td>
+                        <td style={sTD}><span style={mBg(diff===0?"gray":up?"green":"red")}>{up?"+":""}{pct}%</span></td>
+                        <td style={Object.assign({},sTD,{fontSize:12})}>{r.user||"—"}<br/><span style={Object.assign({},mBg(r.role==="admin"?"teal":"blue"),{fontSize:10})}>{ROLE_LABEL[r.role]||r.role||""}</span></td>
+                      </tr>
+                    );
+                  })}
+                  </tbody>
+                </table>
+              )}
+            </div>
+          </div>
+        )}
       </div>
   );
 }

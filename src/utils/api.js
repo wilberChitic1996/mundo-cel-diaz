@@ -56,10 +56,11 @@ export const authAPI = {
 
 // ── Productos ─────────────────────────────────────────
 export const productsAPI = {
-  getAll:  function()      { return api.get('/products'); },
-  create:  function(data)  { return api.post('/products', data); },
-  update:  function(id, d) { return api.put('/products/' + id, d); },
-  remove:  function(id)    { return api.delete('/products/' + id); },
+  getAll:       function()      { return api.get('/products'); },
+  create:       function(data)  { return api.post('/products', data); },
+  update:       function(id, d) { return api.put('/products/' + id, d); },
+  remove:       function(id)    { return api.delete('/products/' + id); },
+  priceHistory: function(id)    { return api.get('/products/' + id + '/price-history'); },
 };
 
 // ── Ventas ────────────────────────────────────────────
