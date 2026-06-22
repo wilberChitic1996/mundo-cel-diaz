@@ -111,6 +111,14 @@ export const repairsAPI = {
   remove:       function(id)          { return api.delete('/repairs/' + id); },
 };
 
+// ── Auditoría ─────────────────────────────────────────
+export const auditAPI = {
+  getAll: function(params) {
+    var qs = params ? ('?' + Object.keys(params).filter(function(k){ return params[k]; }).map(function(k){ return k + '=' + encodeURIComponent(params[k]); }).join('&')) : '';
+    return api.get('/audit' + qs);
+  },
+};
+
 // ── Health check ──────────────────────────────────────
 export const checkAPI = async function() {
   try {
