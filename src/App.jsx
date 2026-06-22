@@ -673,23 +673,26 @@ var THEME_CSS = `
 class ErrorBoundary extends React.Component {
   constructor(props){
     super(props);
-    this.state={hasError:false,error:null};
+    this.state={hasError:false,error:null,stack:""};
   }
   static getDerivedStateFromError(error){
     return {hasError:true,error:error};
   }
   componentDidCatch(error,info){
     console.error("[ErrorBoundary]",error,info);
+    this.setState({stack:(info&&info.componentStack)||""});
   }
   render(){
     if(this.state.hasError){
+      var msg=this.state.error?((this.state.error.message||String(this.state.error))+(this.state.error.stack?("\n\n"+this.state.error.stack):"")):"Error desconocido";
       return (
-        <div style={{minHeight:"100vh",display:"flex",alignItems:"center",justifyContent:"center",background:"#f5f4f0"}}>
-          <div style={{background:"#fff",borderRadius:16,padding:"36px 40px",maxWidth:460,width:"90%",textAlign:"center",boxShadow:"0 8px 32px rgba(0,0,0,0.12)"}}>
+        <div style={{minHeight:"100vh",display:"flex",alignItems:"center",justifyContent:"center",background:"#f5f4f0",padding:16,boxSizing:"border-box"}}>
+          <div style={{background:"#fff",borderRadius:16,padding:"28px 24px",maxWidth:520,width:"100%",textAlign:"center",boxShadow:"0 8px 32px rgba(0,0,0,0.12)"}}>
             <div style={{fontSize:48,marginBottom:12}}>⚠️</div>
             <p style={{fontSize:18,fontWeight:700,margin:"0 0 8px",color:"#1a1a1a"}}>Ocurrió un error inesperado</p>
-            <p style={{fontSize:13,color:"#666",margin:"0 0 24px",lineHeight:1.6}}>La pantalla no pudo cargarse correctamente. Podés intentar recargar la página.</p>
-            <button onClick={function(){window.location.reload();}} style={{padding:"12px 28px",borderRadius:8,border:"none",background:"#1D9E75",color:"#fff",fontSize:14,cursor:"pointer",fontWeight:700}}>
+            <p style={{fontSize:13,color:"#666",margin:"0 0 16px",lineHeight:1.6}}>Tomá una captura de este recuadro y enviála para corregirlo:</p>
+            <pre style={{textAlign:"left",background:"#1e1e1e",color:"#ff8a80",fontSize:11,lineHeight:1.5,padding:12,borderRadius:8,overflow:"auto",maxHeight:240,whiteSpace:"pre-wrap",wordBreak:"break-word"}}>{msg}{this.state.stack?("\n--- componentes ---"+this.state.stack):""}</pre>
+            <button onClick={function(){window.location.reload();}} style={{marginTop:16,padding:"12px 28px",borderRadius:8,border:"none",background:"#1D9E75",color:"#fff",fontSize:14,cursor:"pointer",fontWeight:700}}>
               🔄 Recargar página
             </button>
           </div>
