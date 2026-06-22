@@ -1057,9 +1057,9 @@ function POSScreen(props) {
     setShowDrop(true);
   }
 
-  var FC={ok:"#EAF3DE",warn:"#FAEEDA"};
-  var FT={ok:"#27500A",warn:"#633806"};
-  var FB={ok:"#97C459",warn:"#EF9F27"};
+  var FC={ok:"#EAF3DE",warn:"#FAEEDA",err:"#FDECEA"};
+  var FT={ok:"#27500A",warn:"#633806",err:"#7B1010"};
+  var FB={ok:"#97C459",warn:"#EF9F27",err:"#E53935"};
   return (
       <div>
         <p style={H1}>🛒 Nueva Venta</p>
@@ -2668,12 +2668,19 @@ function App(props) {
     function deduct(){ setProducts(function(p){return p.map(function(x){var ci=cart.find(function(i){return i.id===x.id;});return ci&&x.unit!=="serv"?Object.assign({},x,{stock:x.stock-ci.qty}):x;}); }); }
     if(payType==="completo"){
       if(isOnline){
+        var ok=false;
         try {
           await salesAPI.create({client:client,total:cartTotal,method:payMethod,items:cart});
           var freshSales = await salesAPI.getAll();
           var ns = (freshSales||[]).map(function(s){return Object.assign({},s,{items:s.sale_items||[],total:Number(s.total),date:s.created_at,registradoPor:s.registrado_por||null});});
           setSales(ns);
-        } catch(e){ console.warn("Error API venta:",e); setSales(function(p){return [Object.assign({},base)].concat(p);}); }
+          ok=true;
+        } catch(e){
+          var errMsg=e&&e.error?e.error:null;
+          if(errMsg){showFlash("⛔ "+errMsg,"err");return;}
+          console.warn("Error API venta:",e); setSales(function(p){return [Object.assign({},base)].concat(p);}); ok=true;
+        }
+        if(!ok)return;
       } else {
         setSales(function(p){return [Object.assign({},base)].concat(p);});
       }
@@ -2685,15 +2692,21 @@ function App(props) {
       var status=balance<=0?"pagado":paid>0?"parcial":"pendiente";
       var pmts=paid>0?[{id:gid(),date:new Date().toISOString(),amount:paid,method:payMethod,note:"Abono inicial",registradoPor:registradoPor}]:[];
       if(isOnline){
+        var ok2=false;
         try{
           await salesAPI.create({client:client,total:cartTotal,method:payMethod,items:cart,payType:payType,initialPay:paid});
           var freshAccs = await accountsAPI.getAll();
           var na=(freshAccs||[]).map(function(a){return Object.assign({},a,{items:a.account_items||[],payments:(a.account_payments||[]).map(function(_pp){return Object.assign({},_pp,{date:_pp.date||_pp.created_at,amount:Number(_pp.amount),registradoPor:_pp.registrado_por||_pp.registradoPor||null});}),total:Number(a.total),paid:Number(a.paid),balance:Number(a.balance),date:a.created_at,registradoPor:a.registrado_por||null});});
           setAccounts(na);
+          ok2=true;
         }catch(e){
+          var errMsg2=e&&e.error?e.error:null;
+          if(errMsg2){showFlash("⛔ "+errMsg2,"err");return;}
           console.warn("Error API cuenta:",e);
           setAccounts(function(p){return [Object.assign({},base,{paid:paid,balance:balance,status:status,payments:pmts})].concat(p);});
+          ok2=true;
         }
+        if(!ok2)return;
       } else {
         setAccounts(function(p){return [Object.assign({},base,{paid:paid,balance:balance,status:status,payments:pmts})].concat(p);});
       }
