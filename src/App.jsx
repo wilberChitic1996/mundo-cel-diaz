@@ -783,6 +783,24 @@ function DashboardScreen(props) {
   var todayRev=todaySales.reduce(function(s,x){return s+x.total;},0);
   var todayStr=new Date().toDateString();
 
+  // Ventas últimos 7 días
+  var DIAS=["Dom","Lun","Mar","Mié","Jue","Vie","Sáb"];
+  var last7=Array.from({length:7},function(_,i){
+    var d=new Date(); d.setDate(d.getDate()-(6-i)); d.setHours(0,0,0,0);
+    var dStr=d.toDateString();
+    var rev=sales.filter(function(s){return new Date(s.date).toDateString()===dStr;}).reduce(function(acc,s){return acc+s.total;},0);
+    var cnt=sales.filter(function(s){return new Date(s.date).toDateString()===dStr;}).length;
+    return {label:DIAS[d.getDay()],date:d,rev:rev,cnt:cnt,isToday:dStr===todayStr};
+  });
+  var maxRev=Math.max.apply(null,last7.map(function(d){return d.rev;})) || 1;
+
+  // Desglose por método de pago (todas las ventas + abonos)
+  var metodosMap={};
+  sales.forEach(function(s){ metodosMap[s.method]=(metodosMap[s.method]||0)+s.total; });
+  var metodos=Object.keys(metodosMap).map(function(m){return {name:m,total:metodosMap[m]};}).sort(function(a,b){return b.total-a.total;});
+  var metodoColors={"Efectivo":"#1D9E75","Tarjeta":"#378ADD","Transferencia":"#7C4DFF","Mixto":"#E65100"};
+  var totalMetodos=metodos.reduce(function(s,m){return s+m.total;},0)||1;
+
   var cajaDia=todaySales.filter(function(s){return s.method==="Efectivo";}).reduce(function(s,x){return s+x.total;},0);
   var returnsDia=returns.filter(function(r){return new Date(r.date).toDateString()===todayStr&&r.refundMethod==="Efectivo"&&r.refundAmount>0;}).reduce(function(s,r){return s+r.refundAmount;},0);
   var saldoCaja=cajaDia-returnsDia;
@@ -837,6 +855,46 @@ function DashboardScreen(props) {
             <p style={{fontSize:12,color:"#666",margin:"0 0 6px"}}>📦 Stock bajo mínimo</p>
             <p style={{fontSize:26,fontWeight:700,margin:0,color:stockAlertas.length>0?"#E65100":"#999"}}>{stockAlertas.length}</p>
             {stockAlertas.length>0&&<p style={{fontSize:11,color:"#E65100",margin:"4px 0 0"}}>{stockAlertas.slice(0,2).map(function(p){return p.name;}).join(", ")}{stockAlertas.length>2?"...":""}</p>}
+          </div>
+        </div>
+
+        {/* Gráfica ventas últimos 7 días + métodos de pago */}
+        <div style={{display:"grid",gridTemplateColumns:"2fr 1fr",gap:14,marginBottom:16}}>
+          <div style={sC}>
+            <p style={{fontWeight:600,margin:"0 0 16px",fontSize:15}}>📈 Ventas últimos 7 días</p>
+            <div style={{display:"flex",alignItems:"flex-end",gap:8,height:110}}>
+              {last7.map(function(d,i){
+                var h=maxRev>0?Math.round((d.rev/maxRev)*90):0;
+                var color=d.isToday?TEAL:"#A8D5C2";
+                return (
+                  <div key={i} style={{flex:1,display:"flex",flexDirection:"column",alignItems:"center",gap:4}}>
+                    {d.rev>0&&<span style={{fontSize:9,color:"#666",whiteSpace:"nowrap"}}>{"Q"+Math.round(d.rev)}</span>}
+                    <div style={{width:"100%",height:h||3,background:color,borderRadius:"4px 4px 0 0",minHeight:3,transition:"height 0.3s"}}/>
+                    <span style={{fontSize:10,color:d.isToday?TEAL:"#999",fontWeight:d.isToday?700:400}}>{d.label}</span>
+                    {d.cnt>0&&<span style={{fontSize:9,color:"#bbb"}}>{d.cnt}v</span>}
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+          <div style={sC}>
+            <p style={{fontWeight:600,margin:"0 0 14px",fontSize:15}}>💰 Por método</p>
+            {metodos.length===0?<p style={{color:"#999",fontSize:13}}>Sin ventas aún</p>:metodos.map(function(m,i){
+              var pct=Math.round(m.total/totalMetodos*100);
+              var color=metodoColors[m.name]||"#888";
+              return (
+                <div key={i} style={{marginBottom:10}}>
+                  <div style={{display:"flex",justifyContent:"space-between",fontSize:12,marginBottom:3}}>
+                    <span style={{color:"#555"}}>{m.name}</span>
+                    <span style={{fontWeight:600,color:color}}>{pct}%</span>
+                  </div>
+                  <div style={{background:"#eee",borderRadius:4,height:6}}>
+                    <div style={{width:pct+"%",height:6,background:color,borderRadius:4,transition:"width 0.4s"}}/>
+                  </div>
+                  <div style={{fontSize:10,color:"#999",marginTop:2}}>{Q(m.total)}</div>
+                </div>
+              );
+            })}
           </div>
         </div>
 
