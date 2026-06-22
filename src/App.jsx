@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react';
 import * as XLSX from 'xlsx';
+import html2canvas from 'html2canvas';
 import { db } from './utils/db.js';
 import { authAPI, productsAPI, salesAPI, accountsAPI, returnsAPI, defectivesAPI, usersAPI, checkAPI, clientsAPI, repairsAPI, auditAPI } from './utils/api.js';
 
@@ -36,13 +37,106 @@ function abrirWA(tel, mensaje){
   var url=t
     ?"https://wa.me/"+t+"?text="+encodeURIComponent(mensaje)
     :"https://wa.me/?text="+encodeURIComponent(mensaje);
-  window.open(url,"_blank","noopener");
+  var a=document.createElement("a");
+  a.href=url; a.target="_blank"; a.rel="noopener noreferrer";
+  document.body.appendChild(a); a.click(); document.body.removeChild(a);
 }
-function pedirTelYEnviar(nombre, mensaje, onTelSaved){
+function pedirTelYEnviar(nombre, getMensaje, opts){
   var tel=window.prompt("📱 Número de WhatsApp de "+nombre+"\n(8 dígitos Guatemala, ej: 55551234)\nDejar vacío para abrir sin número:");
-  if(tel===null)return; // canceló
-  if(onTelSaved&&tel.trim())onTelSaved(tel.trim());
-  abrirWA(tel.trim(), mensaje);
+  if(tel===null)return;
+  compartirWhatsApp(tel.trim(), getMensaje, opts);
+}
+
+// Genera el HTML del recibo (versión simplificada para captura)
+function buildReceiptHTML(sale, opts){
+  opts=opts||{};
+  var items=(sale.items||[]).map(function(it){
+    return '<tr>'+
+      '<td style="padding:8px 10px;border-bottom:1px solid #eee;font-size:12px;font-weight:600;">'+it.name+'</td>'+
+      '<td style="padding:8px 10px;border-bottom:1px solid #eee;text-align:center;font-size:12px;">'+it.qty+'</td>'+
+      '<td style="padding:8px 10px;border-bottom:1px solid #eee;text-align:right;font-size:12px;">Q '+Number(it.price).toFixed(2)+'</td>'+
+      '<td style="padding:8px 10px;border-bottom:1px solid #eee;text-align:right;font-size:12px;font-weight:700;">Q '+Number(it.price*it.qty).toFixed(2)+'</td>'+
+    '</tr>';
+  }).join("");
+  var fecha=new Date(sale.date||sale.created_at).toLocaleDateString("es-GT",{day:"2-digit",month:"long",year:"numeric"});
+  var hora=new Date(sale.date||sale.created_at).toLocaleTimeString("es-GT",{hour:"2-digit",minute:"2-digit"});
+  var estadoHTML="";
+  if(opts.estado==="pendiente")estadoHTML='<div style="text-align:center;padding:8px;margin-bottom:14px;background:#FCEBEB;color:#791F1F;border-radius:6px;font-weight:900;font-size:15px;letter-spacing:2px;">PENDIENTE DE PAGO</div>';
+  else if(opts.estado==="parcial")estadoHTML='<div style="text-align:center;padding:8px;margin-bottom:14px;background:#FAEEDA;color:#633806;border-radius:6px;font-weight:900;font-size:15px;letter-spacing:2px;">ABONO — SALDO PENDIENTE</div>';
+  else if(opts.estado==="pagado")estadoHTML='<div style="text-align:center;padding:8px;margin-bottom:14px;background:#EAF3DE;color:#27500A;border-radius:6px;font-weight:900;font-size:15px;letter-spacing:2px;">✓ CUENTA CANCELADA</div>';
+  var saldoHTML="";
+  if(opts.estado&&opts.estado!=="")saldoHTML='<tr style="background:#f0f9f5;"><td colspan="3" style="padding:8px 10px;font-weight:700;font-size:13px;">Abonado</td><td style="padding:8px 10px;text-align:right;font-weight:700;font-size:13px;color:#1D9E75;">Q '+Number(opts.pagado||sale.paid||0).toFixed(2)+'</td></tr>'+
+    '<tr style="background:#fff0f0;"><td colspan="3" style="padding:8px 10px;font-weight:900;font-size:14px;">Saldo pendiente</td><td style="padding:8px 10px;text-align:right;font-weight:900;font-size:14px;color:#E24B4A;">Q '+Number(opts.saldo||sale.balance||0).toFixed(2)+'</td></tr>';
+  return '<!DOCTYPE html><html><head><meta charset="UTF-8">'+
+    '<style>*{margin:0;padding:0;box-sizing:border-box;}body{font-family:Arial,sans-serif;font-size:12px;background:#fff;width:600px;padding:24px;}'+
+    '.hdr{border-bottom:3px solid #1D9E75;padding-bottom:12px;margin-bottom:16px;display:flex;justify-content:space-between;align-items:flex-start;}'+
+    '.brand h1{font-size:20px;font-weight:900;color:#1a2535;}.brand p{font-size:9px;color:#1D9E75;font-weight:700;letter-spacing:2px;margin-top:2px;}'+
+    '.brand .sub{font-size:9px;color:#999;font-weight:400;letter-spacing:0;margin-top:3px;}'+
+    '.num-doc{text-align:right;}.num-doc .lbl{font-size:9px;color:#999;text-transform:uppercase;}.num-doc .n{font-size:20px;font-weight:900;color:#1D9E75;}'+
+    '.info{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:16px;padding:12px;background:#f8f9fa;border-radius:8px;border-left:4px solid #1D9E75;}'+
+    '.ib .lbl{font-size:9px;color:#999;text-transform:uppercase;letter-spacing:0.8px;margin-bottom:3px;}.ib .val{font-size:12px;font-weight:700;color:#222;}'+
+    'table{width:100%;border-collapse:collapse;margin-bottom:12px;}thead{background:#1a2535;}thead th{padding:8px 10px;color:#fff;font-size:10px;font-weight:700;text-transform:uppercase;}'+
+    'tbody tr:nth-child(even){background:#f9f9f9;}'+
+    '.total-row{display:flex;justify-content:flex-end;margin-bottom:16px;}.total-box{border:1px solid #eee;border-radius:8px;overflow:hidden;min-width:220px;}'+
+    '.tr{display:flex;justify-content:space-between;padding:7px 12px;font-size:12px;border-bottom:1px solid #eee;}.tr:last-child{background:#1D9E75;color:#fff;font-weight:700;font-size:14px;border-bottom:none;}'+
+    '.footer{border-top:2px dashed #ccc;padding-top:12px;font-size:10px;color:#999;display:flex;justify-content:space-between;}'+
+    '.gracias{text-align:center;margin-top:16px;font-size:13px;color:#1D9E75;font-weight:700;letter-spacing:1px;}'+
+    '</style></head><body>'+
+    '<div class="hdr"><div class="brand"><h1>MUNDO CEL DIAZ</h1><p>SISTEMA DE GESTIÓN</p><p class="sub">Tecnología · Accesorios · Reparaciones · Guatemala</p></div>'+
+    '<div class="num-doc"><div class="lbl">'+(opts.estado?"Comprobante de Cuenta":"Comprobante de Venta")+'</div><div class="n"># '+String(sale.id||"").toUpperCase().slice(-8)+'</div></div></div>'+
+    estadoHTML+
+    '<div class="info">'+
+      '<div class="ib"><div class="lbl">Cliente</div><div class="val">'+sale.client+'</div></div>'+
+      '<div class="ib"><div class="lbl">Fecha</div><div class="val">'+fecha+'</div><div style="font-size:10px;color:#666;">'+hora+' hrs</div></div>'+
+      '<div class="ib"><div class="lbl">Método</div><div class="val">'+(sale.method||"Efectivo")+'</div></div>'+
+      '<div class="ib"><div class="lbl">Atendido por</div><div class="val">'+((sale.registradoPor&&sale.registradoPor.name)||opts.usuario||"—")+'</div></div>'+
+    '</div>'+
+    '<table><thead><tr><th style="text-align:left;">Producto</th><th style="text-align:center;">Cant.</th><th style="text-align:right;">Precio</th><th style="text-align:right;">Subtotal</th></tr></thead>'+
+    '<tbody>'+items+saldoHTML+'</tbody></table>'+
+    '<div class="total-row"><div class="total-box"><div class="tr"><span>Total</span><span>Q '+Number(sale.total).toFixed(2)+'</span></div></div></div>'+
+    '<div class="footer"><span>Generado por MUNDO CEL DIAZ POS</span><span>'+fecha+' · '+hora+'</span></div>'+
+    '<div class="gracias">¡Gracias por su compra! 🙏</div>'+
+    '</body></html>';
+}
+
+async function compartirWhatsApp(tel, getMensaje, opts){
+  opts=opts||{};
+  var sale=opts.sale;
+  var mensaje=getMensaje();
+  // Intentar generar imagen del recibo
+  if(sale){
+    try{
+      var htmlStr=buildReceiptHTML(sale, opts.receiptOpts||{});
+      // Renderizar en iframe oculto
+      var iframe=document.createElement("iframe");
+      iframe.style.cssText="position:fixed;left:-9999px;top:0;width:650px;height:900px;border:none;background:#fff;";
+      document.body.appendChild(iframe);
+      iframe.contentDocument.open();
+      iframe.contentDocument.write(htmlStr);
+      iframe.contentDocument.close();
+      await new Promise(function(r){setTimeout(r,600);});
+      var canvas=await html2canvas(iframe.contentDocument.body,{scale:2,useCORS:true,backgroundColor:"#ffffff",width:650});
+      document.body.removeChild(iframe);
+      // Convertir a blob
+      var blob=await new Promise(function(r){canvas.toBlob(r,"image/png",0.95);});
+      var file=new File([blob],"boleta-mundoceldiaz.png",{type:"image/png"});
+      // Intentar Web Share API (funciona en móvil)
+      if(navigator.share&&navigator.canShare&&navigator.canShare({files:[file]})){
+        await navigator.share({files:[file],title:"Boleta MUNDO CEL DIAZ",text:mensaje});
+        return;
+      }
+      // Fallback desktop: descargar imagen
+      var imgUrl=URL.createObjectURL(blob);
+      var a=document.createElement("a");
+      a.href=imgUrl; a.download="boleta-mundoceldiaz.png"; document.body.appendChild(a); a.click();
+      document.body.removeChild(a);
+      setTimeout(function(){URL.revokeObjectURL(imgUrl);},5000);
+    }catch(err){
+      console.warn("[WA] html2canvas falló:",err);
+    }
+  }
+  // Siempre abrir WhatsApp con texto (con o sin imagen)
+  abrirWA(tel, mensaje);
 }
 const Q    = function(n){ return "Q " + Number(n).toFixed(2); };
 const fmtD = function(d){ return new Date(d).toLocaleDateString("es-GT",{day:"2-digit",month:"short",year:"numeric"}); };
@@ -1495,8 +1589,9 @@ function AccountsScreen(props) {
             <button style={mB("gray")} onClick={function(){setSelAcc(null);setPmtAmount("");setPmtNote("");setPmtErr("");}}>← Volver</button>
             <button style={mB("teal")} onClick={function(){printVoucher(acc,{estado:acc.status==="pagado"?"pagado":acc.status==="parcial"?"parcial":"pendiente",pagado:acc.paid,saldo:acc.balance,usuario:session.name,usuarioRole:session.role,products:products,payments:acc.payments});}}>🖨 Imprimir constancia</button>
             {acc.status!=="pagado"&&<button style={Object.assign({},mB("green"),{background:"#25D366"})} onClick={function(){
-              var msg=waRecordatorio(acc);
-              if(accTel){abrirWA(accTel,msg);}else{pedirTelYEnviar(acc.client,msg,null);}
+              var getMsj=function(){return waRecordatorio(acc);};
+              var waopts={sale:acc,receiptOpts:{estado:acc.status,pagado:acc.paid,saldo:acc.balance}};
+              if(accTel){compartirWhatsApp(accTel,getMsj,waopts);}else{pedirTelYEnviar(acc.client,getMsj,waopts);}
             }}>💬 Recordatorio WhatsApp</button>}
           </div>
           <div style={sC}>
@@ -1612,8 +1707,9 @@ function AccountsScreen(props) {
                             {a.status!=="pagado"&&<button style={Object.assign({},mB("green"),{background:"#25D366",padding:"4px 10px",fontSize:11})} onClick={function(e){
                               e.stopPropagation();
                               var tel=(props.clients&&props.clients.find(function(c){return c.id===a.clientId;})||{}).phone||"";
-                              var msg=waRecordatorio(a);
-                              if(tel){abrirWA(tel,msg);}else{pedirTelYEnviar(a.client,msg,null);}
+                              var getMsj=function(){return waRecordatorio(a);};
+                              var waopts={sale:a,receiptOpts:{estado:a.status,pagado:a.paid,saldo:a.balance}};
+                              if(tel){compartirWhatsApp(tel,getMsj,waopts);}else{pedirTelYEnviar(a.client,getMsj,waopts);}
                             }}>💬</button>}
                           </div>
                         </td>
@@ -2288,9 +2384,10 @@ function HistoryScreen(props) {
             <button style={mB("gray")} onClick={function(){setSelectedSale(null);}}>← Volver</button>
             <button style={mB("teal")} onClick={function(){printVoucher(selectedSale,{usuario:session.name,usuarioRole:session.role,products:products});}}>🖨 Imprimir / PDF</button>
             <button style={Object.assign({},mB("green"),{background:"#25D366"})} onClick={function(){
-              var tel=selectedSale.clientPhone||(selectedSale.clientId&&props.clients&&(props.clients.find(function(c){return c.id===selectedSale.clientId;})||{}).phone)||"";
-              var msg=waBoletaVenta(selectedSale);
-              if(tel){abrirWA(tel,msg);}else{pedirTelYEnviar(selectedSale.client,msg,null);}
+              var tel=selectedSale.clientPhone||(selectedSale.clientId&&(clients.find(function(c){return c.id===selectedSale.clientId;})||{}).phone)||"";
+              var getMsj=function(){return waBoletaVenta(selectedSale);};
+              var waopts={sale:selectedSale,receiptOpts:{usuario:session.name,usuarioRole:session.role}};
+              if(tel){compartirWhatsApp(tel,getMsj,waopts);}else{pedirTelYEnviar(selectedSale.client,getMsj,waopts);}
             }}>💬 WhatsApp</button>
           </div>
           <div style={sC}>
@@ -2405,8 +2502,9 @@ function HistoryScreen(props) {
                               {m.kind==="sale"&&<button style={Object.assign({},mB("green"),{background:"#25D366",padding:"4px 10px",fontSize:11})} onClick={function(e){
                                 e.stopPropagation();
                                 var tel=(clients.find(function(c){return c.id===m.obj.clientId;})||{}).phone||"";
-                                var msg=waBoletaVenta(m.obj);
-                                if(tel){abrirWA(tel,msg);}else{pedirTelYEnviar(m.obj.client,msg,null);}
+                                var getMsj=function(){return waBoletaVenta(m.obj);};
+                                var waopts={sale:m.obj,receiptOpts:{}};
+                                if(tel){compartirWhatsApp(tel,getMsj,waopts);}else{pedirTelYEnviar(m.obj.client,getMsj,waopts);}
                               }}>💬</button>}
                             </div>}
                         </td>
