@@ -4100,32 +4100,64 @@ function CuadresScreen(props){
   // Ventas del período
   var periodSales=sales.filter(function(s){return inRange(s.date);});
 
-  // Ingresos por método
-  var byMethod={Efectivo:0,Tarjeta:0,Transferencia:0};
-  periodSales.forEach(function(s){if(byMethod[s.method]!==undefined)byMethod[s.method]+=s.total;else byMethod["Transferencia"]+=s.total;});
+  // Ingresos por método (ventas completas)
+  var byMethod={Efectivo:0,Tarjeta:0,Transferencia:0,Mixto:0};
+  periodSales.forEach(function(s){
+    if(byMethod[s.method]!==undefined) byMethod[s.method]+=s.total;
+    else byMethod["Transferencia"]+=s.total;
+  });
 
-  // Abonos cobrados en el período (pagos sobre cuentas)
-  var abonosPeriod=0;
-  var abonosEfectivo=0;
+  // Abonos cobrados en el período, desglosados por método
+  var abonosPeriod=0, abonosEfectivo=0, abonosTarjeta=0, abonosTransferencia=0;
   accounts.forEach(function(a){
     (a.payments||[]).forEach(function(p){
       if(inRange(p.date)){
-        abonosPeriod+=p.amount;
-        if(p.method==="Efectivo") abonosEfectivo+=p.amount;
+        var amt=Number(p.amount||0);
+        abonosPeriod+=amt;
+        if(p.method==="Efectivo") abonosEfectivo+=amt;
+        else if(p.method==="Tarjeta") abonosTarjeta+=amt;
+        else abonosTransferencia+=amt;
       }
     });
   });
 
-  // Reembolsos del período
-  var reembolsosPeriod=returns.filter(function(r){return inRange(r.date)&&r.refundAmount>0;}).reduce(function(s,r){return s+r.refundAmount;},0);
-  var reembolsosEfectivo=returns.filter(function(r){return inRange(r.date)&&r.refundMethod==="Efectivo"&&r.refundAmount>0;}).reduce(function(s,r){return s+r.refundAmount;},0);
+  // Devoluciones del período
+  var retsPeriod=returns.filter(function(r){return inRange(r.date);});
+  var reembolsosPeriod=0, reembolsosEfectivo=0, reembolsosTarjeta=0, reembolsosTransferencia=0, reembolsosCreditoCuenta=0;
+  retsPeriod.forEach(function(r){
+    var amt=Number(r.refundAmount||0);
+    if(amt<=0) return;
+    reembolsosPeriod+=amt;
+    if(r.refundMethod==="Efectivo")           reembolsosEfectivo+=amt;
+    else if(r.refundMethod==="Tarjeta")       reembolsosTarjeta+=amt;
+    else if(r.refundMethod==="Crédito en cuenta") reembolsosCreditoCuenta+=amt;
+    else                                       reembolsosTransferencia+=amt;
+  });
+  // Devoluciones sin reembolso (solo cambio o sin dinero)
+  var sinReembolso=retsPeriod.filter(function(r){return !r.refundAmount||r.refundAmount<=0||r.refundMethod==="Sin reembolso";}).length;
+  // Reembolsos parciales: artículos devueltos donde lo reembolsado < total artículos
+  var diferenciaReembolsos=retsPeriod.filter(function(r){return r.refundAmount>0&&r.total>r.refundAmount;}).reduce(function(s,r){return s+(r.total-r.refundAmount);},0);
+  // Artículos defectuosos (no regresan a inventario)
+  var retsDefectuosas=retsPeriod.filter(function(r){return r.itemCondition==="defectuoso";});
 
-  // Totales
+  // Totales netos
   var totalVentas=periodSales.reduce(function(s,x){return s+x.total;},0);
+  // Reembolsos que salen de caja (no crédito en cuenta)
+  var reembolsosCaja=reembolsosPeriod-reembolsosCreditoCuenta;
+  // Neto efectivo: ventas efectivo + abonos efectivo - reembolsos efectivo
   var totalEfectivo=byMethod.Efectivo+abonosEfectivo-reembolsosEfectivo;
-  var totalIngresos=totalVentas+abonosPeriod;
+  // Total tarjeta neto
+  var totalTarjeta=byMethod.Tarjeta+abonosTarjeta-reembolsosTarjeta;
+  // Total transferencia neto
+  var totalTransferencia=byMethod.Transferencia+abonosTransferencia-reembolsosTransferencia;
+  // Total ingresado bruto
+  var totalIngresosBruto=totalVentas+abonosPeriod;
+  // Total ingresado neto (resta lo que realmente salió de caja)
+  var totalIngresosNeto=totalIngresosBruto-reembolsosCaja;
+  // Usar neto como valor principal del header
+  var totalIngresos=totalIngresosNeto;
 
-  // Costo y ganancia bruta
+  // Costo y ganancia bruta — descuenta costo de artículos defectuosos devueltos
   var costoVentas=0;
   periodSales.forEach(function(s){
     s.items.forEach(function(it){
@@ -4133,7 +4165,15 @@ function CuadresScreen(props){
       if(prod&&prod.cost>0) costoVentas+=prod.cost*it.qty;
     });
   });
-  var gananciaBruta=totalVentas-costoVentas;
+  // Recuperamos el costo de los artículos devueltos en buen estado (regresan a inventario)
+  var costoRecuperado=0;
+  retsPeriod.filter(function(r){return r.itemCondition!=="defectuoso";}).forEach(function(r){
+    (r.items||[]).forEach(function(it){
+      var prod=products.find(function(p){return p.code===it.code;});
+      if(prod&&prod.cost>0) costoRecuperado+=prod.cost*it.qty;
+    });
+  });
+  var gananciaBruta=totalVentas-reembolsosCaja-costoVentas+costoRecuperado;
 
   // Reparaciones activas
   var repActivas=repairs.filter(function(r){return r.status!=="entregado";}).length;
@@ -4181,33 +4221,42 @@ function CuadresScreen(props){
       '</div>'+
     '</div>'+
 
-    '<div class="section"><div class="section-title">📊 Resumen de ventas</div>'+
+    '<div class="section"><div class="section-title">📊 Resumen de ingresos</div>'+
     '<div class="grid4">'+
-      '<div class="metric"><div class="lbl">Total ventas</div><div class="val">'+periodSales.length+'</div></div>'+
-      '<div class="metric"><div class="lbl">Ingresos ventas</div><div class="val">Q '+totalVentas.toFixed(2)+'</div></div>'+
+      '<div class="metric"><div class="lbl">Transacciones</div><div class="val">'+periodSales.length+'</div></div>'+
+      '<div class="metric"><div class="lbl">Ventas brutas</div><div class="val">Q '+totalVentas.toFixed(2)+'</div></div>'+
       '<div class="metric"><div class="lbl">Abonos cobrados</div><div class="val">Q '+abonosPeriod.toFixed(2)+'</div></div>'+
-      '<div class="metric"><div class="lbl">Total ingresado</div><div class="val">Q '+totalIngresos.toFixed(2)+'</div></div>'+
+      '<div class="metric" style="border-left-color:#2E7D32;"><div class="lbl">Ingresos netos</div><div class="val" style="color:#2E7D32;">Q '+totalIngresosNeto.toFixed(2)+'</div></div>'+
     '</div></div>'+
 
-    '<div class="section"><div class="section-title">💵 Por método de pago</div>'+
+    '<div class="section"><div class="section-title">💵 Por método de pago (neto)</div>'+
     '<div class="grid3">'+
-      '<div class="metric"><div class="lbl">Efectivo (neto)</div><div class="val">Q '+totalEfectivo.toFixed(2)+'</div></div>'+
-      '<div class="metric navy"><div class="lbl">Tarjeta</div><div class="val">Q '+byMethod.Tarjeta.toFixed(2)+'</div></div>'+
-      '<div class="metric gray"><div class="lbl">Transferencia</div><div class="val">Q '+byMethod.Transferencia.toFixed(2)+'</div></div>'+
+      '<div class="metric"><div class="lbl">Efectivo neto</div><div class="val">Q '+totalEfectivo.toFixed(2)+'</div>'+
+        '<div style="font-size:10px;color:#999;margin-top:4px;">+ventas Q'+byMethod.Efectivo.toFixed(2)+' +abonos Q'+abonosEfectivo.toFixed(2)+' −reemb. Q'+reembolsosEfectivo.toFixed(2)+'</div></div>'+
+      '<div class="metric navy"><div class="lbl">Tarjeta neto</div><div class="val">Q '+totalTarjeta.toFixed(2)+'</div>'+
+        '<div style="font-size:10px;color:#999;margin-top:4px;">+ventas Q'+byMethod.Tarjeta.toFixed(2)+' +abonos Q'+abonosTarjeta.toFixed(2)+' −reemb. Q'+reembolsosTarjeta.toFixed(2)+'</div></div>'+
+      '<div class="metric gray"><div class="lbl">Transferencia neto</div><div class="val">Q '+totalTransferencia.toFixed(2)+'</div>'+
+        '<div style="font-size:10px;color:#999;margin-top:4px;">+ventas Q'+byMethod.Transferencia.toFixed(2)+' +abonos Q'+abonosTransferencia.toFixed(2)+' −reemb. Q'+reembolsosTransferencia.toFixed(2)+'</div></div>'+
     '</div></div>'+
 
     (costoVentas>0?'<div class="section"><div class="section-title">📉 Costos y ganancia bruta</div>'+
-    '<div class="grid3">'+
+    '<div class="grid4">'+
       '<div class="metric"><div class="lbl">Ventas brutas</div><div class="val">Q '+totalVentas.toFixed(2)+'</div></div>'+
       '<div class="metric red"><div class="lbl">Costo productos</div><div class="val">Q '+costoVentas.toFixed(2)+'</div></div>'+
+      '<div class="metric red"><div class="lbl">Reembolsos salida</div><div class="val">Q '+reembolsosCaja.toFixed(2)+'</div></div>'+
       '<div class="metric" style="border-left-color:#2E7D32;"><div class="lbl">Ganancia bruta</div><div class="val" style="color:#2E7D32;">Q '+gananciaBruta.toFixed(2)+'</div></div>'+
     '</div></div>':'')+
 
-    (reembolsosPeriod>0?'<div class="section"><div class="section-title">🔄 Reembolsos del período</div>'+
-    '<div class="grid3">'+
+    (retsPeriod.length>0?'<div class="section"><div class="section-title">🔄 Devoluciones del período</div>'+
+    '<div class="grid4">'+
       '<div class="metric red"><div class="lbl">Total reembolsado</div><div class="val">Q '+reembolsosPeriod.toFixed(2)+'</div></div>'+
       '<div class="metric red"><div class="lbl">Reemb. en efectivo</div><div class="val">Q '+reembolsosEfectivo.toFixed(2)+'</div></div>'+
-      '<div class="metric gray"><div class="lbl">Devoluciones</div><div class="val">'+returns.filter(function(r){return inRange(r.date);}).length+'</div></div>'+
+      (reembolsosTarjeta>0?'<div class="metric red"><div class="lbl">Reemb. en tarjeta</div><div class="val">Q '+reembolsosTarjeta.toFixed(2)+'</div></div>':'')+
+      (reembolsosCreditoCuenta>0?'<div class="metric gray"><div class="lbl">Crédito en cuenta</div><div class="val">Q '+reembolsosCreditoCuenta.toFixed(2)+'</div><div style="font-size:10px;color:#999;margin-top:3px;">Saldo a favor del cliente — no sale de caja</div></div>':'')+
+      (diferenciaReembolsos>0?'<div class="metric" style="border-left-color:#F59E0B;"><div class="lbl">Reembolsos parciales (diferencia retenida)</div><div class="val" style="color:#D97706;">Q '+diferenciaReembolsos.toFixed(2)+'</div></div>':'')+
+      (sinReembolso>0?'<div class="metric gray"><div class="lbl">Sin reembolso</div><div class="val">'+sinReembolso+'</div></div>':'')+
+      '<div class="metric gray"><div class="lbl">Buen estado (reingresado)</div><div class="val">'+(retsPeriod.length-retsDefectuosas.length)+'</div></div>'+
+      (retsDefectuosas.length>0?'<div class="metric red"><div class="lbl">Defectuosos (baja)</div><div class="val">'+retsDefectuosas.length+'</div></div>':'')+
     '</div></div>':'')+
 
     (top5.length>0?'<div class="section"><div class="section-title">🏆 Más vendidos del período</div>'+
@@ -4271,30 +4320,37 @@ function CuadresScreen(props){
       {/* Métricas principales */}
       <div className="rg-4" style={{display:"grid",gridTemplateColumns:"repeat(4,1fr)",gap:14,marginBottom:16}}>
         <MetricBox label="Ventas del período" value={periodSales.length} color="#378ADD"/>
-        <MetricBox label="Ingresos ventas" value={Q(totalVentas)} color={TEAL}/>
+        <MetricBox label="Ventas brutas" value={Q(totalVentas)} color={TEAL}/>
         <MetricBox label="Abonos cobrados" value={Q(abonosPeriod)} color="#7F77DD"/>
-        <MetricBox label="Reembolsos" value={Q(reembolsosPeriod)} color="#E24B4A"/>
+        <MetricBox label="Reembolsos salida" value={Q(reembolsosCaja)} color="#E24B4A"/>
       </div>
 
       {/* Por método */}
-      <div style={{display:"grid",gridTemplateColumns:"1fr 1fr 2fr",gap:14,marginBottom:16}}>
+      <div style={{display:"grid",gridTemplateColumns:"1fr 1fr 1fr",gap:14,marginBottom:16}}>
         <div style={sC}>
-          <p style={{fontSize:11,color:"#999",textTransform:"uppercase",margin:"0 0 8px"}}>💵 Saldo caja efectivo</p>
+          <p style={{fontSize:11,color:"#999",textTransform:"uppercase",margin:"0 0 8px"}}>💵 Efectivo neto</p>
           <p style={{fontSize:26,fontWeight:800,color:totalEfectivo>=0?TEAL:"#E24B4A",margin:0}}>Q {totalEfectivo.toFixed(2)}</p>
-          <p style={{fontSize:11,color:"#999",margin:"4px 0 0"}}>Ventas + abonos − reembolsos en efectivo</p>
+          <p style={{fontSize:11,color:"#999",margin:"4px 0 0"}}>Ventas Q{byMethod.Efectivo.toFixed(2)} + abonos Q{abonosEfectivo.toFixed(2)} − reemb. Q{reembolsosEfectivo.toFixed(2)}</p>
         </div>
         <div style={sC}>
-          <p style={{fontSize:11,color:"#999",textTransform:"uppercase",margin:"0 0 8px"}}>💳 Tarjeta + Transferencia</p>
-          <p style={{fontSize:26,fontWeight:800,color:"#378ADD",margin:0}}>Q {(byMethod.Tarjeta+byMethod.Transferencia).toFixed(2)}</p>
-          <p style={{fontSize:11,color:"#999",margin:"4px 0 0"}}>Tarjeta: Q {byMethod.Tarjeta.toFixed(2)} · Trans: Q {byMethod.Transferencia.toFixed(2)}</p>
+          <p style={{fontSize:11,color:"#999",textTransform:"uppercase",margin:"0 0 8px"}}>💳 Tarjeta neto</p>
+          <p style={{fontSize:26,fontWeight:800,color:"#378ADD",margin:0}}>Q {totalTarjeta.toFixed(2)}</p>
+          <p style={{fontSize:11,color:"#999",margin:"4px 0 0"}}>Ventas Q{byMethod.Tarjeta.toFixed(2)} + abonos Q{abonosTarjeta.toFixed(2)} − reemb. Q{reembolsosTarjeta.toFixed(2)}</p>
+        </div>
+        <div style={sC}>
+          <p style={{fontSize:11,color:"#999",textTransform:"uppercase",margin:"0 0 8px"}}>🏦 Transferencia neto</p>
+          <p style={{fontSize:26,fontWeight:800,color:"#555",margin:0}}>Q {totalTransferencia.toFixed(2)}</p>
+          <p style={{fontSize:11,color:"#999",margin:"4px 0 0"}}>Ventas Q{byMethod.Transferencia.toFixed(2)} + abonos Q{abonosTransferencia.toFixed(2)} − reemb. Q{reembolsosTransferencia.toFixed(2)}</p>
         </div>
         {costoVentas>0?(
           <div style={sC}>
             <p style={{fontSize:11,color:"#999",textTransform:"uppercase",margin:"0 0 10px"}}>📉 Ganancia bruta estimada</p>
-            <div style={{display:"flex",gap:16,alignItems:"center"}}>
+            <div style={{display:"flex",gap:12,alignItems:"center",flexWrap:"wrap"}}>
               <div><p style={{fontSize:11,color:"#999",margin:"0 0 2px"}}>Ventas</p><p style={{fontWeight:700,color:TEAL}}>Q {totalVentas.toFixed(2)}</p></div>
               <span style={{color:"#E24B4A",fontSize:18}}>−</span>
               <div><p style={{fontSize:11,color:"#999",margin:"0 0 2px"}}>Costo</p><p style={{fontWeight:700,color:"#E24B4A"}}>Q {costoVentas.toFixed(2)}</p></div>
+              <span style={{color:"#E24B4A",fontSize:18}}>−</span>
+              <div><p style={{fontSize:11,color:"#999",margin:"0 0 2px"}}>Reembolsos</p><p style={{fontWeight:700,color:"#E24B4A"}}>Q {reembolsosCaja.toFixed(2)}</p></div>
               <span style={{color:"#2E7D32",fontSize:18}}>=</span>
               <div><p style={{fontSize:11,color:"#999",margin:"0 0 2px"}}>Ganancia</p><p style={{fontWeight:800,fontSize:18,color:"#2E7D32"}}>Q {gananciaBruta.toFixed(2)}</p></div>
             </div>
@@ -4304,6 +4360,19 @@ function CuadresScreen(props){
             <p style={{fontSize:11,color:"#999",textTransform:"uppercase",margin:"0 0 8px"}}>🔧 Reparaciones activas</p>
             <p style={{fontSize:26,fontWeight:800,color:"#378ADD",margin:0}}>{repActivas}</p>
             <p style={{fontSize:11,color:repListas>0?TEAL:"#999",margin:"4px 0 0"}}>{repListas>0?"✅ "+repListas+" listas para entregar":"Sin órdenes listas aún"}</p>
+          </div>
+        )}
+        {retsPeriod.length>0&&(
+          <div style={sC}>
+            <p style={{fontSize:11,color:"#999",textTransform:"uppercase",margin:"0 0 10px"}}>🔄 Resumen devoluciones</p>
+            <div style={{display:"flex",flexDirection:"column",gap:6,fontSize:13}}>
+              <div style={{display:"flex",justifyContent:"space-between"}}><span style={{color:"#666"}}>Total devuelto</span><span style={{fontWeight:700,color:"#E24B4A"}}>Q {reembolsosPeriod.toFixed(2)}</span></div>
+              {reembolsosCreditoCuenta>0&&<div style={{display:"flex",justifyContent:"space-between"}}><span style={{color:"#666"}}>Crédito en cuenta (no sale de caja)</span><span style={{fontWeight:700,color:"#F59E0B"}}>Q {reembolsosCreditoCuenta.toFixed(2)}</span></div>}
+              {diferenciaReembolsos>0&&<div style={{display:"flex",justifyContent:"space-between"}}><span style={{color:"#666"}}>Reembolsos parciales — diferencia retenida</span><span style={{fontWeight:700,color:"#2E7D32"}}>Q {diferenciaReembolsos.toFixed(2)}</span></div>}
+              <div style={{display:"flex",justifyContent:"space-between"}}><span style={{color:"#666"}}>Artículos buen estado (reingresados)</span><span style={{fontWeight:700}}>{retsPeriod.length-retsDefectuosas.length}</span></div>
+              {retsDefectuosas.length>0&&<div style={{display:"flex",justifyContent:"space-between"}}><span style={{color:"#666"}}>Artículos defectuosos (baja)</span><span style={{fontWeight:700,color:"#E24B4A"}}>{retsDefectuosas.length}</span></div>}
+              {sinReembolso>0&&<div style={{display:"flex",justifyContent:"space-between"}}><span style={{color:"#666"}}>Sin reembolso</span><span style={{fontWeight:700,color:"#999"}}>{sinReembolso}</span></div>}
+            </div>
           </div>
         )}
       </div>
