@@ -3207,6 +3207,21 @@ function HistoryScreen(props) {
   var accounts=props.accounts||[]; var returns=props.returns||[]; var products=props.products||[]; var session=props.session||{}; var clients=props.clients||[];
   var _hf=useState("todos"); var hfilter=_hf[0]; var setHfilter=_hf[1];
   var _ho=useState("desc"); var horder=_ho[0]; var setHorder=_ho[1];
+  var _hrng=useState("todos"); var hRango=_hrng[0]; var setHRango=_hrng[1];
+  var _hdf=useState(""); var hDateFrom=_hdf[0]; var setHDateFrom=_hdf[1];
+  var _hdt=useState(""); var hDateTo=_hdt[0]; var setHDateTo=_hdt[1];
+
+  var hNow=new Date();
+  function hInRange(dateStr){
+    if(hRango==="todos") return true;
+    var d=new Date(dateStr);
+    if(hRango==="hoy") return d.toDateString()===hNow.toDateString();
+    if(hRango==="semana"){ var ws=new Date(hNow); ws.setDate(hNow.getDate()-hNow.getDay()); ws.setHours(0,0,0,0); return d>=ws&&d<=hNow; }
+    if(hRango==="mes") return d.getMonth()===hNow.getMonth()&&d.getFullYear()===hNow.getFullYear();
+    if(hRango==="mes_ant"){ var pm=hNow.getMonth()===0?11:hNow.getMonth()-1; var py=hNow.getMonth()===0?hNow.getFullYear()-1:hNow.getFullYear(); return d.getMonth()===pm&&d.getFullYear()===py; }
+    if(hRango==="custom"&&hDateFrom&&hDateTo){ var f=new Date(hDateFrom+"T00:00:00"); var t=new Date(hDateTo+"T23:59:59"); return d>=f&&d<=t; }
+    return true;
+  }
 
   var movs=[];
   sales.forEach(function(s){movs.push({k:"v"+s.id,date:s.date,tipo:"Venta",color:"teal",cliente:s.client,metodo:s.method,atendio:(s.registradoPor&&s.registradoPor.name)?s.registradoPor.name:(session.name||"—"),monto:Number(s.total),signo:1,kind:"sale",obj:s});});
@@ -3222,7 +3237,10 @@ function HistoryScreen(props) {
   });
   returns.forEach(function(r){if(Number(r.refundAmount)>0){movs.push({k:"r"+r.id,date:r.date,tipo:"Devolucion",color:"red",cliente:r.client,metodo:r.refundMethod,atendio:(r.registradoPor&&r.registradoPor.name)?r.registradoPor.name:"—",monto:Number(r.refundAmount),signo:-1,kind:"devolucion",obj:r});}});
   movs.sort(function(a,b){return horder==="desc"?(new Date(b.date)-new Date(a.date)):(new Date(a.date)-new Date(b.date));});
-  var fmovs=hfilter==="todos"?movs:movs.filter(function(m){return m.kind===hfilter;});
+  var fmovs=movs.filter(function(m){
+    if(hfilter!=="todos"&&m.kind!==hfilter) return false;
+    return hInRange(m.date);
+  });
   var histPag=usePaginator(fmovs,25);
 
   if(selectedSale){
@@ -3314,7 +3332,21 @@ function HistoryScreen(props) {
           <MetricBox label="Movimientos totales" value={movs.length} color="#378ADD"/>
         </div>
         <div style={Object.assign({},sC,{marginBottom:14})}>
-          <div style={{display:"flex",gap:8,flexWrap:"wrap",alignItems:"center",justifyContent:"space-between"}}>
+          {/* Filtro por período */}
+          <div style={{marginBottom:12}}>
+            <p style={{fontSize:12,fontWeight:600,color:"#888",margin:"0 0 8px",textTransform:"uppercase",letterSpacing:"0.5px"}}>📅 Período</p>
+            <div style={{display:"flex",gap:8,flexWrap:"wrap"}}>
+              {[["todos","Todos"],["hoy","Hoy"],["semana","Esta semana"],["mes","Este mes"],["mes_ant","Mes anterior"],["custom","Personalizado"]].map(function(pair){
+                return <button key={pair[0]} style={Object.assign({},mB(hRango===pair[0]?"teal":"gray"),{padding:"5px 12px",fontSize:12})} onClick={function(){setHRango(pair[0]);}}>{pair[1]}</button>;
+              })}
+            </div>
+            {hRango==="custom"&&<div style={{display:"flex",gap:12,alignItems:"center",marginTop:10,flexWrap:"wrap"}}>
+              <div><label style={{fontSize:12,color:"#666",display:"block",marginBottom:3}}>Desde</label><input type="date" style={Object.assign({},sI,{width:155,fontSize:13})} value={hDateFrom} onChange={function(e){setHDateFrom(e.target.value);}}/></div>
+              <div><label style={{fontSize:12,color:"#666",display:"block",marginBottom:3}}>Hasta</label><input type="date" style={Object.assign({},sI,{width:155,fontSize:13})} value={hDateTo} onChange={function(e){setHDateTo(e.target.value);}}/></div>
+            </div>}
+          </div>
+          {/* Filtro por tipo + orden */}
+          <div style={{display:"flex",gap:8,flexWrap:"wrap",alignItems:"center",justifyContent:"space-between",paddingTop:10,borderTop:"1px solid #f0ede8"}}>
             <div style={{display:"flex",gap:8,flexWrap:"wrap"}}>
               {hfilters.map(function(pair){
                 return <button key={pair[0]} style={Object.assign({},mB(hfilter===pair[0]?"teal":"gray"),{padding:"6px 14px"})} onClick={function(){setHfilter(pair[0]);}}>{pair[1]}</button>;
@@ -6242,10 +6274,26 @@ function CuadresScreen(props){
   var repActivas=repairs.filter(function(r){return r.status!=="entregado";}).length;
   var repListas=repairs.filter(function(r){return r.status==="listo";}).length;
 
-  // Más vendidos del período
+  // Más vendidos del período (por unidades)
   var qtyMap={};
   periodSales.forEach(function(s){(s.items||[]).forEach(function(it){qtyMap[it.name]=(qtyMap[it.name]||0)+it.qty;});});
   var top5=Object.keys(qtyMap).map(function(k){return [k,qtyMap[k]];}).sort(function(a,b){return b[1]-a[1];}).slice(0,5);
+
+  // Más rentables del período (por ganancia generada = (precio-costo)*qty)
+  var profitMap={};
+  periodSales.forEach(function(s){
+    (s.items||[]).forEach(function(it){
+      var prod=products.find(function(p){return p.id===it.id||p.code===it.code;});
+      var cost=prod&&prod.cost>0?prod.cost:0;
+      var profit=(Number(it.price||0)-cost)*Number(it.qty||0);
+      if(!profitMap[it.name]) profitMap[it.name]={name:it.name,qty:0,revenue:0,profit:0};
+      profitMap[it.name].qty+=Number(it.qty||0);
+      profitMap[it.name].revenue+=Number(it.price||0)*Number(it.qty||0);
+      profitMap[it.name].profit+=profit;
+    });
+  });
+  var topProfitable=Object.values(profitMap).sort(function(a,b){return b.profit-a.profit;}).slice(0,5);
+  var margenPct=costoVentas>0?Math.round((gananciaBruta/totalVentas)*100):null;
 
   function printCuadre(){
     var _si=getStore(); var _sn=_si.store_name||"MUNDO CEL DIAZ";
@@ -6441,43 +6489,75 @@ function CuadresScreen(props){
         )}
       </div>
 
-      {/* Top 5 + Detalle ventas */}
-      <div style={{display:"grid",gridTemplateColumns:"1fr 2fr",gap:16}}>
+      {/* Margen global */}
+      {margenPct!==null&&<div style={{background:"linear-gradient(135deg,#0d6e4a 0%,#1D9E75 100%)",borderRadius:12,padding:"14px 20px",marginBottom:16,display:"flex",alignItems:"center",justifyContent:"space-between",flexWrap:"wrap",gap:12}}>
+        <div>
+          <p style={{color:"rgba(255,255,255,0.6)",fontSize:11,textTransform:"uppercase",letterSpacing:1,margin:0}}>Margen bruto del período</p>
+          <p style={{color:"#fff",fontSize:13,margin:"4px 0 0"}}>Ventas <b>Q{totalVentas.toFixed(2)}</b> − Costo <b>Q{costoVentas.toFixed(2)}</b> − Reembolsos <b>Q{reembolsosCaja.toFixed(2)}</b></p>
+        </div>
+        <div style={{textAlign:"right"}}>
+          <p style={{color:"#fff",fontWeight:800,fontSize:32,margin:0,lineHeight:1}}>{margenPct}%</p>
+          <p style={{color:"rgba(255,255,255,0.7)",fontSize:12,margin:"2px 0 0"}}>Ganancia Q{gananciaBruta.toFixed(2)}</p>
+        </div>
+      </div>}
+
+      {/* Top más vendidos + Top más rentables + Detalle */}
+      <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:16,marginBottom:16}}>
         <div style={sC}>
-          <p style={{fontWeight:600,fontSize:14,margin:"0 0 12px"}}>🏆 Más vendidos</p>
+          <p style={{fontWeight:700,fontSize:14,margin:"0 0 12px",color:NAVY}}>🏆 Más vendidos <span style={{fontWeight:400,color:"#999",fontSize:12}}>(unidades)</span></p>
           {top5.length===0?<p style={{color:"#999",fontSize:13}}>Sin ventas en el período</p>:
             top5.map(function(item,i){return (
-              <div key={i} style={{display:"flex",justifyContent:"space-between",padding:"7px 0",borderBottom:"1px solid rgba(0,0,0,0.06)",fontSize:13}}>
+              <div key={i} style={{display:"flex",justifyContent:"space-between",alignItems:"center",padding:"7px 0",borderBottom:"1px solid rgba(0,0,0,0.06)",fontSize:13}}>
                 <span style={{color:"#666"}}><b style={{color:TEAL,marginRight:6}}>{i+1}.</b>{item[0]}</span>
-                <span style={{fontWeight:700,color:TEAL}}>{item[1]} uds</span>
+                <span style={{fontWeight:700,color:TEAL,background:"#f0fdf8",padding:"2px 8px",borderRadius:6}}>{item[1]} uds</span>
               </div>
             );}
           )}
         </div>
         <div style={sC}>
-          <p style={{fontWeight:600,fontSize:14,margin:"0 0 12px"}}>📋 Ventas del período <span style={{fontWeight:400,color:"#999",fontSize:12}}>({periodSales.length})</span></p>
-          {periodSales.length===0?<p style={{color:"#999",fontSize:13,padding:"20px 0",textAlign:"center"}}>Sin ventas en el período seleccionado</p>:(
-            <div style={{maxHeight:280,overflowY:"auto"}}>
-              <table style={{width:"100%",borderCollapse:"collapse"}}>
-                <thead><tr>{["Fecha","Hora","Cliente","Método","Total"].map(function(h){return <th key={h} style={sTH}>{h}</th>;})}</tr></thead>
-                <tbody>
-                  {periodSales.slice().sort(function(a,b){return new Date(b.date)-new Date(a.date);}).map(function(s){
-                    return <tr key={s.id}>
-                      <td style={sTD}>{fmtD(s.date)}</td>
-                      <td style={sTD}>{fmtT(s.date)}</td>
-                      <td style={Object.assign({},sTD,{fontWeight:500})}>{s.client}</td>
-                      <td style={sTD}><span style={mBg("teal")}>{s.method}</span></td>
-                      <td style={Object.assign({},sTD,{fontWeight:700,color:TEAL})}>{Q(s.total)}</td>
-                    </tr>;
-                  })}
-                </tbody>
-              </table>
-              <div style={{borderTop:"2px solid rgba(0,0,0,0.1)",marginTop:8,paddingTop:8,textAlign:"right",fontSize:14,fontWeight:700,color:TEAL}}>
-                Total: {Q(totalVentas)}
-              </div>
-            </div>
-          )}
+          <p style={{fontWeight:700,fontSize:14,margin:"0 0 12px",color:NAVY}}>💰 Más rentables <span style={{fontWeight:400,color:"#999",fontSize:12}}>(ganancia Q)</span></p>
+          {topProfitable.length===0?<p style={{color:"#999",fontSize:13}}>Sin datos de costo configurados</p>:
+            topProfitable.map(function(item,i){
+              var mg=item.revenue>0?Math.round((item.profit/item.revenue)*100):0;
+              return (
+                <div key={i} style={{display:"flex",justifyContent:"space-between",alignItems:"center",padding:"7px 0",borderBottom:"1px solid rgba(0,0,0,0.06)",fontSize:13}}>
+                  <span style={{color:"#666",flex:1,minWidth:0,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}><b style={{color:"#27AE60",marginRight:6}}>{i+1}.</b>{item.name}</span>
+                  <div style={{textAlign:"right",flexShrink:0,marginLeft:8}}>
+                    <span style={{fontWeight:700,color:"#27AE60"}}>Q{item.profit.toFixed(2)}</span>
+                    <span style={{fontSize:11,color:"#999",marginLeft:6}}>{mg}%</span>
+                  </div>
+                </div>
+              );
+            })
+          }
+          {topProfitable.length===0&&costoVentas===0&&<p style={{fontSize:11,color:"#aaa",marginTop:8}}>Configurá el costo de los productos para ver este reporte.</p>}
         </div>
+      </div>
+
+      {/* Detalle ventas */}
+      <div style={sC}>
+        <p style={{fontWeight:600,fontSize:14,margin:"0 0 12px"}}>📋 Ventas del período <span style={{fontWeight:400,color:"#999",fontSize:12}}>({periodSales.length})</span></p>
+        {periodSales.length===0?<p style={{color:"#999",fontSize:13,padding:"20px 0",textAlign:"center"}}>Sin ventas en el período seleccionado</p>:(
+          <div style={{maxHeight:280,overflowY:"auto"}}>
+            <table style={{width:"100%",borderCollapse:"collapse"}}>
+              <thead><tr>{["Fecha","Hora","Cliente","Método","Total"].map(function(h){return <th key={h} style={sTH}>{h}</th>;})}</tr></thead>
+              <tbody>
+                {periodSales.slice().sort(function(a,b){return new Date(b.date)-new Date(a.date);}).map(function(s){
+                  return <tr key={s.id}>
+                    <td style={sTD}>{fmtD(s.date)}</td>
+                    <td style={sTD}>{fmtT(s.date)}</td>
+                    <td style={Object.assign({},sTD,{fontWeight:500})}>{s.client}</td>
+                    <td style={sTD}><span style={mBg("teal")}>{s.method}</span></td>
+                    <td style={Object.assign({},sTD,{fontWeight:700,color:TEAL})}>{Q(s.total)}</td>
+                  </tr>;
+                })}
+              </tbody>
+            </table>
+            <div style={{borderTop:"2px solid rgba(0,0,0,0.1)",marginTop:8,paddingTop:8,textAlign:"right",fontSize:14,fontWeight:700,color:TEAL}}>
+              Total: {Q(totalVentas)}
+            </div>
+          </div>
+        )}
       </div>
     </div>
   );
