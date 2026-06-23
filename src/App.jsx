@@ -4606,6 +4606,7 @@ function SuperAdminPanel(props){
   var _fae=useState(""); var fAdminEmail=_fae[0]; var setFAdminEmail=_fae[1];
   var _fap=useState(""); var fAdminPass=_fap[0]; var setFAdminPass=_fap[1];
   var _fm=useState("1"); var fMonths=_fm[0]; var setFMonths=_fm[1];
+  var _fsk=useState(true); var fSkipWizard=_fsk[0]; var setFSkipWizard=_fsk[1];
 
   function showMsg(msg,type){ setFlash({msg,type}); setTimeout(function(){setFlash(null);},3500); }
 
@@ -4666,11 +4667,11 @@ function SuperAdminPanel(props){
     if(!fName||!fAdminEmail||!fAdminPass){ showMsg("Nombre, email admin y contraseña son requeridos","error"); return; }
     setSaving(true);
     try {
-      var res = await adminAPI.createTenant({ name:fName, plan:fPlan, email:fEmail, phone:fPhone, ownerName:fOwner, adminEmail:fAdminEmail, adminPassword:fAdminPass, months:Number(fMonths) });
+      var res = await adminAPI.createTenant({ name:fName, plan:fPlan, email:fEmail, phone:fPhone, ownerName:fOwner, adminEmail:fAdminEmail, adminPassword:fAdminPass, months:Number(fMonths), skipWizard:fSkipWizard });
       setTenants(function(prev){ return [res.tenant].concat(prev); });
       showMsg("Negocio creado exitosamente","ok");
       setTab("tenants");
-      setFName(""); setFPlan("basic"); setFEmail(""); setFPhone(""); setFOwner(""); setFAdminEmail(""); setFAdminPass(""); setFMonths("1");
+      setFName(""); setFPlan("basic"); setFEmail(""); setFPhone(""); setFOwner(""); setFAdminEmail(""); setFAdminPass(""); setFMonths("1"); setFSkipWizard(true);
     } catch(e){ showMsg(e.error||"Error al crear negocio","error"); }
     setSaving(false);
   }
@@ -4905,6 +4906,10 @@ function SuperAdminPanel(props){
           <label style={{display:"block",fontSize:12,fontWeight:600,color:"#555",marginBottom:4}}>Contraseña inicial *</label>
           <input type="password" value={fAdminPass} onChange={function(e){setFAdminPass(e.target.value);}} style={sI} placeholder="Mínimo 6 caracteres"/>
         </div>
+        <label style={{display:"flex",alignItems:"center",gap:8,marginBottom:16,cursor:"pointer",fontSize:13,color:"#555"}}>
+          <input type="checkbox" checked={fSkipWizard} onChange={function(e){setFSkipWizard(e.target.checked);}} style={{width:16,height:16,cursor:"pointer"}}/>
+          Omitir asistente inicial (el negocio ya está configurado)
+        </label>
         <button onClick={createTenant} disabled={saving||!fName||!fAdminEmail||!fAdminPass} style={Object.assign({},mB(TEAL),{width:"100%",padding:"13px",fontSize:15,opacity:saving||!fName||!fAdminEmail||!fAdminPass?0.6:1})}>
           {saving?"Creando…":"Crear negocio ✓"}
         </button>
@@ -4993,6 +4998,7 @@ function OnboardingWizard(props){
           <div style={{fontSize:40,marginBottom:8}}>🚀</div>
           <h2 style={{margin:"0 0 4px",fontSize:22,fontWeight:800,color:NAVY}}>Configuración inicial</h2>
           <p style={{margin:0,fontSize:13,color:"#888"}}>Sigue los pasos para dejar el sistema listo</p>
+          <button onClick={finish} style={{marginTop:10,background:"none",border:"none",color:"#aaa",fontSize:12,cursor:"pointer",textDecoration:"underline"}}>Saltar y configurar después →</button>
         </div>
 
         {/* Progress */}
@@ -5142,7 +5148,14 @@ function App(props) {
           var wars = await warrantiesAPI.getAll().catch(function(){return [];});
           var cfg  = await settingsAPI.getAll().catch(function(){return {};});
           if(cfg&&cfg.store_name){ setStoreInfo(function(prev){return Object.assign({},prev,cfg);}); setStore(cfg); }
-          if(session.role==="admin"&&(!cfg||cfg.onboarding_done!=="true")){ setShowOnboarding(true); }
+          if(session.role==="admin"&&(!cfg||cfg.onboarding_done!=="true")){
+            if((prods||[]).length>0){
+              // negocio ya tiene datos — marcar onboarding como completado silenciosamente
+              settingsAPI.update({onboarding_done:"true"}).catch(function(){});
+            } else {
+              setShowOnboarding(true);
+            }
+          }
           if(session.role!=="superadmin"){
             adminAPI.getSubscription().then(function(s){ setSubInfo(s); }).catch(function(){});
           }
