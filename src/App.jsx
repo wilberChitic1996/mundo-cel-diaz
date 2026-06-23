@@ -6000,11 +6000,17 @@ function AuditScreen(props){
   var _entity=useState(""); var entity=_entity[0]; var setEntity=_entity[1];
   var _action=useState(""); var action=_action[0]; var setAction=_action[1];
   var _user=useState(""); var userFilter=_user[0]; var setUserFilter=_user[1];
+  var _dateFrom=useState(""); var dateFrom=_dateFrom[0]; var setDateFrom=_dateFrom[1];
+  var _dateTo=useState(""); var dateTo=_dateTo[0]; var setDateTo=_dateTo[1];
   var LIMIT=50;
 
   useEffect(function(){
     load(1);
-  },[entity,action,userFilter]);
+  },[entity,action,userFilter,dateFrom,dateTo]);
+
+  function clearFilters(){
+    setEntity("");setAction("");setUserFilter("");setDateFrom("");setDateTo("");
+  }
 
   async function load(p){
     setLoading(true);setErr("");
@@ -6013,6 +6019,8 @@ function AuditScreen(props){
       if(entity)params.entity=entity;
       if(action)params.action=action;
       if(userFilter)params.user=userFilter;
+      if(dateFrom)params.date_from=dateFrom;
+      if(dateTo)params.date_to=dateTo;
       var res=await auditAPI.getAll(params);
       setLogs(res.data||[]);
       setTotal(res.total||0);
@@ -6030,7 +6038,7 @@ function AuditScreen(props){
       <h2 style={H1}>🔍 Rastro de Auditoría</h2>
       <div style={Object.assign({},sC,{marginBottom:16})}>
         <div style={{display:"flex",gap:10,flexWrap:"wrap",alignItems:"flex-end"}}>
-          <div style={{flex:"1 1 150px"}}>
+          <div style={{flex:"1 1 140px"}}>
             <label style={sL}>Tipo de registro</label>
             <select value={entity} onChange={function(e){setEntity(e.target.value);}} style={sI}>
               <option value="">Todos</option>
@@ -6044,18 +6052,31 @@ function AuditScreen(props){
               <option value="defective">Defectuosos</option>
             </select>
           </div>
-          <div style={{flex:"1 1 150px"}}>
+          <div style={{flex:"1 1 140px"}}>
             <label style={sL}>Acción</label>
             <select value={action} onChange={function(e){setAction(e.target.value);}} style={sI}>
               <option value="">Todas</option>
               {Object.keys(AUDIT_ACTIONS).map(function(k){return <option key={k} value={k}>{AUDIT_ACTIONS[k]}</option>;})}
             </select>
           </div>
-          <div style={{flex:"1 1 150px"}}>
+          <div style={{flex:"1 1 130px"}}>
             <label style={sL}>Usuario</label>
             <input style={sI} placeholder="Nombre..." value={userFilter} onChange={function(e){setUserFilter(e.target.value);}}/>
           </div>
-          <button style={mB("teal")} onClick={function(){load(1);}}>Buscar</button>
+          <div style={{flex:"1 1 130px"}}>
+            <label style={sL}>Desde</label>
+            <input type="date" style={sI} value={dateFrom} onChange={function(e){setDateFrom(e.target.value);}}/>
+          </div>
+          <div style={{flex:"1 1 130px"}}>
+            <label style={sL}>Hasta</label>
+            <input type="date" style={sI} value={dateTo} onChange={function(e){setDateTo(e.target.value);}}/>
+          </div>
+          <div style={{display:"flex",gap:8}}>
+            <button style={mB("teal")} onClick={function(){load(1);}}>Buscar</button>
+            {(entity||action||userFilter||dateFrom||dateTo)&&(
+              <button style={mB("gray")} onClick={clearFilters}>Limpiar</button>
+            )}
+          </div>
         </div>
       </div>
 
