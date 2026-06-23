@@ -5818,6 +5818,11 @@ function App(props) {
 
     var wb = XLSX.utils.book_new();
     var storeName = getStore().store_name || STORE_FALLBACK;
+    function mkSheet(data) {
+      var ws = XLSX.utils.aoa_to_sheet(data);
+      ws['!views'] = [{ state: 'normal', topLeftCell: 'A1', activeCell: 'A1' }];
+      return ws;
+    }
 
     // ── Totales para el resumen ──
     var totalVentas     = sls.reduce(function(s,x){ return s+Number(x.total||0); }, 0);
@@ -5854,7 +5859,7 @@ function App(props) {
       resumenData.push(["⚠ MÓDULOS CON FALLO (respaldá de nuevo después de revisar tu conexión):"]);
       resumenData.push([failed.join(", ")]);
     }
-    XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(resumenData), "Resumen");
+    XLSX.utils.book_append_sheet(wb, mkSheet(resumenData), "Resumen");
 
     // ══════════════════════════════════════════════════════════════
     //  HOJA 2 — PRODUCTOS
@@ -5875,7 +5880,7 @@ function App(props) {
         esServ ? "—" : (Number(p.cost || 0) * Number(p.stock || 0)).toFixed(2),
       ]);
     });
-    XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(prodRows), "Productos");
+    XLSX.utils.book_append_sheet(wb, mkSheet(prodRows), "Productos");
 
     // ══════════════════════════════════════════════════════════════
     //  HOJA 3 — VENTAS (cabecera)
@@ -5890,7 +5895,7 @@ function App(props) {
         s.status || "", rp.name || "", rp.role || "",
       ]);
     });
-    XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(ventasRows), "Ventas");
+    XLSX.utils.book_append_sheet(wb, mkSheet(ventasRows), "Ventas");
 
     // ══════════════════════════════════════════════════════════════
     //  HOJA 4 — DETALLE DE VENTAS (artículo por artículo)
@@ -5908,7 +5913,7 @@ function App(props) {
         ]);
       });
     });
-    XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(detalleVentasRows), "Detalle Ventas");
+    XLSX.utils.book_append_sheet(wb, mkSheet(detalleVentasRows), "Detalle Ventas");
 
     // ══════════════════════════════════════════════════════════════
     //  HOJA 5 — CUENTAS POR COBRAR
@@ -5924,7 +5929,7 @@ function App(props) {
         a.status || "", a.method || "", rp.name || "",
       ]);
     });
-    XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(cuentasRows), "Cuentas");
+    XLSX.utils.book_append_sheet(wb, mkSheet(cuentasRows), "Cuentas");
 
     // ══════════════════════════════════════════════════════════════
     //  HOJA 6 — ARTÍCULOS DE CUENTAS
@@ -5941,7 +5946,7 @@ function App(props) {
         ]);
       });
     });
-    XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(artCuentasRows), "Artículos Cuentas");
+    XLSX.utils.book_append_sheet(wb, mkSheet(artCuentasRows), "Artículos Cuentas");
 
     // ══════════════════════════════════════════════════════════════
     //  HOJA 7 — HISTORIAL DE PAGOS / ABONOS
@@ -5958,7 +5963,7 @@ function App(props) {
         ]);
       });
     });
-    XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(pagosRows), "Historial Pagos");
+    XLSX.utils.book_append_sheet(wb, mkSheet(pagosRows), "Historial Pagos");
 
     // ══════════════════════════════════════════════════════════════
     //  HOJA 8 — DEVOLUCIONES
@@ -5973,7 +5978,7 @@ function App(props) {
         Number(r.total || 0).toFixed(2),
       ]);
     });
-    XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(devRows), "Devoluciones");
+    XLSX.utils.book_append_sheet(wb, mkSheet(devRows), "Devoluciones");
 
     // ══════════════════════════════════════════════════════════════
     //  HOJA 9 — ARTÍCULOS DE DEVOLUCIONES
@@ -5990,7 +5995,7 @@ function App(props) {
         ]);
       });
     });
-    XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(artDevRows), "Artículos Devoluciones");
+    XLSX.utils.book_append_sheet(wb, mkSheet(artDevRows), "Artículos Devoluciones");
 
     // ══════════════════════════════════════════════════════════════
     //  HOJA 10 — CLIENTES
@@ -6003,7 +6008,7 @@ function App(props) {
         c.address || "", c.active ? "Sí" : "No", fmtD(c.created_at),
       ]);
     });
-    XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(cliRows), "Clientes");
+    XLSX.utils.book_append_sheet(wb, mkSheet(cliRows), "Clientes");
 
     // ══════════════════════════════════════════════════════════════
     //  HOJA 11 — REPARACIONES
@@ -6022,7 +6027,7 @@ function App(props) {
         r.promised_date || "", r.internal_note || "", r.status || "",
       ]);
     });
-    XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(repRows), "Reparaciones");
+    XLSX.utils.book_append_sheet(wb, mkSheet(repRows), "Reparaciones");
 
     // ══════════════════════════════════════════════════════════════
     //  HOJA 12 — GARANTÍAS
@@ -6036,7 +6041,7 @@ function App(props) {
         w.start_date || "", w.end_date || "", w.status || "",
       ]);
     });
-    XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(warRows), "Garantías");
+    XLSX.utils.book_append_sheet(wb, mkSheet(warRows), "Garantías");
 
     // ══════════════════════════════════════════════════════════════
     //  HOJA 13 — PIEZAS DEFECTUOSAS
@@ -6050,7 +6055,7 @@ function App(props) {
         d.reason || "", d.status || "", d.return_id || "—",
       ]);
     });
-    XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(defRows), "Piezas Defectuosas");
+    XLSX.utils.book_append_sheet(wb, mkSheet(defRows), "Piezas Defectuosas");
 
     // ══════════════════════════════════════════════════════════════
     //  HOJA 14 — PROVEEDORES
@@ -6060,7 +6065,7 @@ function App(props) {
     sups.forEach(function(s){
       supRows.push([s.name || "", s.phone || "", s.email || "", s.address || "", s.notes || ""]);
     });
-    XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(supRows), "Proveedores");
+    XLSX.utils.book_append_sheet(wb, mkSheet(supRows), "Proveedores");
 
     // ══════════════════════════════════════════════════════════════
     //  HOJA 15 — COMPRAS (cabecera)
@@ -6074,7 +6079,7 @@ function App(props) {
         p.notes || "", p.registered_by || "",
       ]);
     });
-    XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(comprasRows), "Compras");
+    XLSX.utils.book_append_sheet(wb, mkSheet(comprasRows), "Compras");
 
     // ══════════════════════════════════════════════════════════════
     //  HOJA 16 — DETALLE DE COMPRAS (artículo por artículo)
@@ -6092,7 +6097,7 @@ function App(props) {
         ]);
       });
     });
-    XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(detalleComprasRows), "Detalle Compras");
+    XLSX.utils.book_append_sheet(wb, mkSheet(detalleComprasRows), "Detalle Compras");
 
     // ══════════════════════════════════════════════════════════════
     //  HOJA 17 — USUARIOS DEL SISTEMA
@@ -6107,7 +6112,7 @@ function App(props) {
         fmtD(u.created_at), u.sec_question || "—",
       ]);
     });
-    XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(usrRows), "Usuarios");
+    XLSX.utils.book_append_sheet(wb, mkSheet(usrRows), "Usuarios");
 
     // ══════════════════════════════════════════════════════════════
     //  HOJA 18 — SESIONES DE CAJA
@@ -6125,7 +6130,7 @@ function App(props) {
         s.nota_cierre || "",
       ]);
     });
-    XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(cajaRows), "Sesiones Caja");
+    XLSX.utils.book_append_sheet(wb, mkSheet(cajaRows), "Sesiones Caja");
 
     // ── Generar archivo ──
     XLSX.writeFile(wb, storeName.replace(/\s+/g, "_") + "_respaldo_" + now.toISOString().slice(0, 10) + ".xlsx");
