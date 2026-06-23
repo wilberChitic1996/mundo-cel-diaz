@@ -4365,9 +4365,8 @@ function SuppliersScreen(props){
                 );
               })}
               </tbody>
-            </table>
-            <supPag.Pager/>
-          }
+            </table>}
+          <supPag.Pager/>
         </div>
       )}
 
@@ -4400,9 +4399,8 @@ function SuppliersScreen(props){
                 );
               })}
               </tbody>
-            </table>
-            <purPag.Pager/>
-          }
+            </table>}
+          <purPag.Pager/>
         </div>
       )}
 
