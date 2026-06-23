@@ -165,6 +165,9 @@ export const adminAPI = {
   resetUserPassword:   function(id, data)  { return api.put('/admin/users/' + id + '/reset-password', data); },
   toggleUser:          function(id)        { return api.put('/admin/users/' + id + '/toggle', {}); },
   updateMe:            function(data)      { return api.put('/admin/me', data); },
+  deleteTenant:        function(id)        { return api.delete('/admin/tenants/' + id); },
+  createTenantUser:    function(id, data)  { return api.post('/admin/tenants/' + id + '/users', data); },
+  deleteUser:          function(id)        { return api.delete('/admin/users/' + id); },
 };
 
 // ── Health check ──────────────────────────────────────

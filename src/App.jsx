@@ -4598,6 +4598,19 @@ function SuperAdminPanel(props){
   var _rpw=useState({}); var resetPwMap=_rpw[0]; var setResetPwMap=_rpw[1]; // { [userId]: newPw }
   var _rsaving=useState({}); var resetSaving=_rsaving[0]; var setResetSaving=_rsaving[1];
 
+  // Edit tenant modal
+  var _emod=useState(null); var editModal=_emod[0]; var setEditModal=_emod[1]; // tenant object
+  var _esav=useState(false); var editSaving=_esav[0]; var setEditSaving=_esav[1];
+  // Delete tenant confirm
+  var _dconf=useState(null); var deleteConfirm=_dconf[0]; var setDeleteConfirm=_dconf[1]; // tenant object
+  var _dsav=useState(false); var deleteSaving=_dsav[0]; var setDeleteSaving=_dsav[1];
+  // New user form (inside users modal)
+  var _nuf=useState(null); var newUserForm=_nuf[0]; var setNewUserForm=_nuf[1]; // {name,email,password,role} or null
+  var _nusav=useState(false); var newUserSaving=_nusav[0]; var setNewUserSaving=_nusav[1];
+  // Delete user confirm
+  var _duconf=useState(null); var deleteUserConfirm=_duconf[0]; var setDeleteUserConfirm=_duconf[1]; // user object
+  var _dusav=useState(false); var deleteUserSaving=_dusav[0]; var setDeleteUserSaving=_dusav[1];
+
   // Mi cuenta tab
   var _mcn=useState(""); var mcName=_mcn[0]; var setMcName=_mcn[1];
   var _mce=useState(""); var mcEmail=_mce[0]; var setMcEmail=_mce[1];
@@ -4703,6 +4716,58 @@ function SuperAdminPanel(props){
     setRenewSaving(function(prev){ return Object.assign({},prev,{[t.id]:false}); });
   }
 
+  async function saveEditTenant(){
+    if(!editModal) return;
+    setEditSaving(true);
+    try {
+      var updated = await adminAPI.updateTenant(editModal.id, {
+        name: editModal.name, plan: editModal.plan, email: editModal.email||null,
+        phone: editModal.phone||null, ownerName: editModal.owner_name||null, notes: editModal.notes||null
+      });
+      setTenants(function(prev){ return prev.map(function(x){ return x.id===updated.id?Object.assign({},x,updated):x; }); });
+      showMsg("Negocio actualizado","ok");
+      setEditModal(null);
+    } catch(e){ showMsg(e.error||"Error actualizando negocio","error"); }
+    setEditSaving(false);
+  }
+
+  async function doDeleteTenant(){
+    if(!deleteConfirm) return;
+    setDeleteSaving(true);
+    try {
+      await adminAPI.deleteTenant(deleteConfirm.id);
+      setTenants(function(prev){ return prev.filter(function(x){ return x.id!==deleteConfirm.id; }); });
+      showMsg("Negocio eliminado permanentemente","ok");
+      setDeleteConfirm(null);
+    } catch(e){ showMsg(e.error||"Error eliminando negocio","error"); }
+    setDeleteSaving(false);
+  }
+
+  async function doCreateUser(){
+    if(!newUserForm||!usersModal) return;
+    if(!newUserForm.name||!newUserForm.email||!newUserForm.password){ showMsg("Todos los campos son requeridos","error"); return; }
+    setNewUserSaving(true);
+    try {
+      var created = await adminAPI.createTenantUser(usersModal.tenant.id, newUserForm);
+      setUsersModal(function(prev){ return prev?Object.assign({},prev,{users:[created].concat(prev.users)}):prev; });
+      setNewUserForm(null);
+      showMsg("Usuario creado: "+created.name,"ok");
+    } catch(e){ showMsg(e.error||"Error creando usuario","error"); }
+    setNewUserSaving(false);
+  }
+
+  async function doDeleteUser(){
+    if(!deleteUserConfirm||!usersModal) return;
+    setDeleteUserSaving(true);
+    try {
+      await adminAPI.deleteUser(deleteUserConfirm.id);
+      setUsersModal(function(prev){ return prev?Object.assign({},prev,{users:prev.users.filter(function(u){ return u.id!==deleteUserConfirm.id; })}):prev; });
+      showMsg("Usuario eliminado","ok");
+      setDeleteUserConfirm(null);
+    } catch(e){ showMsg(e.error||"Error eliminando usuario","error"); }
+    setDeleteUserSaving(false);
+  }
+
   function expiryBadge(expires_at){
     if(!expires_at) return <span style={Object.assign({},mBg("#aaa"),{fontSize:10})}>Sin fecha</span>;
     var days = Math.ceil((new Date(expires_at)-new Date())/86400000);
@@ -4793,7 +4858,9 @@ function SuperAdminPanel(props){
                     <button onClick={function(){ toggleActive(t); }} style={{padding:"5px 12px",borderRadius:6,border:"1px solid #ddd",background:"#fff",fontSize:12,cursor:"pointer",color:t.active?"#E24B4A":TEAL,fontWeight:600}}>
                       {t.active?"Desactivar":"Activar"}
                     </button>
+                    <button onClick={function(){ setEditModal(Object.assign({},t)); }} style={{padding:"5px 12px",borderRadius:6,border:"1px solid #378ADD",background:"#fff",fontSize:12,cursor:"pointer",color:"#378ADD",fontWeight:600}}>✏️ Editar</button>
                     {t.phone&&<a href={"https://wa.me/502"+t.phone.replace(/\D/g,"")} target="_blank" rel="noopener noreferrer" style={{padding:"5px 10px",borderRadius:6,border:"1px solid #25D366",background:"#fff",fontSize:12,cursor:"pointer",color:"#25D366",fontWeight:600,textDecoration:"none"}}>📱</a>}
+                    <button onClick={function(){ setDeleteConfirm(t); }} style={{padding:"5px 12px",borderRadius:6,border:"1px solid #E24B4A",background:"#fff",fontSize:12,cursor:"pointer",color:"#E24B4A",fontWeight:600}}>🗑️</button>
                   </div>
                 </td>
               </tr>; })}
@@ -4832,6 +4899,26 @@ function SuperAdminPanel(props){
             </div>
             <button onClick={function(){setUsersModal(null);setResetPwMap({});}} style={{background:"none",border:"none",fontSize:22,cursor:"pointer",color:"#aaa",lineHeight:1}}>✕</button>
           </div>
+          {/* Botón agregar usuario */}
+          {!newUserForm&&<button onClick={function(){setNewUserForm({name:"",email:"",password:"",role:"cajero"});}} style={{marginBottom:14,padding:"7px 16px",borderRadius:8,border:"none",background:TEAL,color:"#fff",fontSize:13,fontWeight:700,cursor:"pointer"}}>➕ Agregar usuario</button>}
+          {/* Formulario nuevo usuario */}
+          {newUserForm&&<div style={{border:"2px solid "+TEAL,borderRadius:10,padding:"14px 16px",marginBottom:14,background:"#f0f9f5"}}>
+            <p style={{margin:"0 0 10px",fontWeight:700,fontSize:13,color:TEAL}}>Nuevo usuario</p>
+            <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:8,marginBottom:8}}>
+              <input value={newUserForm.name} onChange={function(e){setNewUserForm(function(p){return Object.assign({},p,{name:e.target.value});});}} placeholder="Nombre completo" style={Object.assign({},sI,{fontSize:12})}/>
+              <input value={newUserForm.email} onChange={function(e){setNewUserForm(function(p){return Object.assign({},p,{email:e.target.value});});}} placeholder="Email" type="email" style={Object.assign({},sI,{fontSize:12})}/>
+              <input value={newUserForm.password} onChange={function(e){setNewUserForm(function(p){return Object.assign({},p,{password:e.target.value});});}} placeholder="Contraseña (mín. 6)" type="password" style={Object.assign({},sI,{fontSize:12})}/>
+              <select value={newUserForm.role} onChange={function(e){setNewUserForm(function(p){return Object.assign({},p,{role:e.target.value});});}} style={Object.assign({},sI,{fontSize:12})}>
+                <option value="cajero">Cajero</option>
+                <option value="admin">Administrador</option>
+                <option value="auditor">Auditor</option>
+              </select>
+            </div>
+            <div style={{display:"flex",gap:8}}>
+              <button onClick={doCreateUser} disabled={newUserSaving} style={{padding:"7px 16px",borderRadius:8,border:"none",background:TEAL,color:"#fff",fontSize:12,fontWeight:700,cursor:"pointer",opacity:newUserSaving?0.6:1}}>{newUserSaving?"Creando…":"Crear"}</button>
+              <button onClick={function(){setNewUserForm(null);}} style={{padding:"7px 14px",borderRadius:8,border:"1px solid #ddd",background:"#fff",fontSize:12,cursor:"pointer",color:"#888"}}>Cancelar</button>
+            </div>
+          </div>}
           {usersLoading?<p style={{textAlign:"center",color:"#888",padding:30}}>Cargando…</p>:
           usersModal.users.length===0?<p style={{textAlign:"center",color:"#888",padding:30}}>Sin usuarios en este negocio</p>:
           <div>{usersModal.users.map(function(u){
@@ -4844,9 +4931,12 @@ function SuperAdminPanel(props){
                   {!u.active&&<span style={Object.assign({},mBg("#ccc"),{fontSize:10,marginLeft:4})}>Inactivo</span>}
                   <div style={{fontSize:11,color:"#888",marginTop:2}}>{u.email}</div>
                 </div>
-                <button onClick={function(){doToggleUser(u);}} style={{padding:"4px 12px",borderRadius:6,border:"1px solid #ddd",background:"#fff",fontSize:12,cursor:"pointer",color:u.active?"#E24B4A":TEAL,fontWeight:600}}>
-                  {u.active?"Desactivar":"Activar"}
-                </button>
+                <div style={{display:"flex",gap:6}}>
+                  <button onClick={function(){doToggleUser(u);}} style={{padding:"4px 12px",borderRadius:6,border:"1px solid #ddd",background:"#fff",fontSize:12,cursor:"pointer",color:u.active?"#E24B4A":TEAL,fontWeight:600}}>
+                    {u.active?"Desactivar":"Activar"}
+                  </button>
+                  <button onClick={function(){setDeleteUserConfirm(u);}} style={{padding:"4px 10px",borderRadius:6,border:"1px solid #E24B4A",background:"#fff",fontSize:12,cursor:"pointer",color:"#E24B4A",fontWeight:600}}>🗑️</button>
+                </div>
               </div>
               <div style={{display:"flex",gap:8,alignItems:"center"}}>
                 <input
@@ -4866,6 +4956,75 @@ function SuperAdminPanel(props){
               </div>
             </div>;
           })}</div>}
+        </div>
+      </div>}
+
+      {/* Modal editar negocio */}
+      {editModal&&<div style={{position:"fixed",inset:0,background:"rgba(0,0,0,0.5)",zIndex:3000,display:"flex",alignItems:"center",justifyContent:"center",padding:16}}>
+        <div style={{background:"#fff",borderRadius:16,padding:24,width:"100%",maxWidth:500,maxHeight:"90vh",overflowY:"auto",boxShadow:"0 8px 40px rgba(0,0,0,0.2)"}}>
+          <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:16}}>
+            <h3 style={{margin:0,fontSize:16,fontWeight:700,color:NAVY}}>✏️ Editar negocio</h3>
+            <button onClick={function(){setEditModal(null);}} style={{background:"none",border:"none",fontSize:22,cursor:"pointer",color:"#aaa"}}>✕</button>
+          </div>
+          <label style={{display:"block",fontSize:12,fontWeight:600,color:"#555",marginBottom:4}}>Nombre del negocio</label>
+          <input value={editModal.name||""} onChange={function(e){setEditModal(function(p){return Object.assign({},p,{name:e.target.value});});}} style={Object.assign({},sI,{marginBottom:12})}/>
+          <label style={{display:"block",fontSize:12,fontWeight:600,color:"#555",marginBottom:4}}>Propietario</label>
+          <input value={editModal.owner_name||""} onChange={function(e){setEditModal(function(p){return Object.assign({},p,{owner_name:e.target.value});});}} style={Object.assign({},sI,{marginBottom:12})}/>
+          <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:12,marginBottom:12}}>
+            <div>
+              <label style={{display:"block",fontSize:12,fontWeight:600,color:"#555",marginBottom:4}}>Plan</label>
+              <select value={editModal.plan||"basic"} onChange={function(e){setEditModal(function(p){return Object.assign({},p,{plan:e.target.value});});}} style={sI}>
+                <option value="basic">Básico</option>
+                <option value="professional">Profesional</option>
+                <option value="enterprise">Empresarial</option>
+              </select>
+            </div>
+            <div>
+              <label style={{display:"block",fontSize:12,fontWeight:600,color:"#555",marginBottom:4}}>Teléfono</label>
+              <input value={editModal.phone||""} onChange={function(e){setEditModal(function(p){return Object.assign({},p,{phone:e.target.value});});}} style={sI} placeholder="50212345678"/>
+            </div>
+          </div>
+          <label style={{display:"block",fontSize:12,fontWeight:600,color:"#555",marginBottom:4}}>Email de contacto</label>
+          <input type="email" value={editModal.email||""} onChange={function(e){setEditModal(function(p){return Object.assign({},p,{email:e.target.value});});}} style={Object.assign({},sI,{marginBottom:12})}/>
+          <label style={{display:"block",fontSize:12,fontWeight:600,color:"#555",marginBottom:4}}>Notas internas</label>
+          <textarea value={editModal.notes||""} onChange={function(e){setEditModal(function(p){return Object.assign({},p,{notes:e.target.value});});}} style={Object.assign({},sI,{marginBottom:16,height:70,resize:"vertical"})}/>
+          <div style={{display:"flex",gap:10}}>
+            <button onClick={saveEditTenant} disabled={editSaving} style={Object.assign({},mB(TEAL),{flex:1,opacity:editSaving?0.6:1})}>{editSaving?"Guardando…":"Guardar cambios ✓"}</button>
+            <button onClick={function(){setEditModal(null);}} style={{padding:"11px 18px",borderRadius:10,border:"1px solid #ddd",background:"#fff",fontSize:14,cursor:"pointer",color:"#666"}}>Cancelar</button>
+          </div>
+        </div>
+      </div>}
+
+      {/* Confirmar eliminar negocio */}
+      {deleteConfirm&&<div style={{position:"fixed",inset:0,background:"rgba(0,0,0,0.6)",zIndex:4000,display:"flex",alignItems:"center",justifyContent:"center",padding:16}}>
+        <div style={{background:"#fff",borderRadius:16,padding:28,width:"100%",maxWidth:420,boxShadow:"0 8px 40px rgba(0,0,0,0.3)"}}>
+          <div style={{textAlign:"center",marginBottom:16}}>
+            <div style={{fontSize:48,marginBottom:8}}>⚠️</div>
+            <h3 style={{margin:"0 0 8px",fontSize:17,fontWeight:800,color:"#E24B4A"}}>Eliminar negocio</h3>
+            <p style={{margin:"0 0 6px",fontSize:14,color:"#333"}}>Estás a punto de eliminar <strong>{deleteConfirm.name}</strong></p>
+            <p style={{margin:0,fontSize:12,color:"#E24B4A",fontWeight:600}}>Esta acción es IRREVERSIBLE. Se borrarán todos sus datos: ventas, productos, usuarios, reparaciones y más.</p>
+          </div>
+          <div style={{display:"flex",gap:10}}>
+            <button onClick={doDeleteTenant} disabled={deleteSaving} style={{flex:1,padding:"12px",borderRadius:10,border:"none",background:"#E24B4A",color:"#fff",fontSize:14,fontWeight:700,cursor:"pointer",opacity:deleteSaving?0.6:1}}>{deleteSaving?"Eliminando…":"Sí, eliminar todo"}</button>
+            <button onClick={function(){setDeleteConfirm(null);}} style={{flex:1,padding:"12px",borderRadius:10,border:"1px solid #ddd",background:"#fff",fontSize:14,cursor:"pointer",color:"#666"}}>Cancelar</button>
+          </div>
+        </div>
+      </div>}
+
+      {/* Confirmar eliminar usuario */}
+      {deleteUserConfirm&&<div style={{position:"fixed",inset:0,background:"rgba(0,0,0,0.6)",zIndex:4000,display:"flex",alignItems:"center",justifyContent:"center",padding:16}}>
+        <div style={{background:"#fff",borderRadius:16,padding:28,width:"100%",maxWidth:380,boxShadow:"0 8px 40px rgba(0,0,0,0.3)"}}>
+          <div style={{textAlign:"center",marginBottom:16}}>
+            <div style={{fontSize:42,marginBottom:8}}>🗑️</div>
+            <h3 style={{margin:"0 0 8px",fontSize:16,fontWeight:800,color:"#E24B4A"}}>Eliminar usuario</h3>
+            <p style={{margin:"0 0 4px",fontSize:14,color:"#333"}}><strong>{deleteUserConfirm.name}</strong></p>
+            <p style={{margin:0,fontSize:12,color:"#888"}}>{deleteUserConfirm.email}</p>
+            <p style={{margin:"10px 0 0",fontSize:12,color:"#E24B4A",fontWeight:600}}>Esta acción no se puede deshacer.</p>
+          </div>
+          <div style={{display:"flex",gap:10}}>
+            <button onClick={doDeleteUser} disabled={deleteUserSaving} style={{flex:1,padding:"11px",borderRadius:10,border:"none",background:"#E24B4A",color:"#fff",fontSize:14,fontWeight:700,cursor:"pointer",opacity:deleteUserSaving?0.6:1}}>{deleteUserSaving?"Eliminando…":"Eliminar"}</button>
+            <button onClick={function(){setDeleteUserConfirm(null);}} style={{flex:1,padding:"11px",borderRadius:10,border:"1px solid #ddd",background:"#fff",fontSize:14,cursor:"pointer",color:"#666"}}>Cancelar</button>
+          </div>
         </div>
       </div>}
 
