@@ -1,7 +1,7 @@
 {
-  "name": "mundo-cel-diaz",
-  "version": "2.1.0",
-  "description": "Sistema de Gestión POS — MUNDO CEL DIAZ",
+  "name": "praxisgt",
+  "version": "2.2.0",
+  "description": "PraxisGT — Sistema de Gestión Empresarial para Guatemala",
   "main": "electron/main.js",
   "scripts": {
     "dev": "vite",
@@ -11,9 +11,12 @@
     "electron": "electron .",
     "package": "vite build && electron-builder"
   },
+  "engines": {
+    "node": ">=18"
+  },
   "build": {
-    "appId": "com.mundoceldiaz.pos",
-    "productName": "MUNDO CEL DIAZ",
+    "appId": "com.praxisgt.pos",
+    "productName": "PraxisGT",
     "win": {
       "target": "nsis",
       "icon": "assets/icon.ico"
@@ -23,7 +26,7 @@
       "allowToChangeInstallationDirectory": true,
       "createDesktopShortcut": true,
       "createStartMenuShortcut": true,
-      "shortcutName": "MUNDO CEL DIAZ"
+      "shortcutName": "PraxisGT"
     },
     "files": [
       "dist/**/*",
