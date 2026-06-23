@@ -131,16 +131,17 @@ async function compartirWhatsApp(tel, getMensaje, opts){
       var canvas=await html2canvas(wrapper.firstChild,{scale:2,useCORS:true,backgroundColor:"#ffffff",logging:false});
       document.body.removeChild(wrapper);
       var blob=await new Promise(function(r){canvas.toBlob(r,"image/png",0.95);});
-      var file=new File([blob],"boleta-mundoceldiaz.png",{type:"image/png"});
+      var _shareName=(getStore().store_name||APP_NAME).replace(/\s+/g,"-").toLowerCase();
+      var file=new File([blob],"boleta-"+_shareName+".png",{type:"image/png"});
       // Web Share API (móvil — adjunta imagen)
       if(navigator.share&&navigator.canShare&&navigator.canShare({files:[file]})){
-        await navigator.share({files:[file],title:"Boleta MUNDO CEL DIAZ",text:mensaje});
+        await navigator.share({files:[file],title:"Boleta "+(getStore().store_name||APP_NAME),text:mensaje});
         return;
       }
       // Fallback escritorio: descargar imagen y avisar al usuario
       var imgUrl=URL.createObjectURL(blob);
       var dl=document.createElement("a");
-      dl.href=imgUrl; dl.download="boleta-mundoceldiaz.png";
+      dl.href=imgUrl; dl.download="boleta-"+_shareName+".png";
       document.body.appendChild(dl); dl.click(); document.body.removeChild(dl);
       setTimeout(function(){URL.revokeObjectURL(imgUrl);},5000);
       abrirWA(tel, mensaje);
@@ -284,8 +285,8 @@ function LandingPage(props){
       <nav style={{position:"sticky",top:0,zIndex:100,background:"rgba(255,255,255,0.97)",backdropFilter:"blur(8px)",borderBottom:"1px solid #eee",padding:"0 clamp(16px,4vw,60px)"}}>
         <div style={{maxWidth:1100,margin:"0 auto",display:"flex",alignItems:"center",justifyContent:"space-between",height:64}}>
           <div style={{display:"flex",alignItems:"center",gap:10}}>
-            <div style={{width:36,height:36,borderRadius:10,background:TEAL,display:"flex",alignItems:"center",justifyContent:"center",color:"#fff",fontWeight:800,fontSize:16}}>P</div>
-            <span style={{fontWeight:800,fontSize:18,color:NAVY}}>POS<span style={{color:TEAL}}>CEL</span></span>
+            <div style={{width:36,height:36,borderRadius:10,background:TEAL,display:"flex",alignItems:"center",justifyContent:"center",color:"#fff",fontWeight:800,fontSize:16}}>{APP_NAME[0]}</div>
+            <span style={{fontWeight:800,fontSize:18,color:NAVY}}>{APP_NAME}</span>
           </div>
           <div style={{display:"flex",gap:24,alignItems:"center"}} className="nav-links">
             {[["Funciones","features"],["Precios","precios"],["Contacto","contacto"]].map(function(l){
@@ -306,8 +307,8 @@ function LandingPage(props){
       {/* ── HERO ── */}
       <section style={{background:"linear-gradient(135deg,"+NAVY+" 0%,#243552 100%)",padding:"clamp(60px,10vw,120px) clamp(16px,4vw,60px)",textAlign:"center"}}>
         <div style={{maxWidth:700,margin:"0 auto"}}>
-          <div style={{display:"inline-block",background:"rgba(29,158,117,0.2)",border:"1px solid rgba(29,158,117,0.4)",borderRadius:20,padding:"6px 16px",fontSize:12,color:TEAL,fontWeight:700,marginBottom:20,letterSpacing:1}}>SOFTWARE POS PARA CELULARÍAS — GUATEMALA</div>
-          <h1 style={{color:"#fff",fontSize:"clamp(28px,5vw,52px)",fontWeight:900,margin:"0 0 20px",lineHeight:1.15}}>El sistema POS más completo para tu <span style={{color:TEAL}}>negocio de celulares</span></h1>
+          <div style={{display:"inline-block",background:"rgba(29,158,117,0.2)",border:"1px solid rgba(29,158,117,0.4)",borderRadius:20,padding:"6px 16px",fontSize:12,color:TEAL,fontWeight:700,marginBottom:20,letterSpacing:1}}>SISTEMA DE GESTIÓN EMPRESARIAL — GUATEMALA</div>
+          <h1 style={{color:"#fff",fontSize:"clamp(28px,5vw,52px)",fontWeight:900,margin:"0 0 20px",lineHeight:1.15}}>El sistema de gestión más completo para <span style={{color:TEAL}}>tu negocio</span></h1>
           <p style={{color:"rgba(255,255,255,0.75)",fontSize:"clamp(15px,2vw,18px)",margin:"0 0 36px",lineHeight:1.7}}>Ventas, reparaciones, inventario, cuentas por cobrar y más — todo en un solo sistema diseñado para Guatemala.</p>
           <div style={{display:"flex",gap:14,justifyContent:"center",flexWrap:"wrap"}}>
             <button onClick={function(){scrollTo("contacto");}} style={{padding:"14px 32px",borderRadius:10,border:"none",background:TEAL,color:"#fff",fontWeight:800,fontSize:16,cursor:"pointer",boxShadow:"0 4px 20px rgba(29,158,117,0.4)"}}>Solicitar demo gratis →</button>
@@ -338,7 +339,7 @@ function LandingPage(props){
         <div style={{maxWidth:1100,margin:"0 auto"}}>
           <div style={{textAlign:"center",marginBottom:48}}>
             <h2 style={{fontSize:"clamp(22px,3vw,36px)",fontWeight:800,color:NAVY,margin:"0 0 12px"}}>Todo lo que necesitás en un solo sistema</h2>
-            <p style={{fontSize:16,color:"#666",margin:0}}>Diseñado específicamente para celularías y tiendas de tecnología</p>
+            <p style={{fontSize:16,color:"#666",margin:0}}>Diseñado para negocios en Guatemala — ventas, inventario, reparaciones y más</p>
           </div>
           <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(240px,1fr))",gap:20}}>
             {features.map(function(f){
@@ -403,7 +404,7 @@ function LandingPage(props){
           <h2 style={{color:"#fff",fontSize:"clamp(22px,3vw,36px)",fontWeight:800,margin:"0 0 12px"}}>¿Listo para modernizar tu negocio?</h2>
           <p style={{color:"rgba(255,255,255,0.7)",fontSize:16,margin:"0 0 36px",lineHeight:1.7}}>Escribinos por WhatsApp y te hacemos una demo gratuita en menos de 24 horas.</p>
           <div style={{display:"flex",gap:14,justifyContent:"center",flexWrap:"wrap"}}>
-            <a href={"https://wa.me/50254707112?text="+encodeURIComponent("Hola, me interesa el sistema POS para mi negocio de celulares. ¿Pueden darme más información?")}
+            <a href={"https://wa.me/50254707112?text="+encodeURIComponent("Hola, me interesa "+APP_NAME+" para gestionar mi negocio. ¿Pueden darme más información?")}
                target="_blank" rel="noopener noreferrer"
                style={{display:"inline-block",padding:"15px 36px",borderRadius:10,border:"none",background:"#25D366",color:"#fff",fontWeight:800,fontSize:16,cursor:"pointer",textDecoration:"none",boxShadow:"0 4px 20px rgba(37,211,102,0.4)"}}>
               📱 Escribir por WhatsApp
@@ -419,7 +420,7 @@ function LandingPage(props){
       <footer style={{background:"#0f1923",padding:"28px clamp(16px,4vw,60px)",textAlign:"center"}}>
         <div style={{maxWidth:1100,margin:"0 auto",display:"flex",alignItems:"center",justifyContent:"space-between",flexWrap:"wrap",gap:12}}>
           <div style={{display:"flex",alignItems:"center",gap:8}}>
-            <div style={{width:28,height:28,borderRadius:8,background:TEAL,display:"flex",alignItems:"center",justifyContent:"center",color:"#fff",fontWeight:800,fontSize:12}}>P</div>
+            <div style={{width:28,height:28,borderRadius:8,background:TEAL,display:"flex",alignItems:"center",justifyContent:"center",color:"#fff",fontWeight:800,fontSize:12}}>{APP_NAME[0]}</div>
             <span style={{color:"rgba(255,255,255,0.7)",fontSize:13,fontWeight:600}}>{APP_NAME} — {APP_TAGLINE}</span>
           </div>
           <span style={{color:"rgba(255,255,255,0.4)",fontSize:12}}>© {new Date().getFullYear()} — Guatemala</span>
@@ -937,7 +938,7 @@ function AppWrapper() {
       var users=await db.load(UK,[]);
       if(!users||users.length===0){
         var hash=await hashPass("Admin2026#");
-        await db.save(UK,[{id:gid(),name:"Administrador",email:"admin@mundoceldiaz.com",passwordHash:hash,role:"admin",active:true,createdAt:new Date().toISOString()}]);
+        await db.save(UK,[{id:gid(),name:"Administrador",email:"admin@demo.com",passwordHash:hash,role:"admin",active:true,createdAt:new Date().toISOString()}]);
         console.log("Admin creado exitosamente");
       }
     }
@@ -998,7 +999,7 @@ function AppWrapper() {
         <div style={{position:"fixed",bottom:16,left:"50%",transform:"translateX(-50%)",zIndex:9999,background:"#1a2535",color:"#fff",borderRadius:14,padding:"12px 18px",display:"flex",alignItems:"center",gap:12,boxShadow:"0 8px 32px rgba(0,0,0,0.35)",maxWidth:360,width:"calc(100% - 32px)",boxSizing:"border-box"}}>
           <img src="/icon-192.png" alt="" style={{width:36,height:36,borderRadius:8,flexShrink:0}}/>
           <div style={{flex:1,minWidth:0}}>
-            <p style={{margin:0,fontWeight:700,fontSize:13}}>Instalar MCD POS</p>
+            <p style={{margin:0,fontWeight:700,fontSize:13}}>Instalar {APP_NAME}</p>
             <p style={{margin:0,fontSize:11,opacity:0.7}}>Acceso rápido desde tu pantalla de inicio</p>
           </div>
           <button onClick={installPWA} style={{background:"#1D9E75",color:"#fff",border:"none",borderRadius:8,padding:"8px 14px",fontSize:12,fontWeight:700,cursor:"pointer",flexShrink:0}}>Instalar</button>
@@ -3178,6 +3179,7 @@ function printVoucher(sale, opts){
     var fecha=new Date(sale.date).toLocaleDateString("es-GT",{day:"2-digit",month:"long",year:"numeric"});
     var hora=new Date(sale.date).toLocaleTimeString("es-GT",{hour:"2-digit",minute:"2-digit"});
 
+    var _rSn=getStore().store_name||STORE_FALLBACK;
     var html='<!DOCTYPE html><html><head><meta charset="UTF-8"><title>Comprobante '+ventaNum+'</title>'+
     '<style>'+
       '*{margin:0;padding:0;box-sizing:border-box;}'+
@@ -3216,7 +3218,7 @@ function printVoucher(sale, opts){
 
     '<div class="header">'+
       '<div class="brand">'+
-        '<h1>MUNDO CEL DIAZ</h1>'+
+        '<h1>'+_rSn+'</h1>'+
         '<p>SISTEMA DE GESTIÓN</p>'+
         '<p class="sub">Tecnología · Accesorios · Reparaciones · Guatemala</p>'+
       '</div>'+
@@ -3295,7 +3297,7 @@ function printVoucher(sale, opts){
     '</body></html>';
 
     var w=window.open("","_blank","width=800,height=700");
-    var qrTxt='MUNDO CEL DIAZ | #'+ventaNum+' | '+sale.client+' | '+fecha+' | Q'+Number(sale.total).toFixed(2);
+    var qrTxt=_rSn+' | #'+ventaNum+' | '+sale.client+' | '+fecha+' | Q'+Number(sale.total).toFixed(2);
     w.document.write(html+'<scr'+'ipt src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></scr'+'ipt><scr'+'ipt>window.onload=function(){try{new QRCode(document.getElementById("qrv"),{text:'+JSON.stringify(qrTxt)+',width:90,height:90,colorDark:"#1a2535",colorLight:"#fff"});}catch(e){}setTimeout(function(){window.print();},800);};</scr'+'ipt>');
     w.document.close();
   }
@@ -4493,7 +4495,7 @@ function StoreConfigScreen(props){
   }
 
   var fields=[
-    {key:"store_name",    label:"Nombre del negocio *",   placeholder:"Ej: MUNDO CEL DIAZ"},
+    {key:"store_name",    label:"Nombre del negocio *",   placeholder:"Ej: Tecnología García"},
     {key:"store_tagline", label:"Eslogan / descripción",   placeholder:"Ej: Tecnología · Accesorios · Reparaciones"},
     {key:"store_phone",   label:"Teléfono",                placeholder:"Ej: 5555-1234"},
     {key:"store_address", label:"Dirección",               placeholder:"Ej: Zona 1, Guatemala"},
@@ -4531,7 +4533,7 @@ function StoreConfigScreen(props){
                 <div style={{display:"flex",alignItems:"center",gap:10}}>
                   {form.store_logo_url
                     ?<img src={form.store_logo_url} alt="logo" style={{width:40,height:40,borderRadius:8,objectFit:"cover"}}/>
-                    :<div style={{width:40,height:40,borderRadius:8,background:NAVY,display:"flex",alignItems:"center",justifyContent:"center",color:TEAL,fontWeight:900,fontSize:14}}>MCD</div>
+                    :<div style={{width:40,height:40,borderRadius:8,background:NAVY,display:"flex",alignItems:"center",justifyContent:"center",color:TEAL,fontWeight:900,fontSize:14}}>{APP_NAME.slice(0,2).toUpperCase()}</div>
                   }
                   <div>
                     <div style={{fontWeight:900,fontSize:16,color:NAVY}}>{form.store_name||"Nombre del negocio"}</div>
@@ -6067,11 +6069,11 @@ function printRepairTicket(rep){
     rep.parts.map(function(p){return '<tr><td style="font-family:monospace;">'+p.code+'</td><td>'+p.name+'</td><td>'+p.qty+'</td><td>Q '+Number(p.price).toFixed(2)+'</td></tr>';}).join("")+
   '</tbody></table></div></div>':'')+
   (rep.internalNote?'<div class="section"><div class="section-title">📝 Nota interna</div><div class="section-body" style="color:#666;">'+rep.internalNote+'</div></div>':'')+
-  '<div class="footer"><div><b>Mundo Cel Diaz</b> · Guatemala</div><div>Ref: '+rep.repCode+' · '+rep.id.slice(0,8).toUpperCase()+'</div></div>'+
+  '<div class="footer"><div><b>'+_sn+'</b> · Guatemala</div><div>Ref: '+rep.repCode+' · '+rep.id.slice(0,8).toUpperCase()+'</div></div>'+
   '<div class="firma">Firma del cliente: _____________________________ &nbsp;&nbsp;&nbsp; Fecha entrega: _______________</div>'+
   '</body></html>';
   var w=window.open("","_blank","width=800,height=700");
-  var qrTxtR='MUNDO CEL DIAZ | Orden: '+rep.repCode+' | '+rep.clientName+' | '+rep.brand+' '+rep.model;
+  var qrTxtR=_sn+' | Orden: '+rep.repCode+' | '+rep.clientName+' | '+rep.brand+' '+rep.model;
   w.document.write(html+'<scr'+'ipt src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></scr'+'ipt><scr'+'ipt>window.onload=function(){try{new QRCode(document.getElementById("qrr"),{text:'+JSON.stringify(qrTxtR)+',width:85,height:85,colorDark:"#1a2535",colorLight:"#fff"});}catch(e){}setTimeout(function(){window.print();},800);};</scr'+'ipt>');
   w.document.close();
 }
@@ -6690,7 +6692,7 @@ function CuadresScreen(props){
         '<td style="text-align:right;font-weight:700;color:#1D9E75;">Q '+Number(s.total).toFixed(2)+'</td></tr>';
     }).join("");
 
-    var html='<!DOCTYPE html><html><head><meta charset="UTF-8"><title>Cuadre — MUNDO CEL DIAZ</title>'+
+    var html='<!DOCTYPE html><html><head><meta charset="UTF-8"><title>Cuadre — '+_sn+'</title>'+
     '<style>*{margin:0;padding:0;box-sizing:border-box;}body{font-family:Arial,sans-serif;font-size:12px;color:#222;padding:24px;max-width:900px;margin:0 auto;}'+
     '.header{border-bottom:3px solid #1D9E75;padding-bottom:14px;margin-bottom:20px;display:flex;justify-content:space-between;align-items:flex-start;}'+
     '.brand h1{font-size:20px;font-weight:900;color:#1a2535;}.brand p{font-size:10px;color:#1D9E75;font-weight:700;letter-spacing:2px;}'+

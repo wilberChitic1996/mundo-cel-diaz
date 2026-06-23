@@ -10,10 +10,10 @@ export default defineConfig({
       manifestFilename: 'manifest.json',
       includeAssets: ['icon-180.png', 'icon-192.png', 'icon-512.png'],
       manifest: {
-        name: 'MUNDO CEL DIAZ — Sistema POS',
-        short_name: 'MCD POS',
-        description: 'Sistema de gestión POS para tiendas de telefonía y reparación',
-        theme_color: '#1a2535',
+        name: 'PraxisGT — Sistema de Gestión',
+        short_name: 'PraxisGT',
+        description: 'Sistema de gestión empresarial para negocios en Guatemala',
+        theme_color: '#1D9E75',
         background_color: '#1a2535',
         display: 'standalone',
         orientation: 'portrait-primary',
@@ -28,7 +28,7 @@ export default defineConfig({
         globPatterns: ['**/*.{js,css,html,ico,png,svg,woff2}'],
         runtimeCaching: [
           {
-            urlPattern: /^https:\/\/.*mundoceldiaz\.com\/api\/.*/i,
+            urlPattern: /\/api\//i,
             handler: 'NetworkFirst',
             options: {
               cacheName: 'api-cache',
