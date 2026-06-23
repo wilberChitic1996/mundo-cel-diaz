@@ -1324,7 +1324,7 @@ function DashboardScreen(props) {
   var chartData=Array.from({length:chartDays},function(_,i){
     var d=new Date(); d.setDate(d.getDate()-(chartDays-1-i)); d.setHours(0,0,0,0);
     var dStr=d.toDateString();
-    var daySales=sales.filter(function(s){return new Date(s.date).toDateString()===dStr;});
+    var daySales=sales.filter(function(s){return new Date(s.date).toDateString()===dStr&&s.status==='completado';});
     var rev=daySales.reduce(function(a,s){return a+s.total;},0);
     var cnt=daySales.length;
     var label=chartDays===7?DIAS[d.getDay()]:(d.getDate()+"/"+(d.getMonth()+1));
@@ -1336,7 +1336,7 @@ function DashboardScreen(props) {
     var d=new Date(now.getFullYear(),now.getMonth()-5+i,1);
     var mStart=new Date(d.getFullYear(),d.getMonth(),1);
     var mEnd=new Date(d.getFullYear(),d.getMonth()+1,0,23,59,59);
-    var rev=sales.filter(function(s){var sd=new Date(s.date);return sd>=mStart&&sd<=mEnd;}).reduce(function(a,s){return a+s.total;},0);
+    var rev=sales.filter(function(s){var sd=new Date(s.date);return sd>=mStart&&sd<=mEnd&&s.status==='completado';}).reduce(function(a,s){return a+s.total;},0);
     return {label:MESES[d.getMonth()],ingresos:Math.round(rev*100)/100};
   });
 
@@ -1631,7 +1631,7 @@ function CajaScreen(props) {
   var todayStr=now.toDateString();
   var movements=[];
   sales.forEach(function(s){
-    if(s.method==="Efectivo"&&new Date(s.date).toDateString()===todayStr){
+    if(s.method==="Efectivo"&&new Date(s.date).toDateString()===todayStr&&s.status==='completado'){
       movements.push({id:s.id,date:s.date,desc:"Venta",detail:s.client,amount:s.total,type:"entrada"});
     }
   });
@@ -3335,7 +3335,10 @@ function HistoryScreen(props) {
   }
 
   var movs=[];
-  sales.forEach(function(s){movs.push({k:"v"+s.id,date:s.date,tipo:"Venta",color:"teal",cliente:s.client,metodo:s.method,atendio:(s.registradoPor&&s.registradoPor.name)?s.registradoPor.name:(session.name||"—"),monto:Number(s.total),signo:1,kind:"sale",obj:s});});
+  sales.forEach(function(s){
+    if(s.status==='cuenta') return; // ventas a crédito se muestran vía cuentas para evitar duplicados
+    movs.push({k:"v"+s.id,date:s.date,tipo:"Venta",color:"teal",cliente:s.client,metodo:s.method,atendio:(s.registradoPor&&s.registradoPor.name)?s.registradoPor.name:(session.name||"—"),monto:Number(s.total),signo:1,kind:"sale",obj:s});
+  });
   accounts.forEach(function(a){
     movs.push({k:"a"+a.id,date:a.date,tipo:"Venta a credito",color:"purple",cliente:a.client,metodo:"Credito",atendio:(a.registradoPor&&a.registradoPor.name)?a.registradoPor.name:(session.name||"—"),monto:Number(a.total),signo:1,kind:"credito",obj:a});
     var _ac=0;
@@ -5382,7 +5385,7 @@ function App(props) {
           adminAPI.getSubscription().then(function(s){ setSubInfo(s); }).catch(function(){});
         }
         var normalProds = (prods||[]).map(function(p){return Object.assign({},p,{id:p.id,code:p.code,name:p.name,category:p.category||'',shelf:p.shelf||'',price:Number(p.price),cost:Number(p.cost),stock:Number(p.stock),unit:p.unit||'uni'});});
-        var normalSales = (sls||[]).map(function(s){return Object.assign({},s,{items:s.sale_items||[],total:Number(s.total),date:s.created_at,registradoPor:s.registrado_por||null});});
+        var normalSales = (sls||[]).map(function(s){return Object.assign({},s,{items:s.sale_items||[],total:Number(s.total),date:s.created_at,registradoPor:s.registrado_por||null,payType:s.pay_type||'completo',status:s.status||'completado'});});
         var normalAccs  = (accs||[]).map(function(a){return Object.assign({},a,{items:a.account_items||[],payments:(a.account_payments||[]).map(function(_pp){return Object.assign({},_pp,{date:_pp.date||_pp.created_at,amount:Number(_pp.amount),registradoPor:_pp.registrado_por||_pp.registradoPor||null});}),total:Number(a.total),paid:Number(a.paid),balance:Number(a.balance),date:a.created_at,registradoPor:a.registrado_por||null});});
         var normalRets  = (rets||[]).map(function(r){return Object.assign({},r,{items:r.return_items||[],refundAmount:Number(r.refund_amount),itemCondition:r.item_condition,refundMethod:r.refund_method,date:r.created_at,saleId:r.sale_id||null});});
         var normalDefs  = (defs||[]).map(function(d){return Object.assign({},d,{price:Number(d.price||0)});});
@@ -5530,7 +5533,7 @@ function App(props) {
       try {
         await salesAPI.create({client:client,total:cartTotal,method:payMethod,items:cart,idempotencyKey:idempotencyKey});
         var freshSales = await salesAPI.getAll();
-        var ns = (freshSales||[]).map(function(s){return Object.assign({},s,{items:s.sale_items||[],total:Number(s.total),date:s.created_at,registradoPor:s.registrado_por||null});});
+        var ns = (freshSales||[]).map(function(s){return Object.assign({},s,{items:s.sale_items||[],total:Number(s.total),date:s.created_at,registradoPor:s.registrado_por||null,payType:s.pay_type||'completo',status:s.status||'completado'});});
         setSales(ns);
       } catch(e){
         var errMsg=e&&e.error?e.error:null;
@@ -5886,13 +5889,15 @@ function App(props) {
     //  HOJA 3 — VENTAS (cabecera)
     //  Campos DB: id, created_at, client, method, total, status, registrado_por {name,role}
     // ══════════════════════════════════════════════════════════════
-    var ventasRows = [["ID","Fecha","Hora","Cliente","Método pago","Total (Q)","Estado","Registrado por","Rol"]];
+    var ventasRows = [["ID","Fecha","Hora","Cliente","Tipo","Método pago","Total (Q)","Estado","Registrado por","Rol"]];
     sls.forEach(function(s){
       var rp = s.registrado_por || {};
+      var tipo = s.pay_type === 'credito' ? 'Crédito' : s.pay_type === 'parcial' ? 'Crédito parcial' : 'Contado';
+      var estado = s.status === 'cuenta' ? 'Por cobrar' : s.status === 'completado' ? 'Completado' : (s.status || '');
       ventasRows.push([
         s.id || "", fmtD(s.created_at), fmtT(s.created_at),
-        s.client || "", s.method || "", Number(s.total || 0).toFixed(2),
-        s.status || "", rp.name || "", rp.role || "",
+        s.client || "", tipo, s.method || "", Number(s.total || 0).toFixed(2),
+        estado, rp.name || "", rp.role || "",
       ]);
     });
     XLSX.utils.book_append_sheet(wb, mkSheet(ventasRows), "Ventas");
@@ -6159,7 +6164,7 @@ function App(props) {
   }
 
   var todayStr=new Date().toDateString();
-  var todaySales=sales.filter(function(s){return new Date(s.date).toDateString()===todayStr;});
+  var todaySales=sales.filter(function(s){return new Date(s.date).toDateString()===todayStr&&s.status==='completado';});
   var pendingAccs=accounts.filter(function(a){return a.status!=="pagado";});
   var totalPend=pendingAccs.reduce(function(s,a){return s+a.balance;},0);
   var pqs={};
@@ -7039,7 +7044,7 @@ function CuadresScreen(props){
   }
 
   // Ventas del período
-  var periodSales=sales.filter(function(s){return inRange(s.date);});
+  var periodSales=sales.filter(function(s){return inRange(s.date)&&s.status==='completado';});
 
   // Ingresos por método (ventas completas)
   var byMethod={Efectivo:0,Tarjeta:0,Transferencia:0,Mixto:0};
