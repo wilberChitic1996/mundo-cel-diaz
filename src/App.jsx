@@ -4582,6 +4582,8 @@ function StoreConfigScreen(props){
    ══════════════════════════════════════════════════════════════════════ */
 function SuperAdminPanel(props){
   var session=props.session||{};
+  var theme=props.theme||"light";
+  var isDark=theme==="dark";
   var _tenants=useState([]); var tenants=_tenants[0]; var setTenants=_tenants[1];
   var _stats=useState(null); var stats=_stats[0]; var setStats=_stats[1];
   var _loading=useState(true); var loading=_loading[0]; var setLoading=_loading[1];
@@ -4780,6 +4782,12 @@ function SuperAdminPanel(props){
   var PLANS = { basic:"Básico", professional:"Profesional", enterprise:"Empresarial" };
   var PLAN_COLOR = { basic:"#888", professional:TEAL, enterprise:"#9B59B6" };
 
+  // Estilos adaptados al tema
+  var saCard={background:"var(--bg-card,#fff)",borderRadius:12,boxShadow:"0 2px 10px var(--shadow,rgba(0,0,0,0.05))",border:"1px solid var(--border-card,rgba(0,0,0,0.09))"};
+  var saTH={padding:"10px 12px",textAlign:"left",fontSize:11,fontWeight:700,color:"var(--text-secondary,#666)",textTransform:"uppercase",borderBottom:"2px solid var(--border-table,rgba(0,0,0,0.08))",background:"var(--bg-table-head,#f5f4f0)",whiteSpace:"nowrap"};
+  var saTD={padding:"12px",fontSize:13,verticalAlign:"middle",color:"var(--text-primary,#1a1a1a)",borderBottom:"1px solid var(--border-row,rgba(0,0,0,0.05))"};
+  var saInput={width:"100%",padding:"10px 12px",borderRadius:8,border:"1px solid var(--border-input,rgba(0,0,0,0.2))",fontSize:14,background:"var(--bg-input,#fff)",color:"var(--text-primary,#1a1a1a)",boxSizing:"border-box",outline:"none"};
+
   return (
     <div style={{padding:"clamp(16px,3vw,32px)",maxWidth:1200,margin:"0 auto"}}>
       {flash&&<div style={{position:"fixed",top:20,right:20,zIndex:9999,padding:"12px 20px",borderRadius:10,background:flash.type==="ok"?"#1D9E75":"#E24B4A",color:"#fff",fontWeight:700,fontSize:13,boxShadow:"0 4px 20px rgba(0,0,0,0.25)"}}>{flash.msg}</div>}
@@ -4802,44 +4810,44 @@ function SuperAdminPanel(props){
           {lb:"Vencidos", val:stats.expired||0, ic:"❌", c:"#E24B4A"},
           {lb:"Usuarios activos", val:stats.total_users, ic:"👥", c:NAVY},
           {lb:"Ingresos 30d", val:"Q "+Number(stats.revenue_30d||0).toLocaleString("es-GT",{minimumFractionDigits:2}), ic:"💰", c:TEAL},
-        ].map(function(s){ return <div key={s.lb} style={Object.assign({},sC,{padding:"14px 18px"})}>
+        ].map(function(s){ return <div key={s.lb} style={Object.assign({},saCard,{padding:"14px 18px"})}>
           <div style={{fontSize:22,marginBottom:4}}>{s.ic}</div>
-          <div style={{fontSize:20,fontWeight:800,color:s.c}}>{s.val}</div>
-          <div style={{fontSize:11,color:"#888",marginTop:2}}>{s.lb}</div>
+          <div style={{fontSize:20,fontWeight:800,color:s.c==="var(--text-primary)"?s.c:s.c}}>{s.val}</div>
+          <div style={{fontSize:11,color:"var(--text-muted,#888)",marginTop:2}}>{s.lb}</div>
         </div>; })}
       </div>}
 
       {/* Tabs */}
       <div style={{display:"flex",gap:8,marginBottom:20,flexWrap:"wrap"}}>
-        {[["tenants","🏢 Negocios"],["crear","➕ Nuevo negocio"],["cuenta","👤 Mi cuenta"]].map(function(t){ return <button key={t[0]} onClick={function(){setTab(t[0]);}} style={{padding:"8px 18px",borderRadius:20,border:"none",background:tab===t[0]?TEAL:"#e8e8e8",color:tab===t[0]?"#fff":"#333",fontWeight:tab===t[0]?700:400,fontSize:13,cursor:"pointer"}}>{t[1]}</button>; })}
+        {[["tenants","🏢 Negocios"],["crear","➕ Nuevo negocio"],["cuenta","👤 Mi cuenta"]].map(function(t){ return <button key={t[0]} onClick={function(){setTab(t[0]);}} style={{padding:"8px 18px",borderRadius:20,border:"none",background:tab===t[0]?TEAL:"var(--bg-alt,#e8e8e8)",color:tab===t[0]?"#fff":"var(--text-primary,#333)",fontWeight:tab===t[0]?700:400,fontSize:13,cursor:"pointer"}}>{t[1]}</button>; })}
       </div>
 
       {/* Lista de tenants */}
       {tab==="tenants"&&<div>
-        {loading?<p style={{color:"#888",textAlign:"center",padding:40}}>Cargando…</p>:
-        tenants.length===0?<p style={{color:"#888",textAlign:"center",padding:40}}>Sin negocios registrados</p>:
-        <div style={{overflowX:"auto"}}>
+        {loading?<p style={{color:"var(--text-muted)",textAlign:"center",padding:40}}>Cargando…</p>:
+        tenants.length===0?<p style={{color:"var(--text-muted)",textAlign:"center",padding:40}}>Sin negocios registrados</p>:
+        <div style={{overflowX:"auto",borderRadius:12,border:"1px solid var(--border-card)",overflow:"hidden"}}>
           <table style={{width:"100%",borderCollapse:"collapse"}}>
             <thead>
-              <tr>{["Negocio","Plan","Usuarios","Estado","Vencimiento","Renovar","Acciones"].map(function(h){ return <th key={h} style={Object.assign({},sTH,{whiteSpace:"nowrap"})}>{h}</th>; })}</tr>
+              <tr>{["Negocio","Plan","Usuarios","Estado","Vencimiento","Renovar","Acciones"].map(function(h){ return <th key={h} style={saTH}>{h}</th>; })}</tr>
             </thead>
             <tbody>
-              {tenants.map(function(t){ return <tr key={t.id} style={{borderBottom:"1px solid #eee"}}>
-                <td style={sTD}>
-                  <div style={{fontWeight:700,fontSize:13,color:NAVY}}>{t.name}</div>
-                  {t.owner_name&&<div style={{fontSize:11,color:"#888"}}>{t.owner_name}</div>}
-                  {t.email&&<div style={{fontSize:11,color:"#aaa"}}>{t.email}</div>}
+              {tenants.map(function(t){ return <tr key={t.id} style={{borderBottom:"1px solid var(--border-row)",background:"var(--bg-row)"}}>
+                <td style={saTD}>
+                  <div style={{fontWeight:700,fontSize:13,color:"var(--text-primary)"}}>{t.name}</div>
+                  {t.owner_name&&<div style={{fontSize:11,color:"var(--text-secondary)"}}>{t.owner_name}</div>}
+                  {t.email&&<div style={{fontSize:11,color:"var(--text-muted)"}}>{t.email}</div>}
                 </td>
-                <td style={sTD}><span style={Object.assign({},mBg(PLAN_COLOR[t.plan]||"#888"),{fontSize:11})}>{PLANS[t.plan]||t.plan}</span></td>
-                <td style={sTD}><span style={{fontWeight:700,color:NAVY}}>{t.user_count||0}</span></td>
-                <td style={sTD}><span style={Object.assign({},mBg(t.active?TEAL:"#ccc"),{fontSize:11})}>{t.active?"Activo":"Inactivo"}</span></td>
-                <td style={sTD}>
+                <td style={saTD}><span style={Object.assign({},mBg(PLAN_COLOR[t.plan]||"#888"),{fontSize:11})}>{PLANS[t.plan]||t.plan}</span></td>
+                <td style={saTD}><span style={{fontWeight:700,color:"var(--text-primary)"}}>{t.user_count||0}</span></td>
+                <td style={saTD}><span style={Object.assign({},mBg(t.active?TEAL:"#ccc"),{fontSize:11})}>{t.active?"Activo":"Inactivo"}</span></td>
+                <td style={saTD}>
                   {expiryBadge(t.expires_at)}
-                  {t.expires_at&&<div style={{fontSize:10,color:"#aaa",marginTop:2}}>{new Date(t.expires_at).toLocaleDateString("es-GT")}</div>}
+                  {t.expires_at&&<div style={{fontSize:10,color:"var(--text-muted)",marginTop:2}}>{new Date(t.expires_at).toLocaleDateString("es-GT")}</div>}
                 </td>
-                <td style={sTD}>
+                <td style={saTD}>
                   <div style={{display:"flex",gap:6,alignItems:"center"}}>
-                    <select value={renewMonths[t.id]||"1"} onChange={function(e){ var id=t.id; setRenewMonths(function(prev){ return Object.assign({},prev,{[id]:e.target.value}); }); }} style={{padding:"4px 6px",borderRadius:6,border:"1px solid #ddd",fontSize:12,background:"#fff"}}>
+                    <select value={renewMonths[t.id]||"1"} onChange={function(e){ var id=t.id; setRenewMonths(function(prev){ return Object.assign({},prev,{[id]:e.target.value}); }); }} style={{padding:"4px 6px",borderRadius:6,border:"1px solid var(--border-input)",fontSize:12,background:"var(--bg-input)",color:"var(--text-primary)"}}>
                       <option value="1">1 mes</option>
                       <option value="3">3 meses</option>
                       <option value="6">6 meses</option>
@@ -4850,17 +4858,17 @@ function SuperAdminPanel(props){
                     </button>
                   </div>
                 </td>
-                <td style={sTD}>
+                <td style={saTD}>
                   <div style={{display:"flex",gap:6,flexWrap:"wrap"}}>
-                    <button onClick={function(){ openUsers(t); }} style={{padding:"5px 12px",borderRadius:6,border:"1px solid "+TEAL,background:"#fff",fontSize:12,cursor:"pointer",color:TEAL,fontWeight:600}}>
+                    <button onClick={function(){ openUsers(t); }} style={{padding:"5px 12px",borderRadius:6,border:"1px solid "+TEAL,background:"transparent",fontSize:12,cursor:"pointer",color:TEAL,fontWeight:600}}>
                       👥 Usuarios
                     </button>
-                    <button onClick={function(){ toggleActive(t); }} style={{padding:"5px 12px",borderRadius:6,border:"1px solid #ddd",background:"#fff",fontSize:12,cursor:"pointer",color:t.active?"#E24B4A":TEAL,fontWeight:600}}>
+                    <button onClick={function(){ toggleActive(t); }} style={{padding:"5px 12px",borderRadius:6,border:"1px solid var(--border-card)",background:"transparent",fontSize:12,cursor:"pointer",color:t.active?"#E24B4A":TEAL,fontWeight:600}}>
                       {t.active?"Desactivar":"Activar"}
                     </button>
-                    <button onClick={function(){ setEditModal(Object.assign({},t)); }} style={{padding:"5px 12px",borderRadius:6,border:"1px solid #378ADD",background:"#fff",fontSize:12,cursor:"pointer",color:"#378ADD",fontWeight:600}}>✏️ Editar</button>
-                    {t.phone&&<a href={"https://wa.me/502"+t.phone.replace(/\D/g,"")} target="_blank" rel="noopener noreferrer" style={{padding:"5px 10px",borderRadius:6,border:"1px solid #25D366",background:"#fff",fontSize:12,cursor:"pointer",color:"#25D366",fontWeight:600,textDecoration:"none"}}>📱</a>}
-                    <button onClick={function(){ setDeleteConfirm(t); }} style={{padding:"5px 12px",borderRadius:6,border:"1px solid #E24B4A",background:"#fff",fontSize:12,cursor:"pointer",color:"#E24B4A",fontWeight:600}}>🗑️</button>
+                    <button onClick={function(){ setEditModal(Object.assign({},t)); }} style={{padding:"5px 12px",borderRadius:6,border:"1px solid #378ADD",background:"transparent",fontSize:12,cursor:"pointer",color:"#378ADD",fontWeight:600}}>✏️ Editar</button>
+                    {t.phone&&<a href={"https://wa.me/502"+t.phone.replace(/\D/g,"")} target="_blank" rel="noopener noreferrer" style={{padding:"5px 10px",borderRadius:6,border:"1px solid #25D366",background:"transparent",fontSize:12,cursor:"pointer",color:"#25D366",fontWeight:600,textDecoration:"none"}}>📱</a>}
+                    <button onClick={function(){ setDeleteConfirm(t); }} style={{padding:"5px 12px",borderRadius:6,border:"1px solid #E24B4A",background:"transparent",fontSize:12,cursor:"pointer",color:"#E24B4A",fontWeight:600}}>🗑️</button>
                   </div>
                 </td>
               </tr>; })}
@@ -4870,19 +4878,19 @@ function SuperAdminPanel(props){
       </div>}
 
       {/* Mi cuenta */}
-      {tab==="cuenta"&&<div style={Object.assign({},sC,{maxWidth:480,padding:28})}>
-        <h3 style={{margin:"0 0 6px",fontSize:16,fontWeight:700,color:NAVY}}>👤 Mi cuenta — SuperAdmin</h3>
-        <p style={{margin:"0 0 20px",fontSize:12,color:"#888"}}>Actualiza tu nombre, email o contraseña. Siempre se requiere la contraseña actual.</p>
-        <label style={{display:"block",fontSize:12,fontWeight:600,color:"#555",marginBottom:4}}>Nombre</label>
-        <input value={mcName} onChange={function(e){setMcName(e.target.value);}} style={Object.assign({},sI,{marginBottom:12})} placeholder={session.name||"Tu nombre"}/>
-        <label style={{display:"block",fontSize:12,fontWeight:600,color:"#555",marginBottom:4}}>Email</label>
-        <input type="email" value={mcEmail} onChange={function(e){setMcEmail(e.target.value);}} style={Object.assign({},sI,{marginBottom:16})} placeholder={session.email||"tu@email.com"}/>
-        <div style={{background:"#f0f9f5",borderRadius:10,padding:"14px 16px",marginBottom:16}}>
+      {tab==="cuenta"&&<div style={Object.assign({},saCard,{maxWidth:480,padding:28})}>
+        <h3 style={{margin:"0 0 6px",fontSize:16,fontWeight:700,color:"var(--text-primary)"}}>👤 Mi cuenta — SuperAdmin</h3>
+        <p style={{margin:"0 0 20px",fontSize:12,color:"var(--text-muted)"}}>Actualiza tu nombre, email o contraseña. Siempre se requiere la contraseña actual.</p>
+        <label style={{display:"block",fontSize:12,fontWeight:600,color:"var(--text-secondary)",marginBottom:4}}>Nombre</label>
+        <input value={mcName} onChange={function(e){setMcName(e.target.value);}} style={Object.assign({},saInput,{marginBottom:12})} placeholder={session.name||"Tu nombre"}/>
+        <label style={{display:"block",fontSize:12,fontWeight:600,color:"var(--text-secondary)",marginBottom:4}}>Email</label>
+        <input type="email" value={mcEmail} onChange={function(e){setMcEmail(e.target.value);}} style={Object.assign({},saInput,{marginBottom:16})} placeholder={session.email||"tu@email.com"}/>
+        <div style={{background:"var(--bg-alt)",borderRadius:10,padding:"14px 16px",marginBottom:16}}>
           <p style={{margin:"0 0 10px",fontSize:12,fontWeight:700,color:TEAL}}>🔒 Cambiar contraseña</p>
-          <label style={{display:"block",fontSize:12,fontWeight:600,color:"#555",marginBottom:4}}>Contraseña actual *</label>
-          <input type="password" value={mcCurrent} onChange={function(e){setMcCurrent(e.target.value);}} style={Object.assign({},sI,{marginBottom:10})} placeholder="Tu contraseña actual"/>
-          <label style={{display:"block",fontSize:12,fontWeight:600,color:"#555",marginBottom:4}}>Nueva contraseña (opcional)</label>
-          <input type="password" value={mcNew} onChange={function(e){setMcNew(e.target.value);}} style={sI} placeholder="Dejar vacío para no cambiar"/>
+          <label style={{display:"block",fontSize:12,fontWeight:600,color:"var(--text-secondary)",marginBottom:4}}>Contraseña actual *</label>
+          <input type="password" value={mcCurrent} onChange={function(e){setMcCurrent(e.target.value);}} style={Object.assign({},saInput,{marginBottom:10})} placeholder="Tu contraseña actual"/>
+          <label style={{display:"block",fontSize:12,fontWeight:600,color:"var(--text-secondary)",marginBottom:4}}>Nueva contraseña (opcional)</label>
+          <input type="password" value={mcNew} onChange={function(e){setMcNew(e.target.value);}} style={saInput} placeholder="Dejar vacío para no cambiar"/>
         </div>
         <button onClick={saveMyAccount} disabled={mcSaving||!mcCurrent} style={Object.assign({},mB(TEAL),{width:"100%",padding:"13px",fontSize:15,opacity:mcSaving||!mcCurrent?0.6:1})}>
           {mcSaving?"Guardando…":"Guardar cambios ✓"}
@@ -4890,12 +4898,12 @@ function SuperAdminPanel(props){
       </div>}
 
       {/* Modal usuarios de tenant */}
-      {usersModal&&<div style={{position:"fixed",inset:0,background:"rgba(0,0,0,0.5)",zIndex:3000,display:"flex",alignItems:"center",justifyContent:"center",padding:16}}>
-        <div style={{background:"#fff",borderRadius:16,padding:24,width:"100%",maxWidth:640,maxHeight:"90vh",overflowY:"auto",boxShadow:"0 8px 40px rgba(0,0,0,0.2)"}}>
+      {usersModal&&<div style={{position:"fixed",inset:0,background:"rgba(0,0,0,0.6)",zIndex:3000,display:"flex",alignItems:"center",justifyContent:"center",padding:16}}>
+        <div style={{background:"var(--bg-card,#fff)",borderRadius:16,padding:24,width:"100%",maxWidth:640,maxHeight:"90vh",overflowY:"auto",boxShadow:"0 8px 40px rgba(0,0,0,0.3)"}}>
           <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:16}}>
             <div>
-              <h3 style={{margin:0,fontSize:16,fontWeight:700,color:NAVY}}>👥 Usuarios — {usersModal.tenant.name}</h3>
-              <p style={{margin:"4px 0 0",fontSize:12,color:"#888"}}>Gestiona accesos y contraseñas del negocio</p>
+              <h3 style={{margin:0,fontSize:16,fontWeight:700,color:"var(--text-primary)"}}>👥 Usuarios — {usersModal.tenant.name}</h3>
+              <p style={{margin:"4px 0 0",fontSize:12,color:"var(--text-muted)"}}>Gestiona accesos y contraseñas del negocio</p>
             </div>
             <button onClick={function(){setUsersModal(null);setResetPwMap({});}} style={{background:"none",border:"none",fontSize:22,cursor:"pointer",color:"#aaa",lineHeight:1}}>✕</button>
           </div>
@@ -4960,65 +4968,65 @@ function SuperAdminPanel(props){
       </div>}
 
       {/* Modal editar negocio */}
-      {editModal&&<div style={{position:"fixed",inset:0,background:"rgba(0,0,0,0.5)",zIndex:3000,display:"flex",alignItems:"center",justifyContent:"center",padding:16}}>
-        <div style={{background:"#fff",borderRadius:16,padding:24,width:"100%",maxWidth:500,maxHeight:"90vh",overflowY:"auto",boxShadow:"0 8px 40px rgba(0,0,0,0.2)"}}>
+      {editModal&&<div style={{position:"fixed",inset:0,background:"rgba(0,0,0,0.6)",zIndex:3000,display:"flex",alignItems:"center",justifyContent:"center",padding:16}}>
+        <div style={{background:"var(--bg-card,#fff)",borderRadius:16,padding:24,width:"100%",maxWidth:500,maxHeight:"90vh",overflowY:"auto",boxShadow:"0 8px 40px rgba(0,0,0,0.3)"}}>
           <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:16}}>
-            <h3 style={{margin:0,fontSize:16,fontWeight:700,color:NAVY}}>✏️ Editar negocio</h3>
+            <h3 style={{margin:0,fontSize:16,fontWeight:700,color:"var(--text-primary)"}}>✏️ Editar negocio</h3>
             <button onClick={function(){setEditModal(null);}} style={{background:"none",border:"none",fontSize:22,cursor:"pointer",color:"#aaa"}}>✕</button>
           </div>
-          <label style={{display:"block",fontSize:12,fontWeight:600,color:"#555",marginBottom:4}}>Nombre del negocio</label>
-          <input value={editModal.name||""} onChange={function(e){setEditModal(function(p){return Object.assign({},p,{name:e.target.value});});}} style={Object.assign({},sI,{marginBottom:12})}/>
-          <label style={{display:"block",fontSize:12,fontWeight:600,color:"#555",marginBottom:4}}>Propietario</label>
-          <input value={editModal.owner_name||""} onChange={function(e){setEditModal(function(p){return Object.assign({},p,{owner_name:e.target.value});});}} style={Object.assign({},sI,{marginBottom:12})}/>
+          <label style={{display:"block",fontSize:12,fontWeight:600,color:"var(--text-secondary)",marginBottom:4}}>Nombre del negocio</label>
+          <input value={editModal.name||""} onChange={function(e){setEditModal(function(p){return Object.assign({},p,{name:e.target.value});});}} style={Object.assign({},saInput,{marginBottom:12})}/>
+          <label style={{display:"block",fontSize:12,fontWeight:600,color:"var(--text-secondary)",marginBottom:4}}>Propietario</label>
+          <input value={editModal.owner_name||""} onChange={function(e){setEditModal(function(p){return Object.assign({},p,{owner_name:e.target.value});});}} style={Object.assign({},saInput,{marginBottom:12})}/>
           <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:12,marginBottom:12}}>
             <div>
-              <label style={{display:"block",fontSize:12,fontWeight:600,color:"#555",marginBottom:4}}>Plan</label>
-              <select value={editModal.plan||"basic"} onChange={function(e){setEditModal(function(p){return Object.assign({},p,{plan:e.target.value});});}} style={sI}>
+              <label style={{display:"block",fontSize:12,fontWeight:600,color:"var(--text-secondary)",marginBottom:4}}>Plan</label>
+              <select value={editModal.plan||"basic"} onChange={function(e){setEditModal(function(p){return Object.assign({},p,{plan:e.target.value});});}} style={saInput}>
                 <option value="basic">Básico</option>
                 <option value="professional">Profesional</option>
                 <option value="enterprise">Empresarial</option>
               </select>
             </div>
             <div>
-              <label style={{display:"block",fontSize:12,fontWeight:600,color:"#555",marginBottom:4}}>Teléfono</label>
-              <input value={editModal.phone||""} onChange={function(e){setEditModal(function(p){return Object.assign({},p,{phone:e.target.value});});}} style={sI} placeholder="50212345678"/>
+              <label style={{display:"block",fontSize:12,fontWeight:600,color:"var(--text-secondary)",marginBottom:4}}>Teléfono</label>
+              <input value={editModal.phone||""} onChange={function(e){setEditModal(function(p){return Object.assign({},p,{phone:e.target.value});});}} style={saInput} placeholder="50212345678"/>
             </div>
           </div>
-          <label style={{display:"block",fontSize:12,fontWeight:600,color:"#555",marginBottom:4}}>Email de contacto</label>
-          <input type="email" value={editModal.email||""} onChange={function(e){setEditModal(function(p){return Object.assign({},p,{email:e.target.value});});}} style={Object.assign({},sI,{marginBottom:12})}/>
-          <label style={{display:"block",fontSize:12,fontWeight:600,color:"#555",marginBottom:4}}>Notas internas</label>
-          <textarea value={editModal.notes||""} onChange={function(e){setEditModal(function(p){return Object.assign({},p,{notes:e.target.value});});}} style={Object.assign({},sI,{marginBottom:16,height:70,resize:"vertical"})}/>
+          <label style={{display:"block",fontSize:12,fontWeight:600,color:"var(--text-secondary)",marginBottom:4}}>Email de contacto</label>
+          <input type="email" value={editModal.email||""} onChange={function(e){setEditModal(function(p){return Object.assign({},p,{email:e.target.value});});}} style={Object.assign({},saInput,{marginBottom:12})}/>
+          <label style={{display:"block",fontSize:12,fontWeight:600,color:"var(--text-secondary)",marginBottom:4}}>Notas internas</label>
+          <textarea value={editModal.notes||""} onChange={function(e){setEditModal(function(p){return Object.assign({},p,{notes:e.target.value});});}} style={Object.assign({},saInput,{marginBottom:16,height:70,resize:"vertical"})}/>
           <div style={{display:"flex",gap:10}}>
             <button onClick={saveEditTenant} disabled={editSaving} style={Object.assign({},mB(TEAL),{flex:1,opacity:editSaving?0.6:1})}>{editSaving?"Guardando…":"Guardar cambios ✓"}</button>
-            <button onClick={function(){setEditModal(null);}} style={{padding:"11px 18px",borderRadius:10,border:"1px solid #ddd",background:"#fff",fontSize:14,cursor:"pointer",color:"#666"}}>Cancelar</button>
+            <button onClick={function(){setEditModal(null);}} style={{padding:"11px 18px",borderRadius:10,border:"1px solid var(--border-card)",background:"var(--bg-alt)",fontSize:14,cursor:"pointer",color:"var(--text-secondary)"}}>Cancelar</button>
           </div>
         </div>
       </div>}
 
       {/* Confirmar eliminar negocio */}
       {deleteConfirm&&<div style={{position:"fixed",inset:0,background:"rgba(0,0,0,0.6)",zIndex:4000,display:"flex",alignItems:"center",justifyContent:"center",padding:16}}>
-        <div style={{background:"#fff",borderRadius:16,padding:28,width:"100%",maxWidth:420,boxShadow:"0 8px 40px rgba(0,0,0,0.3)"}}>
+        <div style={{background:"var(--bg-card,#fff)",borderRadius:16,padding:28,width:"100%",maxWidth:420,boxShadow:"0 8px 40px rgba(0,0,0,0.3)"}}>
           <div style={{textAlign:"center",marginBottom:16}}>
             <div style={{fontSize:48,marginBottom:8}}>⚠️</div>
             <h3 style={{margin:"0 0 8px",fontSize:17,fontWeight:800,color:"#E24B4A"}}>Eliminar negocio</h3>
-            <p style={{margin:"0 0 6px",fontSize:14,color:"#333"}}>Estás a punto de eliminar <strong>{deleteConfirm.name}</strong></p>
+            <p style={{margin:"0 0 6px",fontSize:14,color:"var(--text-primary)"}}>Estás a punto de eliminar <strong>{deleteConfirm.name}</strong></p>
             <p style={{margin:0,fontSize:12,color:"#E24B4A",fontWeight:600}}>Esta acción es IRREVERSIBLE. Se borrarán todos sus datos: ventas, productos, usuarios, reparaciones y más.</p>
           </div>
           <div style={{display:"flex",gap:10}}>
             <button onClick={doDeleteTenant} disabled={deleteSaving} style={{flex:1,padding:"12px",borderRadius:10,border:"none",background:"#E24B4A",color:"#fff",fontSize:14,fontWeight:700,cursor:"pointer",opacity:deleteSaving?0.6:1}}>{deleteSaving?"Eliminando…":"Sí, eliminar todo"}</button>
-            <button onClick={function(){setDeleteConfirm(null);}} style={{flex:1,padding:"12px",borderRadius:10,border:"1px solid #ddd",background:"#fff",fontSize:14,cursor:"pointer",color:"#666"}}>Cancelar</button>
+            <button onClick={function(){setDeleteConfirm(null);}} style={{flex:1,padding:"12px",borderRadius:10,border:"1px solid var(--border-card)",background:"var(--bg-alt)",fontSize:14,cursor:"pointer",color:"var(--text-secondary)"}}>Cancelar</button>
           </div>
         </div>
       </div>}
 
       {/* Confirmar eliminar usuario */}
       {deleteUserConfirm&&<div style={{position:"fixed",inset:0,background:"rgba(0,0,0,0.6)",zIndex:4000,display:"flex",alignItems:"center",justifyContent:"center",padding:16}}>
-        <div style={{background:"#fff",borderRadius:16,padding:28,width:"100%",maxWidth:380,boxShadow:"0 8px 40px rgba(0,0,0,0.3)"}}>
+        <div style={{background:"var(--bg-card,#fff)",borderRadius:16,padding:28,width:"100%",maxWidth:380,boxShadow:"0 8px 40px rgba(0,0,0,0.3)"}}>
           <div style={{textAlign:"center",marginBottom:16}}>
             <div style={{fontSize:42,marginBottom:8}}>🗑️</div>
             <h3 style={{margin:"0 0 8px",fontSize:16,fontWeight:800,color:"#E24B4A"}}>Eliminar usuario</h3>
-            <p style={{margin:"0 0 4px",fontSize:14,color:"#333"}}><strong>{deleteUserConfirm.name}</strong></p>
-            <p style={{margin:0,fontSize:12,color:"#888"}}>{deleteUserConfirm.email}</p>
+            <p style={{margin:"0 0 4px",fontSize:14,color:"var(--text-primary)"}}><strong>{deleteUserConfirm.name}</strong></p>
+            <p style={{margin:0,fontSize:12,color:"var(--text-muted)"}}>{deleteUserConfirm.email}</p>
             <p style={{margin:"10px 0 0",fontSize:12,color:"#E24B4A",fontWeight:600}}>Esta acción no se puede deshacer.</p>
           </div>
           <div style={{display:"flex",gap:10}}>
@@ -5901,11 +5909,16 @@ function App(props) {
   if(session.role==="superadmin"){
     return (
       <div style={{minHeight:"100vh",background:"var(--bg-main,#eceae4)"}}>
-        <div style={{background:NAVY,padding:"12px 24px",display:"flex",alignItems:"center",justifyContent:"space-between"}}>
+        <div style={{background:NAVY,padding:"12px 24px",display:"flex",alignItems:"center",justifyContent:"space-between",flexWrap:"wrap",gap:8}}>
           <span style={{color:"#fff",fontWeight:800,fontSize:16}}>🏢 {APP_NAME} — Panel de Control</span>
-          <button onClick={onLogout} style={{background:"transparent",border:"1px solid rgba(255,255,255,0.3)",color:"#fff",padding:"6px 14px",borderRadius:6,cursor:"pointer",fontSize:13}}>Cerrar sesión</button>
+          <div style={{display:"flex",gap:8,alignItems:"center"}}>
+            <button onClick={toggleTheme} style={{background:"transparent",border:"1px solid rgba(255,255,255,0.3)",color:"#fff",padding:"6px 14px",borderRadius:6,cursor:"pointer",fontSize:13}}>
+              {theme==="light"?"🌙 Modo oscuro":"☀️ Modo claro"}
+            </button>
+            <button onClick={onLogout} style={{background:"transparent",border:"1px solid rgba(255,255,255,0.3)",color:"#fff",padding:"6px 14px",borderRadius:6,cursor:"pointer",fontSize:13}}>Cerrar sesión</button>
+          </div>
         </div>
-        <SuperAdminPanel session={session}/>
+        <SuperAdminPanel session={session} theme={theme}/>
       </div>
     );
   }
