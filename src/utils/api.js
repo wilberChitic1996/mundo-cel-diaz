@@ -90,7 +90,7 @@ export const defectivesAPI = {
 
 // ── Usuarios ──────────────────────────────────────────
 export const usersAPI = {
-  getAll:  function()      { return api.get('/users'); },
+  getAll:  function(cfg)   { return api.get('/users', cfg); },
   create:  function(data)  { return api.post('/users', data); },
   update:  function(id, d) { return api.put('/users/' + id, d); },
 };
