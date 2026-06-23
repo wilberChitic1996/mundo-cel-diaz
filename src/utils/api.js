@@ -127,6 +127,17 @@ export const auditAPI = {
   },
 };
 
+// ── Caja ──────────────────────────────────────────────
+export const cajaAPI = {
+  getSesiones:   function()          { return api.get('/caja/sesiones'); },
+  getSesionActiva: function()        { return api.get('/caja/sesiones/activa'); },
+  abrir:         function(data)      { return api.post('/caja/abrir', data); },
+  cerrar:        function(id, data)  { return api.post('/caja/cerrar/' + id, data); },
+  getGastos:     function(sesionId)  { return api.get('/caja/gastos' + (sesionId ? '?sesion_id=' + sesionId : '')); },
+  crearGasto:    function(data)      { return api.post('/caja/gastos', data); },
+  eliminarGasto: function(id)        { return api.delete('/caja/gastos/' + id); },
+};
+
 // ── Health check ──────────────────────────────────────
 export const checkAPI = async function() {
   try {
