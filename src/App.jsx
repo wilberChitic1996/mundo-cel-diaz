@@ -2324,7 +2324,21 @@ function AccountsScreen(props) {
 
   return (
       <div>
-        <p style={H1}>💳 Cuentas por Cobrar</p>
+        <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:4,flexWrap:"wrap",gap:10}}>
+          <p style={Object.assign({},H1,{margin:0})}>💳 Cuentas por Cobrar</p>
+          <div style={{display:"flex",gap:8}}>
+            <button style={Object.assign({},mB("teal"),{padding:"6px 12px",fontSize:12})} onClick={function(){
+              var cols=["Cliente","Fecha","Total","Pagado","Saldo","Estado"];
+              var rows=filtered.map(function(a){return[a.client||"",fmtD(a.date),a.total.toFixed(2),a.paid.toFixed(2),a.balance.toFixed(2),a.status||""];});
+              exportExcel(rows,cols,"cuentas_por_cobrar");
+            }}>📊 Excel</button>
+            <button style={Object.assign({},mB("blue"),{padding:"6px 12px",fontSize:12})} onClick={function(){
+              var cols=["Cliente","Fecha","Total","Pagado","Saldo","Estado"];
+              var rows=filtered.map(function(a){return[a.client||"",fmtD(a.date),"Q"+a.total.toFixed(2),"Q"+a.paid.toFixed(2),"Q"+a.balance.toFixed(2),a.status||""];});
+              exportPDF("Cuentas por Cobrar",cols,rows,"cuentas_por_cobrar");
+            }}>📄 PDF</button>
+          </div>
+        </div>
         <div className="rg-3" style={{display:"grid",gridTemplateColumns:"repeat(3,1fr)",gap:14,marginBottom:16}}>
           <MetricBox label="Total pendiente" value={Q(totalPend)}       color="#E24B4A"/>
           <MetricBox label="Total cobrado"   value={Q(totalCob)}        color={TEAL}/>
@@ -2953,10 +2967,26 @@ function InventoryScreen(props) {
   var total=products.filter(function(p){return p.unit!=="serv";}).reduce(function(s,p){return s+p.stock;},0);
   return (
       <div>
-        <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:20}}>
+        <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:20,flexWrap:"wrap",gap:10}}>
           <p style={H1}>🗄️ Inventario</p>
-          <div style={{background:"#f5f4f0",borderRadius:8,padding:"8px 14px",fontSize:13,color:"#666"}}>
-            <b>{products.filter(function(p){return p.unit!=="serv";}).length}</b> productos · <b style={{color:TEAL}}>{total}</b> uds
+          <div style={{display:"flex",gap:8,alignItems:"center",flexWrap:"wrap"}}>
+            <div style={{background:"#f5f4f0",borderRadius:8,padding:"8px 14px",fontSize:13,color:"#666"}}>
+              <b>{products.filter(function(p){return p.unit!=="serv";}).length}</b> productos · <b style={{color:TEAL}}>{total}</b> uds
+            </div>
+            <button style={Object.assign({},mB("teal"),{padding:"6px 12px",fontSize:12})} onClick={function(){
+              var cols=["Código","Nombre","Categoría","Ubicación","Stock","Precio","Costo"];
+              var rows=products.filter(function(p){return p.unit!=="serv";}).map(function(p){
+                return[p.code||"",p.name,p.category||"",p.shelf||"",p.stock,p.price.toFixed(2),p.cost.toFixed(2)];
+              });
+              exportExcel(rows,cols,"inventario");
+            }}>📊 Excel</button>
+            <button style={Object.assign({},mB("blue"),{padding:"6px 12px",fontSize:12})} onClick={function(){
+              var cols=["Código","Nombre","Categoría","Ubic.","Stock","Precio","Costo"];
+              var rows=products.filter(function(p){return p.unit!=="serv";}).map(function(p){
+                return[p.code||"",p.name,p.category||"",p.shelf||"",p.stock,"Q"+p.price.toFixed(2),"Q"+p.cost.toFixed(2)];
+              });
+              exportPDF("Inventario de Productos",cols,rows,"inventario");
+            }}>📄 PDF</button>
           </div>
         </div>
         <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fill,minmax(265px,1fr))",gap:16}}>
@@ -2984,6 +3014,26 @@ function InventoryScreen(props) {
         </div>
       </div>
   );
+}
+
+/* ── Exportar Excel / PDF ── */
+function exportExcel(rows, cols, filename){
+  var ws = XLSX.utils.aoa_to_sheet([cols].concat(rows));
+  var wb = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb, ws, "Reporte");
+  XLSX.writeFile(wb, filename+".xlsx");
+}
+
+async function exportPDF(title, cols, rows, filename){
+  var jsPDF = (await import('jspdf')).jsPDF;
+  var autoTable = (await import('jspdf-autotable')).default;
+  var doc = new jsPDF({ orientation: rows[0]&&rows[0].length>6?"landscape":"portrait" });
+  doc.setFontSize(14);
+  doc.text(title, 14, 16);
+  doc.setFontSize(9);
+  doc.text("Generado: "+new Date().toLocaleString("es-GT"), 14, 23);
+  autoTable(doc, { head:[cols], body:rows, startY:28, styles:{fontSize:8}, headStyles:{fillColor:[29,158,117]} });
+  doc.save(filename+".pdf");
 }
 
 /* ── Historial ── */
@@ -3229,9 +3279,21 @@ function HistoryScreen(props) {
   var hfilters=[["todos","Todos"],["sale","Ventas"],["credito","Creditos"],["abono","Abonos"],["devolucion","Devoluciones"]];
   return (
       <div>
-        <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:20}}>
+        <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:20,flexWrap:"wrap",gap:10}}>
           <p style={H1}>📋 Historial de Movimientos</p>
-          <div style={{fontSize:13,color:"#666"}}>{movs.length} movimientos</div>
+          <div style={{display:"flex",gap:8,alignItems:"center",flexWrap:"wrap"}}>
+            <span style={{fontSize:13,color:"#666"}}>{fmovs.length} registros</span>
+            <button style={Object.assign({},mB("teal"),{padding:"6px 12px",fontSize:12})} onClick={function(){
+              var cols=["Fecha","Tipo","Cliente","Método","Atendió","Monto"];
+              var rows=fmovs.map(function(m){return[fmtD(m.date)+" "+fmtT(m.date),m.tipo,m.cliente||"",m.metodo||"",m.atendio||"",(m.signo<0?"-":"+")+m.monto.toFixed(2)];});
+              exportExcel(rows,cols,"historial_movimientos");
+            }}>📊 Excel</button>
+            <button style={Object.assign({},mB("blue"),{padding:"6px 12px",fontSize:12})} onClick={function(){
+              var cols=["Fecha","Tipo","Cliente","Método","Atendió","Monto"];
+              var rows=fmovs.map(function(m){return[fmtD(m.date)+" "+fmtT(m.date),m.tipo,m.cliente||"",m.metodo||"",m.atendio||"",(m.signo<0?"-Q":"+Q")+m.monto.toFixed(2)];});
+              exportPDF("Historial de Movimientos",cols,rows,"historial_movimientos");
+            }}>📄 PDF</button>
+          </div>
         </div>
         <div className="rg-3" style={{display:"grid",gridTemplateColumns:"repeat(3,1fr)",gap:14,marginBottom:18}}>
           <MetricBox label="Entradas (ventas + abonos)" value={Q(totEnt)} color={TEAL}/>
@@ -5706,11 +5768,23 @@ function RepairsScreen(props){
 
   return (
     <div>
-      <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:20}}>
-        <p style={H1}>🔧 Reparaciones</p>
-        <button style={mB(showForm?"red":"teal")} onClick={function(){if(showForm){closeForm();}else{resetForm();setShowForm(true);}}}>
-          {showForm?"✕ Cancelar":"+ Nueva orden"}
-        </button>
+      <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:20,flexWrap:"wrap",gap:10}}>
+        <p style={Object.assign({},H1,{margin:0})}>🔧 Reparaciones</p>
+        <div style={{display:"flex",gap:8,flexWrap:"wrap"}}>
+          {!showForm&&<>
+            <button style={Object.assign({},mB("teal"),{padding:"6px 12px",fontSize:12})} onClick={function(){
+              var cols=["Cliente","Equipo","Problema","Técnico","Estado","Costo","Fecha"];
+              var rows=repairs.map(function(r){return[r.client_name||"",r.brand+" "+r.model,r.problem||"",r.tech||"",r.status||"","Q"+(r.cost||0).toFixed(2),fmtD(r.created_at||r.date)];});
+              exportExcel(rows,cols,"reparaciones");
+            }}>📊 Excel</button>
+            <button style={Object.assign({},mB("blue"),{padding:"6px 12px",fontSize:12})} onClick={function(){
+              var cols=["Cliente","Equipo","Problema","Técnico","Estado","Costo","Fecha"];
+              var rows=repairs.map(function(r){return[r.client_name||"",r.brand+" "+r.model,r.problem||"",r.tech||"",r.status||"","Q"+(r.cost||0).toFixed(2),fmtD(r.created_at||r.date)];});
+              exportPDF("Órdenes de Reparación",cols,rows,"reparaciones");
+            }}>📄 PDF</button>
+          </>}
+          <button style={mB(showForm?"red":"teal")} onClick={function(){if(showForm){closeForm();}else{resetForm();setShowForm(true);}}}>{showForm?"✕ Cancelar":"+ Nueva orden"}</button>
+        </div>
       </div>
 
       {/* FORMULARIO NUEVA ORDEN */}
