@@ -3589,7 +3589,7 @@ function AyudaScreen(props) {
       "El sistema también hace un respaldo automático cada vez que cerrás la caja.",
       "Se recomienda hacer un respaldo manual una vez por semana.",
     ], tips:[
-      "El archivo Excel tiene 11 hojas: Ventas, Inventario, Cuentas, Clientes, Reparaciones y más.",
+      "El archivo Excel tiene 13 hojas: Productos, Ventas, Detalle de Ventas, Cuentas, Pagos, Clientes, Reparaciones y más.",
       "Si aparece la alerta amarilla de respaldo en el Dashboard, significa que hace más de 7 días que no respaldás.",
     ]},
   ];
@@ -3723,7 +3723,7 @@ function BackupScreen(props) {
       <div style={Object.assign({},sC,{marginBottom:16,borderLeft:"4px solid "+TEAL})}>
         <p style={{fontWeight:700,fontSize:15,margin:"0 0 6px"}}>📊 Exportar a Excel completo (.xlsx)</p>
         <p style={{fontSize:13,color:"#666",margin:"0 0 12px",lineHeight:1.6}}>
-          11 hojas: Resumen · Ventas · Detalle Ventas · Cuentas · Pagos · Devoluciones · Inventario · Clientes · Reparaciones · Garantías · Proveedores y Compras.
+          13 hojas con todo el detalle: Resumen · Productos · Ventas · Detalle Ventas · Cuentas · Historial Pagos · Devoluciones · Clientes · Reparaciones · Garantías · Proveedores · Compras · Piezas Defectuosas. Si algún módulo no se descarga, queda marcado en la hoja Resumen.
         </p>
         <button style={Object.assign({},mB("teal"),{padding:"11px 28px",fontSize:14,opacity:busy?0.6:1})} onClick={doExcelFull} disabled={busy}>
           {busy?"Generando…":"📊 Descargar Excel"}
@@ -5749,19 +5749,27 @@ function App(props) {
 
   async function exportJSON(){
     var now=new Date();
-    var [prods,sls,accs,rets,defs,clis,reps,wars,sups,purs]=await Promise.all([
-      productsAPI.getAll().catch(function(){return products;}),
-      salesAPI.getAll().catch(function(){return [];}),
-      accountsAPI.getAll().catch(function(){return [];}),
-      returnsAPI.getAll().catch(function(){return [];}),
-      defectivesAPI.getAll().catch(function(){return [];}),
-      clientsAPI.getAll().catch(function(){return [];}),
-      repairsAPI.getAll().catch(function(){return [];}),
-      warrantiesAPI.getAll().catch(function(){return [];}),
-      suppliersAPI.getAll().catch(function(){return [];}),
-      suppliersAPI.getPurchases().catch(function(){return [];}),
+    var CFG={timeout:60000};
+    var failed=[];
+    function grab(name,promise){ return promise.catch(function(){ failed.push(name); return null; }); }
+    var r=await Promise.all([
+      grab("Productos",   productsAPI.getAll(CFG)),
+      grab("Ventas",      salesAPI.getAll(CFG)),
+      grab("Cuentas",     accountsAPI.getAll(CFG)),
+      grab("Devoluciones",returnsAPI.getAll(CFG)),
+      grab("Defectuosos", defectivesAPI.getAll(CFG)),
+      grab("Clientes",    clientsAPI.getAll(CFG)),
+      grab("Reparaciones",repairsAPI.getAll(CFG)),
+      grab("Garantías",   warrantiesAPI.getAll(CFG)),
+      grab("Proveedores", suppliersAPI.getAll(CFG)),
+      grab("Compras",     suppliersAPI.getPurchases(CFG)),
     ]);
-    var data={version:"2.2",exportDate:now.toISOString(),negocio:getStore().store_name||STORE_FALLBACK,products:prods,sales:sls,accounts:accs,returns:rets,defectives:defs,clients:clis,repairs:reps,warranties:wars,suppliers:sups,purchases:purs};
+    if(failed.length===r.length){
+      showFlash("⛔ No se pudo conectar con el servidor. Revisá tu internet e intentá de nuevo.","err");
+      throw new Error("backup-fetch-failed");
+    }
+    var prods=r[0]||[],sls=r[1]||[],accs=r[2]||[],rets=r[3]||[],defs=r[4]||[],clis=r[5]||[],reps=r[6]||[],wars=r[7]||[],sups=r[8]||[],purs=r[9]||[];
+    var data={version:"2.2",exportDate:now.toISOString(),negocio:getStore().store_name||STORE_FALLBACK,incomplete:failed.length>0?failed:undefined,products:prods,sales:sls,accounts:accs,returns:rets,defectives:defs,clients:clis,repairs:reps,warranties:wars,suppliers:sups,purchases:purs};
     var blob=new Blob([JSON.stringify(data,null,2)],{type:"application/json"});
     var url=URL.createObjectURL(blob);
     var a=document.createElement("a");a.href=url;a.download=(getStore().store_name||"backup").replace(/\s+/g,"_")+"_"+now.toISOString().slice(0,10)+".json";
@@ -5771,65 +5779,112 @@ function App(props) {
 
   async function exportExcel(){
     var now=new Date();
-    var [prods,sls,accs,rets,defs,clis,reps,wars,sups,purs]=await Promise.all([
-      productsAPI.getAll().catch(function(){return products;}),
-      salesAPI.getAll().catch(function(){return [];}),
-      accountsAPI.getAll().catch(function(){return [];}),
-      returnsAPI.getAll().catch(function(){return [];}),
-      defectivesAPI.getAll().catch(function(){return [];}),
-      clientsAPI.getAll().catch(function(){return [];}),
-      repairsAPI.getAll().catch(function(){return [];}),
-      warrantiesAPI.getAll().catch(function(){return [];}),
-      suppliersAPI.getAll().catch(function(){return [];}),
-      suppliersAPI.getPurchases().catch(function(){return [];}),
+    var CFG={timeout:60000}; // 60s — descargar TODO sin cortes en servidores lentos
+    // Cada módulo se descarga registrando si falló, para nunca generar una hoja
+    // vacía "en silencio". Si un módulo crítico falla, el respaldo se aborta.
+    var failed=[];
+    function grab(name,promise){ return promise.catch(function(){ failed.push(name); return null; }); }
+    var results=await Promise.all([
+      grab("Productos",   productsAPI.getAll(CFG)),
+      grab("Ventas",      salesAPI.getAll(CFG)),
+      grab("Cuentas",     accountsAPI.getAll(CFG)),
+      grab("Devoluciones",returnsAPI.getAll(CFG)),
+      grab("Defectuosos", defectivesAPI.getAll(CFG)),
+      grab("Clientes",    clientsAPI.getAll(CFG)),
+      grab("Reparaciones",repairsAPI.getAll(CFG)),
+      grab("Garantías",   warrantiesAPI.getAll(CFG)),
+      grab("Proveedores", suppliersAPI.getAll(CFG)),
+      grab("Compras",     suppliersAPI.getPurchases(CFG)),
     ]);
+    var prods=results[0],sls=results[1],accs=results[2],rets=results[3],defs=results[4],
+        clis=results[5],reps=results[6],wars=results[7],sups=results[8],purs=results[9];
+
+    // Si TODO falló, no generamos un archivo engañoso: avisamos y abortamos.
+    if(failed.length===results.length){
+      showFlash("⛔ No se pudo conectar con el servidor. Revisá tu internet e intentá de nuevo.","err");
+      throw new Error("backup-fetch-failed");
+    }
+    // Normalizar: un módulo que falló queda como [] pero ya está marcado en 'failed'.
+    prods=prods||[];sls=sls||[];accs=accs||[];rets=rets||[];defs=defs||[];
+    clis=clis||[];reps=reps||[];wars=wars||[];sups=sups||[];purs=purs||[];
+
     var wb=XLSX.utils.book_new();
     var storeName=getStore().store_name||STORE_FALLBACK;
-    var pendAcc=(accs||[]).filter(function(a){return a.status!=="pagado";});
-    var totalReemb=(rets||[]).reduce(function(s,r){return s+Number(r.refund_amount||r.refundAmount||0);},0);
-    // Resumen
-    XLSX.utils.book_append_sheet(wb,XLSX.utils.aoa_to_sheet([
-      [storeName+" — Reporte Completo"],["Generado:",fmtD(now)+" "+fmtT(now)],[],
-      ["MÓDULO","CANTIDAD","DETALLE"],
-      ["Productos",(prods||[]).length,""],
-      ["Clientes",(clis||[]).length,""],
-      ["Ventas",(sls||[]).length,"Total Q "+(sls||[]).reduce(function(s,x){return s+Number(x.total||0);},0).toFixed(2)],
-      ["Cuentas activas",pendAcc.length,"Por cobrar Q "+pendAcc.reduce(function(s,a){return s+Number(a.balance||0);},0).toFixed(2)],
-      ["Devoluciones",(rets||[]).length,"Reembolsado Q "+totalReemb.toFixed(2)],
-      ["Reparaciones",(reps||[]).length,""],
-      ["Garantías",(wars||[]).length,""],
-      ["Proveedores",(sups||[]).length,""],
-      ["Compras",(purs||[]).length,"Total Q "+(purs||[]).reduce(function(s,p){return s+Number(p.total||0);},0).toFixed(2)],
-      ["Piezas defectuosas",(defs||[]).length,""],
-    ]),"Resumen");
-    // Ventas
-    XLSX.utils.book_append_sheet(wb,XLSX.utils.aoa_to_sheet([["ID","Fecha","Cliente","Método","Total (Q)","Registrado por"]].concat((sls||[]).map(function(s){return [s.id,fmtD(s.created_at||s.date),s.client,s.method,Number(s.total||0).toFixed(2),(s.registrado_por&&s.registrado_por.name)||""];}))),"Ventas");
-    // Detalle ventas
-    XLSX.utils.book_append_sheet(wb,XLSX.utils.aoa_to_sheet([["ID Venta","Fecha","Cliente","Código","Producto","Cant.","Precio","Subtotal"]].concat((sls||[]).reduce(function(arr,s){return arr.concat(((s.sale_items||s.items)||[]).map(function(it){return [s.id,fmtD(s.created_at||s.date),s.client,it.code||"",it.name,it.qty,Number(it.price||0).toFixed(2),(Number(it.price||0)*Number(it.qty||0)).toFixed(2)];}));},[]))),  "Detalle Ventas");
-    // Cuentas
-    XLSX.utils.book_append_sheet(wb,XLSX.utils.aoa_to_sheet([["ID","Fecha","Cliente","Total","Pagado","Saldo","Estado"]].concat((accs||[]).map(function(a){return [a.id,fmtD(a.created_at||a.date),a.client,Number(a.total||0).toFixed(2),Number(a.paid||0).toFixed(2),Number(a.balance||0).toFixed(2),a.status||""];}))),"Cuentas");
-    // Pagos
-    var pmts=(accs||[]).reduce(function(arr,a){return arr.concat(((a.account_payments||a.payments)||[]).map(function(p){return [a.id,a.client,fmtD(p.date||p.created_at),Number(p.amount||0).toFixed(2),p.method||"",p.note||""];}));},[]);
-    XLSX.utils.book_append_sheet(wb,XLSX.utils.aoa_to_sheet([["ID Cuenta","Cliente","Fecha Pago","Monto","Método","Nota"]].concat(pmts)),"Historial Pagos");
-    // Devoluciones
-    XLSX.utils.book_append_sheet(wb,XLSX.utils.aoa_to_sheet([["ID","Fecha","Cliente","Motivo","Condición","Método reemb.","Monto reemb."]].concat((rets||[]).map(function(r){return [r.id,fmtD(r.created_at||r.date),r.client,r.reason||"",r.item_condition||r.itemCondition||"",r.refund_method||r.refundMethod||"",Number(r.refund_amount||r.refundAmount||0).toFixed(2)];}))),"Devoluciones");
-    // Inventario
-    XLSX.utils.book_append_sheet(wb,XLSX.utils.aoa_to_sheet([["Código","Nombre","Categoría","Estantería","Stock","Precio","Costo","Margen"]].concat((prods||[]).slice().sort(function(a,b){return (a.code||"").localeCompare(b.code||"");}).map(function(p){var mg=p.cost>0?Math.round((p.price-p.cost)/p.price*100)+"%":"N/A";return [p.code,p.name,p.category||"",p.shelf||"",p.unit==="serv"?"Servicio":p.stock,Number(p.price||0).toFixed(2),Number(p.cost||0).toFixed(2),mg];}))),"Inventario");
-    // Clientes
-    XLSX.utils.book_append_sheet(wb,XLSX.utils.aoa_to_sheet([["Código","Nombre","DPI","Teléfono","Dirección","Fecha registro"]].concat((clis||[]).map(function(c){return [c.cli_code||c.cliCode||"",c.name||"",c.dpi||"",c.phone||"",c.address||"",fmtD(c.created_at||c.createdAt||"")];}))),"Clientes");
-    // Reparaciones
-    XLSX.utils.book_append_sheet(wb,XLSX.utils.aoa_to_sheet([["Código","Fecha","Cliente","Teléfono","Marca","Modelo","Problema","Técnico","Costo","Estado"]].concat((reps||[]).map(function(r){return [r.rep_code||r.repCode||"",fmtD(r.created_at||r.date||""),r.client_name||r.clientName||"",r.client_phone||r.clientPhone||"",r.brand||"",r.model||"",r.problem||"",r.tech_name||r.techName||r.tech||"",Number(r.estimated_cost||r.estimatedCost||r.cost||0).toFixed(2),r.status||""];}))),"Reparaciones");
-    // Garantías
-    XLSX.utils.book_append_sheet(wb,XLSX.utils.aoa_to_sheet([["ID","Tipo","Descripción","Cliente","Inicio","Vence","Estado"]].concat((wars||[]).map(function(w){return [w.id,w.entity_type||w.entityType||"",w.description||"",w.client_name||"",fmtD(w.start_date||w.startDate||""),fmtD(w.end_date||w.endDate||""),w.status||""];}))),"Garantías");
-    // Proveedores
-    XLSX.utils.book_append_sheet(wb,XLSX.utils.aoa_to_sheet([["Nombre","Teléfono","Email","Dirección","Notas"]].concat((sups||[]).map(function(s){return [s.name||"",s.phone||"",s.email||"",s.address||"",s.notes||""];}))),"Proveedores");
-    // Compras
-    XLSX.utils.book_append_sheet(wb,XLSX.utils.aoa_to_sheet([["ID","Fecha","Proveedor","Artículos","Total","Registrado por"]].concat((purs||[]).map(function(p){return [p.id,fmtD(p.created_at||""),p.supplier_name||"",((p.purchase_items||[]).length),Number(p.total||0).toFixed(2),p.registered_by||""];}))),"Compras");
-    // Piezas defectuosas
-    XLSX.utils.book_append_sheet(wb,XLSX.utils.aoa_to_sheet([["ID","Fecha","Código","Pieza","Cant.","Precio","Motivo","Estado"]].concat((defs||[]).map(function(d){return [d.id,fmtD(d.created_at||d.date||""),d.code||"",d.name,d.qty,Number(d.price||0).toFixed(2),d.reason||"",d.status||""];}))),"Piezas Defectuosas");
-    XLSX.writeFile(wb,storeName.replace(/\s+/g,"_")+"_"+now.toISOString().slice(0,10)+".xlsx");
+    var pendAcc=accs.filter(function(a){return a.status!=="pagado";});
+    var totalVentas=sls.reduce(function(s,x){return s+Number(x.total||0);},0);
+    var totalPorCobrar=pendAcc.reduce(function(s,a){return s+Number(a.balance||0);},0);
+    var totalReemb=rets.reduce(function(s,r){return s+Number(r.refund_amount||r.refundAmount||0);},0);
+    var totalCompras=purs.reduce(function(s,p){return s+Number(p.total||0);},0);
+    var valorInventario=prods.reduce(function(s,p){return s+Number(p.cost||0)*Number(p.stock||0);},0);
+
+    // ── Hoja RESUMEN ──
+    var resumen=[
+      [storeName+" — Respaldo Completo del Sistema"],
+      ["Generado:",fmtD(now)+" "+fmtT(now)],
+      [],
+      ["MÓDULO","REGISTROS","DETALLE","ESTADO"],
+      ["Productos",       prods.length, "Valor inventario (costo): Q "+valorInventario.toFixed(2), failed.indexOf("Productos")>=0?"⚠ NO SE DESCARGÓ":"OK"],
+      ["Clientes",        clis.length,  "", failed.indexOf("Clientes")>=0?"⚠ NO SE DESCARGÓ":"OK"],
+      ["Ventas",          sls.length,   "Total vendido: Q "+totalVentas.toFixed(2), failed.indexOf("Ventas")>=0?"⚠ NO SE DESCARGÓ":"OK"],
+      ["Cuentas activas", pendAcc.length, "Por cobrar: Q "+totalPorCobrar.toFixed(2), failed.indexOf("Cuentas")>=0?"⚠ NO SE DESCARGÓ":"OK"],
+      ["Devoluciones",    rets.length,  "Reembolsado: Q "+totalReemb.toFixed(2), failed.indexOf("Devoluciones")>=0?"⚠ NO SE DESCARGÓ":"OK"],
+      ["Reparaciones",    reps.length,  "", failed.indexOf("Reparaciones")>=0?"⚠ NO SE DESCARGÓ":"OK"],
+      ["Garantías",       wars.length,  "", failed.indexOf("Garantías")>=0?"⚠ NO SE DESCARGÓ":"OK"],
+      ["Proveedores",     sups.length,  "", failed.indexOf("Proveedores")>=0?"⚠ NO SE DESCARGÓ":"OK"],
+      ["Compras",         purs.length,  "Total comprado: Q "+totalCompras.toFixed(2), failed.indexOf("Compras")>=0?"⚠ NO SE DESCARGÓ":"OK"],
+      ["Piezas defectuosas", defs.length, "", failed.indexOf("Defectuosos")>=0?"⚠ NO SE DESCARGÓ":"OK"],
+    ];
+    if(failed.length>0){
+      resumen.push([]);
+      resumen.push(["⚠ ATENCIÓN: estos módulos no se descargaron del servidor (revisá tu conexión y volvé a respaldar):"]);
+      resumen.push([failed.join(", ")]);
+    }
+    XLSX.utils.book_append_sheet(wb,XLSX.utils.aoa_to_sheet(resumen),"Resumen");
+
+    // ── PRODUCTOS (catálogo completo) ──
+    XLSX.utils.book_append_sheet(wb,XLSX.utils.aoa_to_sheet(
+      [["Código","Nombre","Categoría","Estantería","Unidad","Stock","Stock mínimo","Precio venta (Q)","Costo (Q)","Margen","Valor en stock (Q)"]]
+      .concat(prods.slice().sort(function(a,b){return (a.code||"").localeCompare(b.code||"");}).map(function(p){
+        var mg=Number(p.price)>0&&Number(p.cost)>0?Math.round((p.price-p.cost)/p.price*100)+"%":"N/A";
+        var esServ=p.unit==="serv";
+        return [p.code||"",p.name||"",p.category||"",p.shelf||"",esServ?"Servicio":"Unidad",
+          esServ?"—":Number(p.stock||0),esServ?"—":Number(p.min_stock||0),
+          Number(p.price||0).toFixed(2),Number(p.cost||0).toFixed(2),mg,
+          esServ?"—":(Number(p.cost||0)*Number(p.stock||0)).toFixed(2)];
+      }))
+    ),"Productos");
+
+    // ── VENTAS ──
+    XLSX.utils.book_append_sheet(wb,XLSX.utils.aoa_to_sheet([["ID","Fecha","Cliente","Método","Total (Q)","Registrado por"]].concat(sls.map(function(s){return [s.id,fmtD(s.created_at||s.date),s.client,s.method,Number(s.total||0).toFixed(2),(s.registrado_por&&s.registrado_por.name)||""];}))),"Ventas");
+    // ── DETALLE DE VENTAS (artículo por artículo) ──
+    XLSX.utils.book_append_sheet(wb,XLSX.utils.aoa_to_sheet([["ID Venta","Fecha","Cliente","Código","Producto","Cant.","Precio (Q)","Subtotal (Q)"]].concat(sls.reduce(function(arr,s){return arr.concat(((s.sale_items||s.items)||[]).map(function(it){return [s.id,fmtD(s.created_at||s.date),s.client,it.code||"",it.name,it.qty,Number(it.price||0).toFixed(2),(Number(it.price||0)*Number(it.qty||0)).toFixed(2)];}));},[]))),"Detalle Ventas");
+    // ── CUENTAS POR COBRAR ──
+    XLSX.utils.book_append_sheet(wb,XLSX.utils.aoa_to_sheet([["ID","Fecha","Cliente","Total (Q)","Pagado (Q)","Saldo (Q)","Estado"]].concat(accs.map(function(a){return [a.id,fmtD(a.created_at||a.date),a.client,Number(a.total||0).toFixed(2),Number(a.paid||0).toFixed(2),Number(a.balance||0).toFixed(2),a.status||""];}))),"Cuentas");
+    // ── HISTORIAL DE PAGOS / ABONOS ──
+    var pmts=accs.reduce(function(arr,a){return arr.concat(((a.account_payments||a.payments)||[]).map(function(p){return [a.id,a.client,fmtD(p.date||p.created_at),Number(p.amount||0).toFixed(2),p.method||"",p.note||""];}));},[]);
+    XLSX.utils.book_append_sheet(wb,XLSX.utils.aoa_to_sheet([["ID Cuenta","Cliente","Fecha Pago","Monto (Q)","Método","Nota"]].concat(pmts)),"Historial Pagos");
+    // ── DEVOLUCIONES ──
+    XLSX.utils.book_append_sheet(wb,XLSX.utils.aoa_to_sheet([["ID","Fecha","Cliente","Motivo","Condición","Método reemb.","Monto reemb. (Q)"]].concat(rets.map(function(r){return [r.id,fmtD(r.created_at||r.date),r.client,r.reason||"",r.item_condition||r.itemCondition||"",r.refund_method||r.refundMethod||"",Number(r.refund_amount||r.refundAmount||0).toFixed(2)];}))),"Devoluciones");
+    // ── CLIENTES ──
+    XLSX.utils.book_append_sheet(wb,XLSX.utils.aoa_to_sheet([["Código","Nombre","DPI","Teléfono","Dirección","Fecha registro"]].concat(clis.map(function(c){return [c.cli_code||c.cliCode||"",c.name||"",c.dpi||"",c.phone||"",c.address||"",fmtD(c.created_at||c.createdAt||"")];}))),"Clientes");
+    // ── REPARACIONES ──
+    XLSX.utils.book_append_sheet(wb,XLSX.utils.aoa_to_sheet([["Código","Fecha","Cliente","Teléfono","Marca","Modelo","Problema","Técnico","Costo (Q)","Estado"]].concat(reps.map(function(r){return [r.rep_code||r.repCode||"",fmtD(r.created_at||r.date||""),r.client_name||r.clientName||"",r.client_phone||r.clientPhone||"",r.brand||"",r.model||"",r.problem||"",r.tech_name||r.techName||r.tech||"",Number(r.estimated_cost||r.estimatedCost||r.cost||0).toFixed(2),r.status||""];}))),"Reparaciones");
+    // ── GARANTÍAS ──
+    XLSX.utils.book_append_sheet(wb,XLSX.utils.aoa_to_sheet([["ID","Tipo","Descripción","Cliente","Inicio","Vence","Estado"]].concat(wars.map(function(w){return [w.id,w.entity_type||w.entityType||"",w.description||"",w.client_name||"",fmtD(w.start_date||w.startDate||""),fmtD(w.end_date||w.endDate||""),w.status||""];}))),"Garantías");
+    // ── PROVEEDORES ──
+    XLSX.utils.book_append_sheet(wb,XLSX.utils.aoa_to_sheet([["Nombre","Teléfono","Email","Dirección","Notas"]].concat(sups.map(function(s){return [s.name||"",s.phone||"",s.email||"",s.address||"",s.notes||""];}))),"Proveedores");
+    // ── COMPRAS ──
+    XLSX.utils.book_append_sheet(wb,XLSX.utils.aoa_to_sheet([["ID","Fecha","Proveedor","Artículos","Total (Q)","Registrado por"]].concat(purs.map(function(p){return [p.id,fmtD(p.created_at||""),p.supplier_name||"",((p.purchase_items||[]).length),Number(p.total||0).toFixed(2),p.registered_by||""];}))),"Compras");
+    // ── PIEZAS DEFECTUOSAS ──
+    XLSX.utils.book_append_sheet(wb,XLSX.utils.aoa_to_sheet([["ID","Fecha","Código","Pieza","Cant.","Precio (Q)","Motivo","Estado"]].concat(defs.map(function(d){return [d.id,fmtD(d.created_at||d.date||""),d.code||"",d.name,d.qty,Number(d.price||0).toFixed(2),d.reason||"",d.status||""];}))),"Piezas Defectuosas");
+
+    XLSX.writeFile(wb,storeName.replace(/\s+/g,"_")+"_respaldo_"+now.toISOString().slice(0,10)+".xlsx");
     localStorage.setItem("mnpos-last-backup",now.toISOString());
-    showFlash("✓ Excel completo descargado (12 hojas)","ok");
+    if(failed.length>0){
+      showFlash("⚠ Respaldo descargado, pero "+failed.length+" módulo(s) no se pudieron leer ("+failed.join(", ")+"). Revisá tu conexión y respaldá de nuevo.","err");
+    } else {
+      showFlash("✓ Respaldo completo descargado (13 hojas, todos los módulos)","ok");
+    }
   }
 
   function importData(text){
