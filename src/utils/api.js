@@ -56,7 +56,7 @@ export const authAPI = {
 
 // ── Productos ─────────────────────────────────────────
 export const productsAPI = {
-  getAll:       function()      { return api.get('/products'); },
+  getAll:       function(cfg)   { return api.get('/products', cfg); },
   create:       function(data)  { return api.post('/products', data); },
   update:       function(id, d) { return api.put('/products/' + id, d); },
   remove:       function(id)    { return api.delete('/products/' + id); },
@@ -65,26 +65,26 @@ export const productsAPI = {
 
 // ── Ventas ────────────────────────────────────────────
 export const salesAPI = {
-  getAll:  function()     { return api.get('/sales'); },
+  getAll:  function(cfg)  { return api.get('/sales', cfg); },
   create:  function(data) { return api.post('/sales', data); },
 };
 
 // ── Cuentas ───────────────────────────────────────────
 export const accountsAPI = {
-  getAll:     function()         { return api.get('/accounts'); },
+  getAll:     function(cfg)      { return api.get('/accounts', cfg); },
   create:     function(data)     { return api.post('/accounts', data); },
   addPayment: function(id, data) { return api.post('/accounts/' + id + '/payments', data); },
 };
 
 // ── Devoluciones ──────────────────────────────────────
 export const returnsAPI = {
-  getAll: function()     { return api.get('/returns'); },
+  getAll: function(cfg)  { return api.get('/returns', cfg); },
   create: function(data) { return api.post('/returns', data); },
 };
 
 // ── Piezas Defectuosas ────────────────────────────────
 export const defectivesAPI = {
-  getAll:  function()           { return api.get('/defectives'); },
+  getAll:  function(cfg)        { return api.get('/defectives', cfg); },
   update:  function(id, status) { return api.put('/defectives/' + id, { status }); },
 };
 
@@ -97,7 +97,7 @@ export const usersAPI = {
 
 // ── Clientes ──────────────────────────────────────────
 export const clientsAPI = {
-  getAll:  function()      { return api.get('/clients'); },
+  getAll:  function(cfg)   { return api.get('/clients', cfg); },
   create:  function(data)  { return api.post('/clients', data); },
   update:  function(id, d) { return api.put('/clients/' + id, d); },
   remove:  function(id)    { return api.delete('/clients/' + id); },
@@ -105,7 +105,7 @@ export const clientsAPI = {
 
 // ── Reparaciones ──────────────────────────────────────
 export const repairsAPI = {
-  getAll:       function()            { return api.get('/repairs'); },
+  getAll:       function(cfg)         { return api.get('/repairs', cfg); },
   create:       function(data)        { return api.post('/repairs', data); },
   updateStatus: function(id, status)  { return api.put('/repairs/' + id + '/status', { status }); },
   update:       function(id, data)    { return api.put('/repairs/' + id, data); },
@@ -114,7 +114,7 @@ export const repairsAPI = {
 
 // ── Garantías ─────────────────────────────────────────
 export const warrantiesAPI = {
-  getAll:  function()      { return api.get('/warranties'); },
+  getAll:  function(cfg)   { return api.get('/warranties', cfg); },
   create:  function(data)  { return api.post('/warranties', data); },
   update:  function(id, d) { return api.put('/warranties/' + id, d); },
 };
@@ -129,10 +129,10 @@ export const auditAPI = {
 
 // ── Proveedores y Compras ─────────────────────────────
 export const suppliersAPI = {
-  getAll:          function()      { return api.get('/suppliers'); },
+  getAll:          function(cfg)   { return api.get('/suppliers', cfg); },
   create:          function(data)  { return api.post('/suppliers', data); },
   update:          function(id, d) { return api.put('/suppliers/' + id, d); },
-  getPurchases:    function()      { return api.get('/suppliers/purchases'); },
+  getPurchases:    function(cfg)   { return api.get('/suppliers/purchases', cfg); },
   createPurchase:  function(data)  { return api.post('/suppliers/purchases', data); },
 };
 
