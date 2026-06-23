@@ -11,6 +11,21 @@ const APP_NAME = "PraxisGT";
 const APP_VERSION = "2.2";
 const APP_TAGLINE = "Sistema de Gestión Empresarial · Guatemala";
 const STORE_FALLBACK = "Mi Negocio";
+
+// ── Módulos del sistema — fuente única de verdad para landing page y stats ──
+const PLATFORM_FEATURES = [
+  {ic:"🛒", title:"Punto de Venta",         desc:"Registra ventas en segundos. Efectivo, tarjeta, transferencia. Genera recibos y comprobantes al instante."},
+  {ic:"💳", title:"Cuentas por Cobrar",      desc:"Controla ventas a crédito, abonos y saldos pendientes. Envía recordatorios por WhatsApp con un clic."},
+  {ic:"🔧", title:"Taller de Reparaciones",  desc:"Órdenes de servicio completas con seguimiento de estado, repuestos, costos y fecha de entrega."},
+  {ic:"📦", title:"Inventario Inteligente",  desc:"Stock en tiempo real. Alertas de bajo inventario. Historial de cambios de precio y movimientos."},
+  {ic:"👥", title:"Clientes",                desc:"Base de datos de clientes con historial completo de compras, reparaciones y cuentas pendientes."},
+  {ic:"📊", title:"Reportes y Cuadres",      desc:"Gráficas de ventas, ingresos diarios, top productos y cierre de caja con arqueo formal."},
+  {ic:"🏭", title:"Proveedores y Compras",   desc:"Registra compras, actualiza stock automáticamente y lleva el historial de tus proveedores."},
+  {ic:"🛡️", title:"Garantías",               desc:"Registra garantías de ventas y reparaciones. Alertas automáticas de vencimiento."},
+  {ic:"💵", title:"Caja y Arqueo",           desc:"Control de caja chica, ingresos, egresos y cierre formal de caja con reporte imprimible."},
+  {ic:"🔄", title:"Devoluciones",            desc:"Gestiona devoluciones de ventas con registro de motivo, estado del producto y reembolso."},
+  {ic:"📋", title:"Auditoría",               desc:"Registro completo de todas las acciones del sistema por usuario, fecha y módulo."},
+];
 const PK   = "mnpos-prods-v5";
 const SK   = "mnpos-sales-v5";
 const AK   = "mnpos-accounts-v2";
@@ -259,16 +274,7 @@ function LandingPage(props){
   var onLogin=props.onLogin||function(){};
   var _menu=useState(false); var menuOpen=_menu[0]; var setMenuOpen=_menu[1];
 
-  var features=[
-    {ic:"🛒",title:"Punto de Venta",desc:"Registra ventas en segundos. Efectivo, tarjeta, transferencia. Genera recibos y comprobantes al instante."},
-    {ic:"💳",title:"Cuentas por Cobrar",desc:"Controla ventas a crédito, abonos y saldos pendientes. Envía recordatorios por WhatsApp con un clic."},
-    {ic:"🔧",title:"Taller de Reparaciones",desc:"Órdenes de servicio completas con seguimiento de estado, repuestos, costos y fecha de entrega."},
-    {ic:"📦",title:"Inventario Inteligente",desc:"Stock en tiempo real. Alertas de bajo inventario. Historial de cambios de precio y movimientos."},
-    {ic:"👥",title:"Clientes",desc:"Base de datos de clientes con historial completo de compras, reparaciones y cuentas pendientes."},
-    {ic:"📊",title:"Reportes y Dashboard",desc:"Gráficas de ventas, ingresos diarios, top productos y cierre de caja con arqueo formal."},
-    {ic:"🏭",title:"Proveedores y Compras",desc:"Registra compras, actualiza stock automáticamente y lleva el historial de tus proveedores."},
-    {ic:"🛡️",title:"Garantías",desc:"Registra garantías de ventas y reparaciones. Notificaciones de vencimiento automáticas."},
-  ];
+  var features=PLATFORM_FEATURES;
 
   var plans=[
     {name:"Básico",price:"Q 299",period:"/mes",color:"#888",features:["1 usuario","POS y ventas","Inventario básico","Soporte por WhatsApp"]},
@@ -325,7 +331,7 @@ function LandingPage(props){
       {/* ── STATS ── */}
       <section style={{background:"#f8f9fa",padding:"36px clamp(16px,4vw,60px)",borderBottom:"1px solid #eee"}}>
         <div style={{maxWidth:900,margin:"0 auto",display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(160px,1fr))",gap:20,textAlign:"center"}}>
-          {[["8+","Módulos integrados"],["100%","En la nube"],["24/7","Acceso desde cualquier dispositivo"],["Q0","Costo de instalación"]].map(function(s){
+          {[[PLATFORM_FEATURES.length+"+","Módulos integrados"],["100%","En la nube"],["24/7","Acceso desde cualquier dispositivo"],["Q0","Costo de instalación"]].map(function(s){
             return <div key={s[1]}>
               <div style={{fontSize:32,fontWeight:900,color:TEAL}}>{s[0]}</div>
               <div style={{fontSize:13,color:"#666",marginTop:4}}>{s[1]}</div>
