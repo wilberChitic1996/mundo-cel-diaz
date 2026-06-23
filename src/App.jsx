@@ -1314,6 +1314,7 @@ function DashboardScreen(props) {
   var _chartRange=useState("7d"); var chartRange=_chartRange[0]; var setChartRange=_chartRange[1];
 
   var now=new Date();
+  var todaySalesCobradas=todaySales.filter(function(s){return s.status==='completado';});
   var todayRev=todaySales.reduce(function(s,x){return s+x.total;},0); // total vendido (incluye crédito)
   var todayRevCobrado=todaySalesCobradas.reduce(function(s,x){return s+x.total;},0); // solo cobrado hoy
   var todayStr=now.toDateString();
@@ -6171,8 +6172,6 @@ function App(props) {
   var todayStr=new Date().toDateString();
   // Todas las ventas del día (efectivo + crédito), excluye anuladas
   var todaySales=sales.filter(function(s){return new Date(s.date).toDateString()===todayStr&&s.status!=='anulado';});
-  // Solo ventas cobradas (efectivo/tarjeta/transferencia completadas) para saldo de caja
-  var todaySalesCobradas=todaySales.filter(function(s){return s.status==='completado';});
   var pendingAccs=accounts.filter(function(a){return a.status!=="pagado";});
   var totalPend=pendingAccs.reduce(function(s,a){return s+a.balance;},0);
   var pqs={};
