@@ -399,7 +399,7 @@ function LandingPage(props){
           <h2 style={{color:"#fff",fontSize:"clamp(22px,3vw,36px)",fontWeight:800,margin:"0 0 12px"}}>¿Listo para modernizar tu negocio?</h2>
           <p style={{color:"rgba(255,255,255,0.7)",fontSize:16,margin:"0 0 36px",lineHeight:1.7}}>Escribinos por WhatsApp y te hacemos una demo gratuita en menos de 24 horas.</p>
           <div style={{display:"flex",gap:14,justifyContent:"center",flexWrap:"wrap"}}>
-            <a href={"https://wa.me/50255551234?text="+encodeURIComponent("Hola, me interesa el sistema POS para mi negocio de celulares. ¿Pueden darme más información?")}
+            <a href={"https://wa.me/50254707112?text="+encodeURIComponent("Hola, me interesa el sistema POS para mi negocio de celulares. ¿Pueden darme más información?")}
                target="_blank" rel="noopener noreferrer"
                style={{display:"inline-block",padding:"15px 36px",borderRadius:10,border:"none",background:"#25D366",color:"#fff",fontWeight:800,fontSize:16,cursor:"pointer",textDecoration:"none",boxShadow:"0 4px 20px rgba(37,211,102,0.4)"}}>
               📱 Escribir por WhatsApp
