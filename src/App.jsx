@@ -5,8 +5,12 @@ import { AreaChart, Area, BarChart, Bar, PieChart, Pie, Cell, XAxis, YAxis, Cart
 import { db } from './utils/db.js';
 import { authAPI, productsAPI, salesAPI, accountsAPI, returnsAPI, defectivesAPI, usersAPI, checkAPI, clientsAPI, repairsAPI, auditAPI, warrantiesAPI, cajaAPI, settingsAPI, suppliersAPI, adminAPI } from './utils/api.js';
 
-const TEAL = "#1D9E75";
-const NAVY = "#1a2535";
+const TEAL    = "#1D9E75";
+const NAVY    = "#1a2535";
+const APP_NAME = "PraxisGT";
+const APP_VERSION = "2.2";
+const APP_TAGLINE = "Sistema de Gestión Empresarial · Guatemala";
+const STORE_FALLBACK = "Mi Negocio";
 const PK   = "mnpos-prods-v5";
 const SK   = "mnpos-sales-v5";
 const AK   = "mnpos-accounts-v2";
@@ -17,7 +21,7 @@ const CK   = "mnpos-clients-v1";
 const gid  = () => Date.now().toString(36) + Math.random().toString(36).slice(2,6);
 
 // Estado global de configuración de tienda (se actualiza desde App al cargar)
-var _STORE = {store_name:"MUNDO CEL DIAZ",store_tagline:"Tecnología · Accesorios · Reparaciones · Guatemala",store_phone:"",store_address:"",store_email:"",store_logo_url:""};
+var _STORE = {store_name:"",store_tagline:"",store_phone:"",store_address:"",store_email:"",store_logo_url:""};
 function getStore(){ return _STORE; }
 function setStore(cfg){ _STORE=Object.assign({},_STORE,cfg); }
 
@@ -32,12 +36,12 @@ function limpiarTel(tel){
   return t;
 }
 function waBoletaVenta(sale,si){
-  si=si||getStore(); var sn=si.store_name||"MUNDO CEL DIAZ"; var st=si.store_tagline||"Tecnología · Accesorios · Reparaciones · Guatemala";
+  si=si||getStore(); var sn=si.store_name||STORE_FALLBACK; var st=si.store_tagline||APP_TAGLINE;
   var items=(sale.items||[]).map(function(i){return "  • "+i.name+" x"+i.qty+" — Q"+Number(i.price*i.qty).toFixed(2);}).join("\n");
   return "✅ *"+sn+"*\n"+st+"\n\n📋 *Boleta de compra*\n📅 "+fmtD(sale.date)+"\n👤 "+sale.client+"\n\n*Productos:*\n"+items+"\n\n💰 *Total: Q"+Number(sale.total).toFixed(2)+"*\nMétodo: "+(sale.method||"Efectivo")+"\n\n¡Gracias por su compra! 🙏";
 }
 function waRecordatorio(acc,si){
-  si=si||getStore(); var sn=si.store_name||"MUNDO CEL DIAZ";
+  si=si||getStore(); var sn=si.store_name||STORE_FALLBACK;
   return "Hola *"+acc.client+"*, le saludamos de *"+sn+"*.\n\nLe recordamos que tiene un saldo pendiente de *Q"+Number(acc.balance).toFixed(2)+"* de su compra del "+fmtD(acc.date||acc.created_at)+".\n\nTotal de la compra: Q"+Number(acc.total).toFixed(2)+"\nYa abonado: Q"+Number(acc.paid).toFixed(2)+"\n*Saldo pendiente: Q"+Number(acc.balance).toFixed(2)+"*\n\nPor favor comuníquese con nosotros para coordinar su pago. ¡Gracias! 🙏";
 }
 function abrirWA(tel, mensaje){
@@ -58,7 +62,7 @@ function pedirTelYEnviar(nombre, getMensaje, opts){
 // Genera el HTML del recibo (versión simplificada para captura)
 function buildReceiptHTML(sale, opts, si){
   opts=opts||{}; si=si||getStore();
-  var sn=si.store_name||"MUNDO CEL DIAZ";
+  var sn=si.store_name||STORE_FALLBACK;
   var st=si.store_tagline||"Tecnología · Accesorios · Reparaciones · Guatemala";
   var items=(sale.items||[]).map(function(it){
     return '<tr>'+
@@ -416,7 +420,7 @@ function LandingPage(props){
         <div style={{maxWidth:1100,margin:"0 auto",display:"flex",alignItems:"center",justifyContent:"space-between",flexWrap:"wrap",gap:12}}>
           <div style={{display:"flex",alignItems:"center",gap:8}}>
             <div style={{width:28,height:28,borderRadius:8,background:TEAL,display:"flex",alignItems:"center",justifyContent:"center",color:"#fff",fontWeight:800,fontSize:12}}>P</div>
-            <span style={{color:"rgba(255,255,255,0.7)",fontSize:13,fontWeight:600}}>POSCEL — Sistema POS para Celularías</span>
+            <span style={{color:"rgba(255,255,255,0.7)",fontSize:13,fontWeight:600}}>{APP_NAME} — {APP_TAGLINE}</span>
           </div>
           <span style={{color:"rgba(255,255,255,0.4)",fontSize:12}}>© {new Date().getFullYear()} — Guatemala</span>
         </div>
@@ -562,8 +566,8 @@ function LoginScreen(props) {
                 <line x1="9" y1="5.5" x2="15" y2="5.5" stroke="white" strokeWidth="1.5" strokeLinecap="round"/>
               </svg>
             </div>
-            <p style={{color:"#fff",fontSize:26,fontWeight:800,margin:"0 0 4px",letterSpacing:"-0.5px"}}>MUNDO CEL DIAZ</p>
-            <p style={{color:TEAL,fontSize:13,fontWeight:600,margin:0,letterSpacing:"1px"}}>SISTEMA DE GESTIÓN v2.1</p>
+            <p style={{color:"#fff",fontSize:26,fontWeight:800,margin:"0 0 4px",letterSpacing:"-0.5px"}}>{APP_NAME}</p>
+            <p style={{color:TEAL,fontSize:13,fontWeight:600,margin:0,letterSpacing:"1px"}}>{APP_TAGLINE}</p>
           </div>
 
           <div style={{background:"rgba(255,255,255,0.05)",borderRadius:16,border:"1px solid rgba(255,255,255,0.1)",padding:32}}>
@@ -1137,14 +1141,14 @@ function Sidebar(props) {
                 </svg>
               </div>
               <div>
-                <p style={{color:"#fff",fontSize:13,fontWeight:800,margin:0,lineHeight:1.3,letterSpacing:"-0.2px"}}>{storeInfo.store_name||"MUNDO CEL DIAZ"}</p>
+                <p style={{color:"#fff",fontSize:13,fontWeight:800,margin:0,lineHeight:1.3,letterSpacing:"-0.2px"}}>{storeInfo.store_name||STORE_FALLBACK}</p>
                 <p style={{color:TEAL,fontSize:9,fontWeight:700,margin:0,letterSpacing:"1.5px",textTransform:"uppercase"}}>Sistema de Gestión</p>
               </div>
             </div>
             <div style={{height:"1px",background:"linear-gradient(90deg,"+TEAL+"99,transparent)",marginBottom:8,position:"relative"}}/>
             <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",position:"relative"}}>
-              <p style={{color:"rgba(255,255,255,0.38)",fontSize:8.5,margin:0,letterSpacing:"1.2px",textTransform:"uppercase"}}>Reparaciones · Gestión</p>
-              <p style={{color:"rgba(255,255,255,0.2)",fontSize:8,margin:0,letterSpacing:"0.5px"}}>v2.1</p>
+              <p style={{color:"rgba(255,255,255,0.38)",fontSize:8.5,margin:0,letterSpacing:"1.2px",textTransform:"uppercase"}}>{APP_NAME}</p>
+              <p style={{color:"rgba(255,255,255,0.2)",fontSize:8,margin:0,letterSpacing:"0.5px"}}>v{APP_VERSION}</p>
             </div>
           </div>
         </div>
@@ -1698,7 +1702,7 @@ function CajaScreen(props) {
   }
 
   function printCierreCaja(s){
-    var _si=getStore(); var _sn=_si.store_name||"MUNDO CEL DIAZ";
+    var _si=getStore(); var _sn=_si.store_name||STORE_FALLBACK;
     var contado=s.efectivo_contado!=null?Number(s.efectivo_contado):null;
     var diferencia=contado!=null?contado-saldoEsperado:null;
     var html='<!DOCTYPE html><html><head><meta charset="UTF-8"><title>Cierre de Caja</title>'+
@@ -3276,9 +3280,9 @@ function printVoucher(sale, opts){
     (opts.payments&&opts.payments.length?'<div style="margin:0 0 18px;"><div style="font-size:12px;font-weight:700;color:#1a2535;margin:0 0 6px;border-bottom:2px solid #1D9E75;padding-bottom:4px;">HISTORIAL DE ABONOS</div><table style="width:100%;border-collapse:collapse;font-size:11px;"><thead><tr style="background:#f0f0f0;"><th style="padding:5px 8px;text-align:left;">Fecha</th><th style="padding:5px 8px;text-align:left;">Metodo</th><th style="padding:5px 8px;text-align:left;">Nota</th><th style="padding:5px 8px;text-align:right;">Monto</th></tr></thead><tbody>'+opts.payments.map(function(_p){return '<tr><td style="padding:5px 8px;border-bottom:1px solid #eee;">'+new Date(_p.date).toLocaleDateString("es-GT",{day:"2-digit",month:"2-digit",year:"numeric"})+' '+new Date(_p.date).toLocaleTimeString("es-GT",{hour:"2-digit",minute:"2-digit"})+'</td><td style="padding:5px 8px;border-bottom:1px solid #eee;">'+(_p.method||'-')+'</td><td style="padding:5px 8px;border-bottom:1px solid #eee;color:#666;">'+(_p.note||'-')+'</td><td style="padding:5px 8px;border-bottom:1px solid #eee;text-align:right;font-weight:700;color:#1D9E75;">Q '+Number(_p.amount).toFixed(2)+'</td></tr>';}).join('')+'</tbody></table></div>':'')+
     '<div class="footer">'+
       '<div class="footer-left">'+
-        '<strong>Mundo Cel Diaz</strong><br>'+
+        '<strong>'+APP_NAME+'</strong><br>'+
         'Guatemala, C.A.<br>'+
-        'Sistema de Gestión v2.1'+
+        APP_TAGLINE+
       '</div>'+
       '<div class="footer-right">'+
         'Cantidad de artículos: <strong>'+(sale.items||[]).reduce(function(s,i){return s+i.qty;},0)+'</strong><br>'+
@@ -3588,7 +3592,7 @@ function AyudaScreen(props) {
     <div>
       <p style={H1}>📖 Manual de Usuario</p>
       <div style={Object.assign({},sC,{marginBottom:16,background:"linear-gradient(135deg,"+NAVY+" 0%,#1a3a2a 100%)",padding:"16px 20px"})}>
-        <p style={{color:"#fff",fontWeight:700,fontSize:15,margin:"0 0 4px"}}>Bienvenido a la guía de POSCEL</p>
+        <p style={{color:"#fff",fontWeight:700,fontSize:15,margin:"0 0 4px"}}>Bienvenido a la guía de {APP_NAME}</p>
         <p style={{color:"rgba(255,255,255,0.7)",fontSize:13,margin:0}}>Tocá cada sección para ver los pasos y consejos. Si tenés dudas, contactá a tu administrador.</p>
       </div>
       <div style={{display:"flex",flexDirection:"column",gap:10}}>
@@ -3627,7 +3631,7 @@ function AyudaScreen(props) {
       </div>
       <div style={Object.assign({},sC,{marginTop:16,textAlign:"center",background:"#f5f4f0"})}>
         <p style={{fontSize:13,color:"#666",margin:"0 0 4px"}}>¿Necesitás más ayuda?</p>
-        <a href={"https://wa.me/50254707112?text="+encodeURIComponent("Hola, necesito ayuda con el sistema POSCEL.")} target="_blank" rel="noreferrer" style={{color:TEAL,fontWeight:700,fontSize:14,textDecoration:"none"}}>💬 Contactar soporte por WhatsApp →</a>
+        <a href={"https://wa.me/50254707112?text="+encodeURIComponent("Hola, necesito ayuda con el sistema "+APP_NAME+".")} target="_blank" rel="noreferrer" style={{color:TEAL,fontWeight:700,fontSize:14,textDecoration:"none"}}>💬 Contactar soporte por WhatsApp →</a>
       </div>
     </div>
   );
@@ -4790,8 +4794,8 @@ function OnboardingWizard(props){
   var _saving=useState(false); var saving=_saving[0]; var setSaving=_saving[1];
 
   // Step 1 — Tienda
-  var _sn=useState("MUNDO CEL DIAZ"); var storeName=_sn[0]; var setStoreName=_sn[1];
-  var _st=useState("Tecnología · Accesorios · Reparaciones · Guatemala"); var storeTagline=_st[0]; var setStoreTagline=_st[1];
+  var _sn=useState(""); var storeName=_sn[0]; var setStoreName=_sn[1];
+  var _st=useState(""); var storeTagline=_st[0]; var setStoreTagline=_st[1];
   var _sph=useState(""); var storePhone=_sph[0]; var setStorePhone=_sph[1];
   var _sad=useState(""); var storeAddress=_sad[0]; var setStoreAddress=_sad[1];
 
@@ -4936,7 +4940,7 @@ function OnboardingWizard(props){
         {step===4&&<div style={{textAlign:"center"}}>
           <div style={{fontSize:56,marginBottom:12}}>🎉</div>
           <h3 style={{margin:"0 0 8px",fontSize:20,fontWeight:800,color:NAVY}}>¡Todo listo!</h3>
-          <p style={{margin:"0 0 24px",fontSize:14,color:"#666",lineHeight:1.7}}>Tu sistema MUNDO CEL DIAZ está configurado.<br/>Aquí un resumen de lo que puedes hacer:</p>
+          <p style={{margin:"0 0 24px",fontSize:14,color:"#666",lineHeight:1.7}}>Tu sistema {APP_NAME} está configurado.<br/>Aquí un resumen de lo que puedes hacer:</p>
           <div style={{textAlign:"left",background:"#f5f9f7",borderRadius:12,padding:"16px 20px",marginBottom:24}}>
             {[
               ["🛒","POS","Registra ventas con múltiples métodos de pago"],
@@ -4974,7 +4978,7 @@ function App(props) {
   var _war=useState([]); var warranties=_war[0]; var setWarranties=_war[1];
   var _ld=useState(false); var loaded=_ld[0]; var setLoaded=_ld[1];
   var _on=useState(false); var isOnline=_on[0]; var setIsOnline=_on[1];
-  var _si=useState({store_name:"MUNDO CEL DIAZ",store_tagline:"Tecnología · Accesorios · Reparaciones · Guatemala",store_phone:"",store_address:"",store_email:"",store_logo_url:""});
+  var _si=useState({store_name:"",store_tagline:"",store_phone:"",store_address:"",store_email:"",store_logo_url:""});
   var storeInfo=_si[0]; var setStoreInfo=_si[1];
   var _ob=useState(false); var showOnboarding=_ob[0]; var setShowOnboarding=_ob[1];
   var _sub=useState(null); var subInfo=_sub[0]; var setSubInfo=_sub[1];
@@ -5489,7 +5493,7 @@ function App(props) {
       suppliersAPI.getAll().catch(function(){return [];}),
       suppliersAPI.getPurchases().catch(function(){return [];}),
     ]);
-    var data={version:"2.2",exportDate:now.toISOString(),negocio:getStore().store_name||"MUNDO CEL DIAZ",products:prods,sales:sls,accounts:accs,returns:rets,defectives:defs,clients:clis,repairs:reps,warranties:wars,suppliers:sups,purchases:purs};
+    var data={version:"2.2",exportDate:now.toISOString(),negocio:getStore().store_name||STORE_FALLBACK,products:prods,sales:sls,accounts:accs,returns:rets,defectives:defs,clients:clis,repairs:reps,warranties:wars,suppliers:sups,purchases:purs};
     var blob=new Blob([JSON.stringify(data,null,2)],{type:"application/json"});
     var url=URL.createObjectURL(blob);
     var a=document.createElement("a");a.href=url;a.download=(getStore().store_name||"backup").replace(/\s+/g,"_")+"_"+now.toISOString().slice(0,10)+".json";
@@ -5512,7 +5516,7 @@ function App(props) {
       suppliersAPI.getPurchases().catch(function(){return [];}),
     ]);
     var wb=XLSX.utils.book_new();
-    var storeName=getStore().store_name||"MUNDO CEL DIAZ";
+    var storeName=getStore().store_name||STORE_FALLBACK;
     var pendAcc=(accs||[]).filter(function(a){return a.status!=="pagado";});
     var totalReemb=(rets||[]).reduce(function(s,r){return s+Number(r.refund_amount||r.refundAmount||0);},0);
     // Resumen
@@ -5588,7 +5592,7 @@ function App(props) {
     return (
       <div style={{minHeight:"100vh",background:"var(--bg-main,#eceae4)"}}>
         <div style={{background:NAVY,padding:"12px 24px",display:"flex",alignItems:"center",justifyContent:"space-between"}}>
-          <span style={{color:"#fff",fontWeight:800,fontSize:16}}>🏢 MUNDO CEL DIAZ — Panel de Control</span>
+          <span style={{color:"#fff",fontWeight:800,fontSize:16}}>🏢 {APP_NAME} — Panel de Control</span>
           <button onClick={onLogout} style={{background:"transparent",border:"1px solid rgba(255,255,255,0.3)",color:"#fff",padding:"6px 14px",borderRadius:6,cursor:"pointer",fontSize:13}}>Cerrar sesión</button>
         </div>
         <SuperAdminPanel session={session}/>
@@ -5641,8 +5645,8 @@ function App(props) {
         {/* Header móvil */}
         <div className="mobile-header" style={{display:"none",position:"fixed",top:0,left:0,right:0,zIndex:98,background:NAVY,padding:"10px 16px",alignItems:"center",justifyContent:"space-between",boxShadow:"0 2px 8px rgba(0,0,0,0.3)"}}>
           <button onClick={function(){setSidebarOpen(!sidebarOpen);}} style={{background:"transparent",border:"none",color:"#fff",fontSize:22,cursor:"pointer",padding:"4px 8px",lineHeight:1}}>☰</button>
-          <span style={{color:"#fff",fontWeight:700,fontSize:15,letterSpacing:"-0.3px"}}>{storeInfo.store_name||"MUNDO CEL DIAZ"}</span>
-          <span style={{color:TEAL,fontSize:11,fontWeight:600}}>v2.1</span>
+          <span style={{color:"#fff",fontWeight:700,fontSize:15,letterSpacing:"-0.3px"}}>{storeInfo.store_name||STORE_FALLBACK}</span>
+          <span style={{color:TEAL,fontSize:11,fontWeight:600}}>v{APP_VERSION}</span>
         </div>
         <Sidebar view={view} setView={setView} cartCount={cart.length} pendingCount={pendingAccs.length} products={products} sales={sales} session={session} onLogout={onLogout} isOnline={isOnline} theme={theme} toggleTheme={toggleTheme} sidebarOpen={sidebarOpen} setSidebarOpen={setSidebarOpen} onSearch={function(){setGsOpen(true);}} storeInfo={storeInfo}/>
         {gsOpen&&<GlobalSearch onClose={function(){setGsOpen(false);}} setView={setView} sales={sales} clients={clients} products={products} repairs={repairs} setSelectedSale={setSelSale}/>}
@@ -5877,7 +5881,7 @@ function genRepCode(repairs){
 }
 
 function printRepairTicket(rep){
-  var _si=getStore(); var _sn=_si.store_name||"MUNDO CEL DIAZ";
+  var _si=getStore(); var _sn=_si.store_name||STORE_FALLBACK;
   var statusInfo=REP_STATUS[rep.status]||{label:rep.status,icon:"•"};
   var html='<!DOCTYPE html><html><head><meta charset="UTF-8"><title>Orden '+rep.repCode+'</title>'+
   '<style>*{margin:0;padding:0;box-sizing:border-box;}body{font-family:Arial,sans-serif;font-size:12px;color:#222;max-width:700px;margin:0 auto;padding:24px;}'+
@@ -6533,7 +6537,7 @@ function CuadresScreen(props){
   var margenPct=costoVentas>0?Math.round((gananciaBruta/totalVentas)*100):null;
 
   function printCuadre(){
-    var _si=getStore(); var _sn=_si.store_name||"MUNDO CEL DIAZ";
+    var _si=getStore(); var _sn=_si.store_name||STORE_FALLBACK;
     var salesRows=periodSales.slice().sort(function(a,b){return new Date(b.date)-new Date(a.date);}).map(function(s){
       return '<tr><td>'+new Date(s.date).toLocaleDateString("es-GT",{day:"2-digit",month:"short"})+'</td>'+
         '<td>'+new Date(s.date).toLocaleTimeString("es-GT",{hour:"2-digit",minute:"2-digit"})+'</td>'+
@@ -6622,7 +6626,7 @@ function CuadresScreen(props){
     '<div class="section" style="text-align:center;color:#999;padding:40px;">Sin ventas en el período seleccionado</div>')+
 
     '<div class="footer">'+
-      '<div><b>Mundo Cel Diaz</b> · Guatemala · Sistema de Gestión v2.1</div>'+
+      '<div><b>'+(_sn||APP_NAME)+'</b> · '+APP_NAME+' v'+APP_VERSION+'</div>'+
       '<div>Impreso: '+now.toLocaleDateString("es-GT",{day:"2-digit",month:"short",year:"numeric"})+' '+now.toLocaleTimeString("es-GT",{hour:"2-digit",minute:"2-digit"})+'</div>'+
     '</div>'+
     '</body></html>';
