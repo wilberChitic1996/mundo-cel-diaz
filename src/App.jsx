@@ -4187,9 +4187,11 @@ function SuperAdminPanel(props){
   var _stats=useState(null); var stats=_stats[0]; var setStats=_stats[1];
   var _loading=useState(true); var loading=_loading[0]; var setLoading=_loading[1];
   var _tab=useState("tenants"); var tab=_tab[0]; var setTab=_tab[1];
-  var _showNew=useState(false); var showNew=_showNew[0]; var setShowNew=_showNew[1];
   var _saving=useState(false); var saving=_saving[0]; var setSaving=_saving[1];
   var _flash=useState(null); var flash=_flash[0]; var setFlash=_flash[1];
+  // Renewal state: { [tenantId]: months }
+  var _renew=useState({}); var renewMonths=_renew[0]; var setRenewMonths=_renew[1];
+  var _renewSaving=useState({}); var renewSaving=_renewSaving[0]; var setRenewSaving=_renewSaving[1];
 
   // Form nuevo tenant
   var _fn=useState(""); var fName=_fn[0]; var setFName=_fn[1];
@@ -4199,26 +4201,29 @@ function SuperAdminPanel(props){
   var _fo=useState(""); var fOwner=_fo[0]; var setFOwner=_fo[1];
   var _fae=useState(""); var fAdminEmail=_fae[0]; var setFAdminEmail=_fae[1];
   var _fap=useState(""); var fAdminPass=_fap[0]; var setFAdminPass=_fap[1];
+  var _fm=useState("1"); var fMonths=_fm[0]; var setFMonths=_fm[1];
 
   function showMsg(msg,type){ setFlash({msg,type}); setTimeout(function(){setFlash(null);},3500); }
 
-  useEffect(function(){
+  function reload(){
+    setLoading(true);
     Promise.all([adminAPI.getTenants(), adminAPI.getStats()])
       .then(function(res){ setTenants(res[0]||[]); setStats(res[1]); })
       .catch(function(){ showMsg("Error cargando datos","error"); })
       .finally(function(){ setLoading(false); });
-  },[]);
+  }
+  useEffect(function(){ reload(); },[]);
 
   async function createTenant(){
     if(!fName||!fAdminEmail||!fAdminPass){ showMsg("Nombre, email admin y contraseña son requeridos","error"); return; }
     setSaving(true);
     try {
-      var res = await adminAPI.createTenant({ name:fName, plan:fPlan, email:fEmail, phone:fPhone, ownerName:fOwner, adminEmail:fAdminEmail, adminPassword:fAdminPass });
+      var res = await adminAPI.createTenant({ name:fName, plan:fPlan, email:fEmail, phone:fPhone, ownerName:fOwner, adminEmail:fAdminEmail, adminPassword:fAdminPass, months:Number(fMonths) });
       setTenants(function(prev){ return [res.tenant].concat(prev); });
-      showMsg("Tenant creado exitosamente","ok");
-      setShowNew(false);
-      setFName(""); setFPlan("basic"); setFEmail(""); setFPhone(""); setFOwner(""); setFAdminEmail(""); setFAdminPass("");
-    } catch(e){ showMsg(e.error||"Error al crear tenant","error"); }
+      showMsg("Negocio creado exitosamente","ok");
+      setTab("tenants");
+      setFName(""); setFPlan("basic"); setFEmail(""); setFPhone(""); setFOwner(""); setFAdminEmail(""); setFAdminPass(""); setFMonths("1");
+    } catch(e){ showMsg(e.error||"Error al crear negocio","error"); }
     setSaving(false);
   }
 
@@ -4226,15 +4231,35 @@ function SuperAdminPanel(props){
     try {
       var updated = await adminAPI.updateTenant(t.id, { active: !t.active });
       setTenants(function(prev){ return prev.map(function(x){ return x.id===t.id?updated:x; }); });
-      showMsg("Tenant "+(updated.active?"activado":"desactivado"),"ok");
-    } catch(e){ showMsg("Error actualizando tenant","error"); }
+      showMsg("Negocio "+(updated.active?"activado":"desactivado"),"ok");
+    } catch(e){ showMsg("Error actualizando negocio","error"); }
+  }
+
+  async function renewTenant(t){
+    var m = Number(renewMonths[t.id]||1);
+    setRenewSaving(function(prev){ return Object.assign({},prev,{[t.id]:true}); });
+    try {
+      var updated = await adminAPI.updateTenant(t.id, { months: m });
+      setTenants(function(prev){ return prev.map(function(x){ return x.id===t.id?updated:x; }); });
+      showMsg("Suscripción renovada por "+m+" mes(es)","ok");
+    } catch(e){ showMsg("Error renovando suscripción","error"); }
+    setRenewSaving(function(prev){ return Object.assign({},prev,{[t.id]:false}); });
+  }
+
+  function expiryBadge(expires_at){
+    if(!expires_at) return <span style={Object.assign({},mBg("#aaa"),{fontSize:10})}>Sin fecha</span>;
+    var days = Math.ceil((new Date(expires_at)-new Date())/86400000);
+    if(days<0) return <span style={Object.assign({},mBg("#E24B4A"),{fontSize:10})}>Vencido</span>;
+    if(days<=7) return <span style={Object.assign({},mBg("#F39C12"),{fontSize:10})}>⚠ {days}d</span>;
+    if(days<=30) return <span style={Object.assign({},mBg("#F39C12"),{fontSize:10,background:"#f5a623"})}>{days}d</span>;
+    return <span style={Object.assign({},mBg(TEAL),{fontSize:10})}>{days}d</span>;
   }
 
   var PLANS = { basic:"Básico", professional:"Profesional", enterprise:"Empresarial" };
   var PLAN_COLOR = { basic:"#888", professional:TEAL, enterprise:"#9B59B6" };
 
   return (
-    <div style={{padding:"clamp(16px,3vw,32px)",maxWidth:1100,margin:"0 auto"}}>
+    <div style={{padding:"clamp(16px,3vw,32px)",maxWidth:1200,margin:"0 auto"}}>
       {flash&&<div style={{position:"fixed",top:20,right:20,zIndex:9999,padding:"12px 20px",borderRadius:10,background:flash.type==="ok"?"#1D9E75":"#E24B4A",color:"#fff",fontWeight:700,fontSize:13,boxShadow:"0 4px 20px rgba(0,0,0,0.25)"}}>{flash.msg}</div>}
 
       {/* Header */}
@@ -4247,15 +4272,17 @@ function SuperAdminPanel(props){
       </div>
 
       {/* Stats */}
-      {stats&&<div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(160px,1fr))",gap:12,marginBottom:24}}>
+      {stats&&<div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(150px,1fr))",gap:12,marginBottom:24}}>
         {[
-          {lb:"Total negocios", val:stats.total_tenants, ic:"🏢"},
-          {lb:"Negocios activos", val:stats.active_tenants, ic:"✅"},
-          {lb:"Usuarios activos", val:stats.total_users, ic:"👥"},
-          {lb:"Ingresos 30d", val:"Q "+Number(stats.revenue_30d||0).toLocaleString("es-GT",{minimumFractionDigits:2}), ic:"💰"},
-        ].map(function(s){ return <div key={s.lb} style={Object.assign({},sC,{padding:"16px 20px"})}>
-          <div style={{fontSize:24,marginBottom:4}}>{s.ic}</div>
-          <div style={{fontSize:22,fontWeight:800,color:NAVY}}>{s.val}</div>
+          {lb:"Total negocios", val:stats.total_tenants, ic:"🏢", c:NAVY},
+          {lb:"Negocios activos", val:stats.active_tenants, ic:"✅", c:TEAL},
+          {lb:"Vencen pronto (≤7d)", val:stats.expiring_soon||0, ic:"⚠️", c:"#F39C12"},
+          {lb:"Vencidos", val:stats.expired||0, ic:"❌", c:"#E24B4A"},
+          {lb:"Usuarios activos", val:stats.total_users, ic:"👥", c:NAVY},
+          {lb:"Ingresos 30d", val:"Q "+Number(stats.revenue_30d||0).toLocaleString("es-GT",{minimumFractionDigits:2}), ic:"💰", c:TEAL},
+        ].map(function(s){ return <div key={s.lb} style={Object.assign({},sC,{padding:"14px 18px"})}>
+          <div style={{fontSize:22,marginBottom:4}}>{s.ic}</div>
+          <div style={{fontSize:20,fontWeight:800,color:s.c}}>{s.val}</div>
           <div style={{fontSize:11,color:"#888",marginTop:2}}>{s.lb}</div>
         </div>; })}
       </div>}
@@ -4272,19 +4299,35 @@ function SuperAdminPanel(props){
         <div style={{overflowX:"auto"}}>
           <table style={{width:"100%",borderCollapse:"collapse"}}>
             <thead>
-              <tr>{["Negocio","Plan","Usuarios","Email","Estado","Acciones"].map(function(h){ return <th key={h} style={sTH}>{h}</th>; })}</tr>
+              <tr>{["Negocio","Plan","Usuarios","Estado","Vencimiento","Renovar","Acciones"].map(function(h){ return <th key={h} style={sTH}>{h}</th>; })}</tr>
             </thead>
             <tbody>
               {tenants.map(function(t){ return <tr key={t.id} style={{borderBottom:"1px solid #eee"}}>
                 <td style={sTD}>
                   <div style={{fontWeight:700,fontSize:13,color:NAVY}}>{t.name}</div>
                   {t.owner_name&&<div style={{fontSize:11,color:"#888"}}>{t.owner_name}</div>}
-                  <div style={{fontSize:10,color:"#bbb",marginTop:2}}>{t.id}</div>
+                  {t.email&&<div style={{fontSize:11,color:"#aaa"}}>{t.email}</div>}
                 </td>
                 <td style={sTD}><span style={Object.assign({},mBg(PLAN_COLOR[t.plan]||"#888"),{fontSize:11})}>{PLANS[t.plan]||t.plan}</span></td>
                 <td style={sTD}><span style={{fontWeight:700,color:NAVY}}>{t.user_count||0}</span></td>
-                <td style={sTD}><span style={{fontSize:12,color:"#666"}}>{t.email||"—"}</span></td>
                 <td style={sTD}><span style={Object.assign({},mBg(t.active?TEAL:"#ccc"),{fontSize:11})}>{t.active?"Activo":"Inactivo"}</span></td>
+                <td style={sTD}>
+                  {expiryBadge(t.expires_at)}
+                  {t.expires_at&&<div style={{fontSize:10,color:"#aaa",marginTop:2}}>{new Date(t.expires_at).toLocaleDateString("es-GT")}</div>}
+                </td>
+                <td style={sTD}>
+                  <div style={{display:"flex",gap:6,alignItems:"center"}}>
+                    <select value={renewMonths[t.id]||"1"} onChange={function(e){ var id=t.id; setRenewMonths(function(prev){ return Object.assign({},prev,{[id]:e.target.value}); }); }} style={{padding:"4px 6px",borderRadius:6,border:"1px solid #ddd",fontSize:12,background:"#fff"}}>
+                      <option value="1">1 mes</option>
+                      <option value="3">3 meses</option>
+                      <option value="6">6 meses</option>
+                      <option value="12">1 año</option>
+                    </select>
+                    <button onClick={function(){ renewTenant(t); }} disabled={renewSaving[t.id]} style={{padding:"4px 10px",borderRadius:6,border:"none",background:TEAL,color:"#fff",fontSize:12,cursor:"pointer",fontWeight:600,opacity:renewSaving[t.id]?0.6:1}}>
+                      {renewSaving[t.id]?"…":"Renovar"}
+                    </button>
+                  </div>
+                </td>
                 <td style={sTD}>
                   <button onClick={function(){ toggleActive(t); }} style={{padding:"5px 12px",borderRadius:6,border:"1px solid #ddd",background:"#fff",fontSize:12,cursor:"pointer",color:t.active?"#E24B4A":TEAL,fontWeight:600}}>
                     {t.active?"Desactivar":"Activar"}
@@ -4311,19 +4354,28 @@ function SuperAdminPanel(props){
             </select>
           </div>
           <div>
-            <label style={{display:"block",fontSize:12,fontWeight:600,color:"#555",marginBottom:4}}>Nombre del propietario</label>
-            <input value={fOwner} onChange={function(e){setFOwner(e.target.value);}} style={sI} placeholder="Carlos López"/>
+            <label style={{display:"block",fontSize:12,fontWeight:600,color:"#555",marginBottom:4}}>Duración inicial</label>
+            <select value={fMonths} onChange={function(e){setFMonths(e.target.value);}} style={sI}>
+              <option value="1">1 mes</option>
+              <option value="3">3 meses</option>
+              <option value="6">6 meses</option>
+              <option value="12">1 año</option>
+            </select>
           </div>
         </div>
         <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:12,marginBottom:12}}>
           <div>
-            <label style={{display:"block",fontSize:12,fontWeight:600,color:"#555",marginBottom:4}}>Email del negocio</label>
-            <input type="email" value={fEmail} onChange={function(e){setFEmail(e.target.value);}} style={sI} placeholder="negocio@email.com"/>
+            <label style={{display:"block",fontSize:12,fontWeight:600,color:"#555",marginBottom:4}}>Nombre del propietario</label>
+            <input value={fOwner} onChange={function(e){setFOwner(e.target.value);}} style={sI} placeholder="Carlos López"/>
           </div>
           <div>
             <label style={{display:"block",fontSize:12,fontWeight:600,color:"#555",marginBottom:4}}>Teléfono</label>
             <input value={fPhone} onChange={function(e){setFPhone(e.target.value);}} style={sI} placeholder="55551234"/>
           </div>
+        </div>
+        <div style={{marginBottom:12}}>
+          <label style={{display:"block",fontSize:12,fontWeight:600,color:"#555",marginBottom:4}}>Email del negocio</label>
+          <input type="email" value={fEmail} onChange={function(e){setFEmail(e.target.value);}} style={sI} placeholder="negocio@email.com"/>
         </div>
         <div style={{background:"#f0f9f5",borderRadius:10,padding:"14px 16px",marginBottom:16}}>
           <p style={{margin:"0 0 10px",fontSize:12,fontWeight:700,color:TEAL}}>🔑 Credenciales del admin del negocio</p>
@@ -4538,6 +4590,7 @@ function App(props) {
   var _si=useState({store_name:"MUNDO CEL DIAZ",store_tagline:"Tecnología · Accesorios · Reparaciones · Guatemala",store_phone:"",store_address:"",store_email:"",store_logo_url:""});
   var storeInfo=_si[0]; var setStoreInfo=_si[1];
   var _ob=useState(false); var showOnboarding=_ob[0]; var setShowOnboarding=_ob[1];
+  var _sub=useState(null); var subInfo=_sub[0]; var setSubInfo=_sub[1];
 
   useEffect(function(){
     function handleGlobalKey(e){
@@ -4569,6 +4622,9 @@ function App(props) {
           var cfg  = await settingsAPI.getAll().catch(function(){return {};});
           if(cfg&&cfg.store_name){ setStoreInfo(function(prev){return Object.assign({},prev,cfg);}); setStore(cfg); }
           if(session.role==="admin"&&(!cfg||cfg.onboarding_done!=="true")){ setShowOnboarding(true); }
+          if(session.role!=="superadmin"){
+            adminAPI.getSubscription().then(function(s){ setSubInfo(s); }).catch(function(){});
+          }
           var normalProds = (prods||[]).map(function(p){return Object.assign({},p,{id:p.id,code:p.code,name:p.name,category:p.category||'',shelf:p.shelf||'',price:Number(p.price),cost:Number(p.cost),stock:Number(p.stock),unit:p.unit||'uni'});});
           var normalSales = (sls||[]).map(function(s){return Object.assign({},s,{items:s.sale_items||[],total:Number(s.total),date:s.created_at,registradoPor:s.registrado_por||null});});
           var normalAccs  = (accs||[]).map(function(a){return Object.assign({},a,{items:a.account_items||[],payments:(a.account_payments||[]).map(function(_pp){return Object.assign({},_pp,{date:_pp.date||_pp.created_at,amount:Number(_pp.amount),registradoPor:_pp.registrado_por||_pp.registradoPor||null});}),total:Number(a.total),paid:Number(a.paid),balance:Number(a.balance),date:a.created_at,registradoPor:a.registrado_por||null});});
@@ -5124,6 +5180,17 @@ function App(props) {
 
         {/* Onboarding wizard */}
         {showOnboarding&&<OnboardingWizard session={session} showFlash={showFlash} onDone={function(){setShowOnboarding(false); setStoreInfo(function(prev){return Object.assign({},prev,{store_name:getStore().store_name,store_tagline:getStore().store_tagline});});}}/>}
+
+        {/* Banner de suscripción vencida/por vencer */}
+        {subInfo&&subInfo.daysLeft!==null&&subInfo.daysLeft<=7&&<div style={{position:"fixed",bottom:0,left:0,right:0,zIndex:9000,background:subInfo.daysLeft<0?"#E24B4A":"#F39C12",color:"#fff",padding:"10px 20px",display:"flex",alignItems:"center",justifyContent:"space-between",gap:12,boxShadow:"0 -2px 12px rgba(0,0,0,0.2)"}}>
+          <span style={{fontWeight:700,fontSize:13}}>
+            {subInfo.daysLeft<0?"⚠ Tu suscripción ha vencido.":"⚠ Tu suscripción vence en "+subInfo.daysLeft+" día(s)."}
+            {" "}Contactá al administrador para renovar.
+          </span>
+          <a href={"https://wa.me/50254707112?text=Hola%2C%20necesito%20renovar%20mi%20suscripci%C3%B3n%20de%20"+(subInfo.tenantName||"mi negocio")} target="_blank" rel="noreferrer" style={{background:"#fff",color:"#1a2535",padding:"6px 14px",borderRadius:8,fontWeight:700,fontSize:12,textDecoration:"none",flexShrink:0}}>
+            Renovar ahora
+          </a>
+        </div>}
 
         {/* Overlay móvil */}
         {sidebarOpen&&<div className="sidebar-overlay" onClick={function(){setSidebarOpen(false);}} style={{display:"none"}}/>}
