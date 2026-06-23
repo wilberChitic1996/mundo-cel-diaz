@@ -155,12 +155,16 @@ export const cajaAPI = {
 
 // ── Panel Super Admin ─────────────────────────────────
 export const adminAPI = {
-  getTenants:       function()          { return api.get('/admin/tenants'); },
-  createTenant:     function(data)      { return api.post('/admin/tenants', data); },
-  updateTenant:     function(id, data)  { return api.put('/admin/tenants/' + id, data); },
-  getStats:         function()          { return api.get('/admin/stats'); },
-  getSubscription:  function()          { return api.get('/admin/subscription'); },
-  init:             function(data)      { return api.post('/admin/init', data); },
+  getTenants:          function()          { return api.get('/admin/tenants'); },
+  createTenant:        function(data)      { return api.post('/admin/tenants', data); },
+  updateTenant:        function(id, data)  { return api.put('/admin/tenants/' + id, data); },
+  getStats:            function()          { return api.get('/admin/stats'); },
+  getSubscription:     function()          { return api.get('/admin/subscription'); },
+  init:                function(data)      { return api.post('/admin/init', data); },
+  getTenantUsers:      function(id)        { return api.get('/admin/tenants/' + id + '/users'); },
+  resetUserPassword:   function(id, data)  { return api.put('/admin/users/' + id + '/reset-password', data); },
+  toggleUser:          function(id)        { return api.put('/admin/users/' + id + '/toggle', {}); },
+  updateMe:            function(data)      { return api.put('/admin/me', data); },
 };
 
 // ── Health check ──────────────────────────────────────

@@ -4584,6 +4584,19 @@ function SuperAdminPanel(props){
   var _renew=useState({}); var renewMonths=_renew[0]; var setRenewMonths=_renew[1];
   var _renewSaving=useState({}); var renewSaving=_renewSaving[0]; var setRenewSaving=_renewSaving[1];
 
+  // Users modal
+  var _umodal=useState(null); var usersModal=_umodal[0]; var setUsersModal=_umodal[1]; // { tenant, users }
+  var _uload=useState(false); var usersLoading=_uload[0]; var setUsersLoading=_uload[1];
+  var _rpw=useState({}); var resetPwMap=_rpw[0]; var setResetPwMap=_rpw[1]; // { [userId]: newPw }
+  var _rsaving=useState({}); var resetSaving=_rsaving[0]; var setResetSaving=_rsaving[1];
+
+  // Mi cuenta tab
+  var _mcn=useState(""); var mcName=_mcn[0]; var setMcName=_mcn[1];
+  var _mce=useState(""); var mcEmail=_mce[0]; var setMcEmail=_mce[1];
+  var _mcc=useState(""); var mcCurrent=_mcc[0]; var setMcCurrent=_mcc[1];
+  var _mcnp=useState(""); var mcNew=_mcnp[0]; var setMcNew=_mcnp[1];
+  var _mcsav=useState(false); var mcSaving=_mcsav[0]; var setMcSaving=_mcsav[1];
+
   // Form nuevo tenant
   var _fn=useState(""); var fName=_fn[0]; var setFName=_fn[1];
   var _fp=useState("basic"); var fPlan=_fp[0]; var setFPlan=_fp[1];
@@ -4604,6 +4617,50 @@ function SuperAdminPanel(props){
       .finally(function(){ setLoading(false); });
   }
   useEffect(function(){ reload(); },[]);
+
+  async function openUsers(t){
+    setUsersModal({ tenant:t, users:[] });
+    setUsersLoading(true);
+    try {
+      var users = await adminAPI.getTenantUsers(t.id);
+      setUsersModal({ tenant:t, users });
+    } catch(e){ showMsg("Error cargando usuarios","error"); setUsersModal(null); }
+    setUsersLoading(false);
+  }
+
+  async function doResetPw(user){
+    var pw = resetPwMap[user.id];
+    if(!pw||pw.length<6){ showMsg("Escribe una contraseña de al menos 6 caracteres","error"); return; }
+    setResetSaving(function(prev){ return Object.assign({},prev,{[user.id]:true}); });
+    try {
+      await adminAPI.resetUserPassword(user.id, { newPassword: pw });
+      setResetPwMap(function(prev){ var n=Object.assign({},prev); delete n[user.id]; return n; });
+      showMsg("Contraseña actualizada para "+user.name,"ok");
+    } catch(e){ showMsg(e.error||"Error al resetear contraseña","error"); }
+    setResetSaving(function(prev){ return Object.assign({},prev,{[user.id]:false}); });
+  }
+
+  async function doToggleUser(user){
+    try {
+      var updated = await adminAPI.toggleUser(user.id);
+      setUsersModal(function(prev){
+        if(!prev) return prev;
+        return Object.assign({},prev,{ users: prev.users.map(function(u){ return u.id===updated.id?Object.assign({},u,{active:updated.active}):u; }) });
+      });
+      showMsg(updated.name+" "+(updated.active?"activado":"desactivado"),"ok");
+    } catch(e){ showMsg("Error","error"); }
+  }
+
+  async function saveMyAccount(){
+    if(!mcCurrent){ showMsg("Ingresa tu contraseña actual","error"); return; }
+    setMcSaving(true);
+    try {
+      await adminAPI.updateMe({ name:mcName||undefined, email:mcEmail||undefined, currentPassword:mcCurrent, newPassword:mcNew||undefined });
+      showMsg("Datos actualizados correctamente","ok");
+      setMcCurrent(""); setMcNew("");
+    } catch(e){ showMsg(e.error||"Error al actualizar","error"); }
+    setMcSaving(false);
+  }
 
   async function createTenant(){
     if(!fName||!fAdminEmail||!fAdminPass){ showMsg("Nombre, email admin y contraseña son requeridos","error"); return; }
@@ -4679,8 +4736,8 @@ function SuperAdminPanel(props){
       </div>}
 
       {/* Tabs */}
-      <div style={{display:"flex",gap:8,marginBottom:20}}>
-        {[["tenants","🏢 Negocios"],["crear","➕ Nuevo negocio"]].map(function(t){ return <button key={t[0]} onClick={function(){setTab(t[0]);}} style={{padding:"8px 18px",borderRadius:20,border:"none",background:tab===t[0]?TEAL:"#e8e8e8",color:tab===t[0]?"#fff":"#333",fontWeight:tab===t[0]?700:400,fontSize:13,cursor:"pointer"}}>{t[1]}</button>; })}
+      <div style={{display:"flex",gap:8,marginBottom:20,flexWrap:"wrap"}}>
+        {[["tenants","🏢 Negocios"],["crear","➕ Nuevo negocio"],["cuenta","👤 Mi cuenta"]].map(function(t){ return <button key={t[0]} onClick={function(){setTab(t[0]);}} style={{padding:"8px 18px",borderRadius:20,border:"none",background:tab===t[0]?TEAL:"#e8e8e8",color:tab===t[0]?"#fff":"#333",fontWeight:tab===t[0]?700:400,fontSize:13,cursor:"pointer"}}>{t[1]}</button>; })}
       </div>
 
       {/* Lista de tenants */}
@@ -4690,7 +4747,7 @@ function SuperAdminPanel(props){
         <div style={{overflowX:"auto"}}>
           <table style={{width:"100%",borderCollapse:"collapse"}}>
             <thead>
-              <tr>{["Negocio","Plan","Usuarios","Estado","Vencimiento","Renovar","Acciones"].map(function(h){ return <th key={h} style={sTH}>{h}</th>; })}</tr>
+              <tr>{["Negocio","Plan","Usuarios","Estado","Vencimiento","Renovar","Acciones"].map(function(h){ return <th key={h} style={Object.assign({},sTH,{whiteSpace:"nowrap"})}>{h}</th>; })}</tr>
             </thead>
             <tbody>
               {tenants.map(function(t){ return <tr key={t.id} style={{borderBottom:"1px solid #eee"}}>
@@ -4720,14 +4777,87 @@ function SuperAdminPanel(props){
                   </div>
                 </td>
                 <td style={sTD}>
-                  <button onClick={function(){ toggleActive(t); }} style={{padding:"5px 12px",borderRadius:6,border:"1px solid #ddd",background:"#fff",fontSize:12,cursor:"pointer",color:t.active?"#E24B4A":TEAL,fontWeight:600}}>
-                    {t.active?"Desactivar":"Activar"}
-                  </button>
+                  <div style={{display:"flex",gap:6,flexWrap:"wrap"}}>
+                    <button onClick={function(){ openUsers(t); }} style={{padding:"5px 12px",borderRadius:6,border:"1px solid "+TEAL,background:"#fff",fontSize:12,cursor:"pointer",color:TEAL,fontWeight:600}}>
+                      👥 Usuarios
+                    </button>
+                    <button onClick={function(){ toggleActive(t); }} style={{padding:"5px 12px",borderRadius:6,border:"1px solid #ddd",background:"#fff",fontSize:12,cursor:"pointer",color:t.active?"#E24B4A":TEAL,fontWeight:600}}>
+                      {t.active?"Desactivar":"Activar"}
+                    </button>
+                    {t.phone&&<a href={"https://wa.me/502"+t.phone.replace(/\D/g,"")} target="_blank" rel="noopener noreferrer" style={{padding:"5px 10px",borderRadius:6,border:"1px solid #25D366",background:"#fff",fontSize:12,cursor:"pointer",color:"#25D366",fontWeight:600,textDecoration:"none"}}>📱</a>}
+                  </div>
                 </td>
               </tr>; })}
             </tbody>
           </table>
         </div>}
+      </div>}
+
+      {/* Mi cuenta */}
+      {tab==="cuenta"&&<div style={Object.assign({},sC,{maxWidth:480,padding:28})}>
+        <h3 style={{margin:"0 0 6px",fontSize:16,fontWeight:700,color:NAVY}}>👤 Mi cuenta — SuperAdmin</h3>
+        <p style={{margin:"0 0 20px",fontSize:12,color:"#888"}}>Actualiza tu nombre, email o contraseña. Siempre se requiere la contraseña actual.</p>
+        <label style={{display:"block",fontSize:12,fontWeight:600,color:"#555",marginBottom:4}}>Nombre</label>
+        <input value={mcName} onChange={function(e){setMcName(e.target.value);}} style={Object.assign({},sI,{marginBottom:12})} placeholder={session.name||"Tu nombre"}/>
+        <label style={{display:"block",fontSize:12,fontWeight:600,color:"#555",marginBottom:4}}>Email</label>
+        <input type="email" value={mcEmail} onChange={function(e){setMcEmail(e.target.value);}} style={Object.assign({},sI,{marginBottom:16})} placeholder={session.email||"tu@email.com"}/>
+        <div style={{background:"#f0f9f5",borderRadius:10,padding:"14px 16px",marginBottom:16}}>
+          <p style={{margin:"0 0 10px",fontSize:12,fontWeight:700,color:TEAL}}>🔒 Cambiar contraseña</p>
+          <label style={{display:"block",fontSize:12,fontWeight:600,color:"#555",marginBottom:4}}>Contraseña actual *</label>
+          <input type="password" value={mcCurrent} onChange={function(e){setMcCurrent(e.target.value);}} style={Object.assign({},sI,{marginBottom:10})} placeholder="Tu contraseña actual"/>
+          <label style={{display:"block",fontSize:12,fontWeight:600,color:"#555",marginBottom:4}}>Nueva contraseña (opcional)</label>
+          <input type="password" value={mcNew} onChange={function(e){setMcNew(e.target.value);}} style={sI} placeholder="Dejar vacío para no cambiar"/>
+        </div>
+        <button onClick={saveMyAccount} disabled={mcSaving||!mcCurrent} style={Object.assign({},mB(TEAL),{width:"100%",padding:"13px",fontSize:15,opacity:mcSaving||!mcCurrent?0.6:1})}>
+          {mcSaving?"Guardando…":"Guardar cambios ✓"}
+        </button>
+      </div>}
+
+      {/* Modal usuarios de tenant */}
+      {usersModal&&<div style={{position:"fixed",inset:0,background:"rgba(0,0,0,0.5)",zIndex:3000,display:"flex",alignItems:"center",justifyContent:"center",padding:16}}>
+        <div style={{background:"#fff",borderRadius:16,padding:24,width:"100%",maxWidth:640,maxHeight:"90vh",overflowY:"auto",boxShadow:"0 8px 40px rgba(0,0,0,0.2)"}}>
+          <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:16}}>
+            <div>
+              <h3 style={{margin:0,fontSize:16,fontWeight:700,color:NAVY}}>👥 Usuarios — {usersModal.tenant.name}</h3>
+              <p style={{margin:"4px 0 0",fontSize:12,color:"#888"}}>Gestiona accesos y contraseñas del negocio</p>
+            </div>
+            <button onClick={function(){setUsersModal(null);setResetPwMap({});}} style={{background:"none",border:"none",fontSize:22,cursor:"pointer",color:"#aaa",lineHeight:1}}>✕</button>
+          </div>
+          {usersLoading?<p style={{textAlign:"center",color:"#888",padding:30}}>Cargando…</p>:
+          usersModal.users.length===0?<p style={{textAlign:"center",color:"#888",padding:30}}>Sin usuarios en este negocio</p>:
+          <div>{usersModal.users.map(function(u){
+            var ROLE_COL={admin:TEAL,cajero:"#378ADD",auditor:"#7F77DD"};
+            return <div key={u.id} style={{border:"1px solid #eee",borderRadius:10,padding:"12px 14px",marginBottom:10}}>
+              <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:8,flexWrap:"wrap",gap:6}}>
+                <div>
+                  <span style={{fontWeight:700,fontSize:13,color:NAVY}}>{u.name}</span>
+                  <span style={Object.assign({},mBg(ROLE_COL[u.role]||"#888"),{fontSize:10,marginLeft:8})}>{u.role}</span>
+                  {!u.active&&<span style={Object.assign({},mBg("#ccc"),{fontSize:10,marginLeft:4})}>Inactivo</span>}
+                  <div style={{fontSize:11,color:"#888",marginTop:2}}>{u.email}</div>
+                </div>
+                <button onClick={function(){doToggleUser(u);}} style={{padding:"4px 12px",borderRadius:6,border:"1px solid #ddd",background:"#fff",fontSize:12,cursor:"pointer",color:u.active?"#E24B4A":TEAL,fontWeight:600}}>
+                  {u.active?"Desactivar":"Activar"}
+                </button>
+              </div>
+              <div style={{display:"flex",gap:8,alignItems:"center"}}>
+                <input
+                  type="password"
+                  value={resetPwMap[u.id]||""}
+                  onChange={function(e){ var id=u.id; setResetPwMap(function(prev){ return Object.assign({},prev,{[id]:e.target.value}); }); }}
+                  placeholder="Nueva contraseña (mín. 6 caracteres)"
+                  style={Object.assign({},sI,{flex:1,fontSize:12,padding:"7px 10px"})}
+                />
+                <button
+                  onClick={function(){doResetPw(u);}}
+                  disabled={resetSaving[u.id]||!(resetPwMap[u.id]&&resetPwMap[u.id].length>=6)}
+                  style={{padding:"7px 14px",borderRadius:8,border:"none",background:"#E24B4A",color:"#fff",fontSize:12,fontWeight:700,cursor:"pointer",whiteSpace:"nowrap",opacity:resetSaving[u.id]||!(resetPwMap[u.id]&&resetPwMap[u.id].length>=6)?0.5:1}}
+                >
+                  {resetSaving[u.id]?"…":"🔑 Resetear"}
+                </button>
+              </div>
+            </div>;
+          })}</div>}
+        </div>
       </div>}
 
       {/* Crear tenant */}
