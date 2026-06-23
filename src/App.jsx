@@ -211,9 +211,9 @@ var SESS_KEY = "mnpos-session-v1";
 
 var PERMS = {
   superadmin: ["superadmin"],
-  admin:      ["dashboard","pos","caja","accounts","returns","defective","products","inventory","history","backup","users","clients","repairs","cuadres","audit","warranties","storeconfig","suppliers"],
-  cajero:     ["dashboard","pos","caja","accounts","returns","history","clients","repairs","warranties"],
-  auditor:    ["dashboard","caja","history","inventory","cuadres"],
+  admin:      ["dashboard","pos","caja","accounts","returns","defective","products","inventory","history","backup","users","clients","repairs","cuadres","audit","warranties","storeconfig","suppliers","ayuda"],
+  cajero:     ["dashboard","pos","caja","accounts","returns","history","clients","repairs","warranties","ayuda"],
+  auditor:    ["dashboard","caja","history","inventory","cuadres","ayuda"],
 };
 var ROLE_LABEL = { superadmin:"Super Admin", admin:"Administrador", cajero:"Cajero", auditor:"Auditor" };
 var ROLE_COLOR = { superadmin:"#9B59B6", admin:TEAL, cajero:"#378ADD", auditor:"#7F77DD" };
@@ -1114,6 +1114,7 @@ function Sidebar(props) {
     {id:"users",       ic:"👥", lb:"Usuarios"},
     {id:"suppliers",   ic:"🏭", lb:"Proveedores"},
     {id:"storeconfig", ic:"⚙️", lb:"Mi Tienda"},
+    {id:"ayuda",       ic:"📖", lb:"Ayuda"},
   ];
   return (
       <div className={"sidebar-mobile"+(sidebarOpen?" open":"")} style={{width:200,background:NAVY,display:"flex",flexDirection:"column",flexShrink:0,position:"sticky",top:0,height:"100vh"}}>
@@ -3491,6 +3492,147 @@ function HistoryScreen(props) {
   );
 }
 
+/* ── Ayuda / Manual de usuario ── */
+function AyudaScreen(props) {
+  var session=props.session||{};
+  var _open=useState(null); var openSec=_open[0]; var setOpenSec=_open[1];
+  function toggle(id){ setOpenSec(openSec===id?null:id); }
+
+  var secciones=[
+    {id:"pos", ic:"🛒", titulo:"Nueva Venta (Punto de Venta)", pasos:[
+      "Tocá '🛒 Nueva Venta' en el menú lateral.",
+      "Buscá el producto por nombre o código en la barra de búsqueda.",
+      "Tocá el producto para agregarlo al carrito. Podés cambiar la cantidad tocando los botones + y −.",
+      "Elegí el método de pago: Efectivo, Tarjeta o Transferencia.",
+      "Si el cliente paga al contado, escribí cuánto entrega y el sistema calcula el vuelto.",
+      "Si la venta es al crédito (fiado), seleccioná 'Crédito' y escribí el nombre del cliente. Esto crea una cuenta por cobrar automáticamente.",
+      "Tocá '✓ Cobrar' para finalizar. El sistema imprime el comprobante y actualiza el stock.",
+    ], tips:[
+      "Podés aplicar descuento a un producto tocando su precio en el carrito.",
+      "Para buscar más rápido, escaneá el código de barras si tenés un lector.",
+    ]},
+    {id:"inventario", ic:"🗄️", titulo:"Inventario", pasos:[
+      "En '🗄️ Inventario' ves todos los productos con su stock actual.",
+      "El stock cambia automáticamente al hacer ventas, devoluciones o compras a proveedores.",
+      "Si un producto llega a su stock mínimo, aparece una alerta naranja en el Dashboard.",
+      "Para ver el historial de precios y movimientos de un producto, tocá el producto y luego 'Ver historial'.",
+    ], tips:[
+      "Para agregar productos nuevos, andá a '📦 Productos' (solo administrador).",
+      "El 'Costo' de un producto es el precio al que lo compraste. Sirve para calcular la ganancia en los Cuadres.",
+      "La 'Estantería' es donde guardás el producto físicamente (ej: 'Vitrina 2, fila 3').",
+    ]},
+    {id:"cuentas", ic:"💳", titulo:"Cuentas por Cobrar", pasos:[
+      "Acá aparecen todos los clientes que compraron al fiado.",
+      "El estado puede ser: Pendiente (no han pagado nada), Abono parcial (pagaron una parte) o Pagado (saldo en cero).",
+      "Para registrar un pago, tocá 'Atender →' en la cuenta del cliente.",
+      "Escribí el monto recibido, el método (Efectivo/Transferencia/Tarjeta) y tocá '✓ Registrar pago'.",
+      "Si querés enviarle un recordatorio de cobro por WhatsApp, tocá el botón 💬 verde.",
+      "Para enviar recordatorio a varios clientes a la vez, usá el botón '📱 Recordatorio masivo'.",
+    ], tips:[
+      "La sección 'Antigüedad de cuentas' muestra cuánto tiempo llevan sin pagar (0-30, 31-60, 61-90, +90 días).",
+      "Podés exportar la lista de cuentas a Excel o PDF para llevar tu control.",
+    ]},
+    {id:"reparaciones", ic:"🔧", titulo:"Reparaciones", pasos:[
+      "Al recibir un equipo, tocá '+ Nueva Reparación' y llenás: cliente, marca, modelo, problema y técnico asignado.",
+      "El flujo de estados es: Recibido → En revisión → Esperando repuesto → Listo → Entregado.",
+      "Para cambiar el estado, abrí la reparación y tocá el estado nuevo.",
+      "Cuando el equipo esté 'Listo', el Dashboard muestra una alerta para avisarte.",
+      "Al marcar 'Entregado' y cobrar, podés enviar el comprobante por WhatsApp al cliente.",
+    ], tips:[
+      "Podés crear una Garantía automáticamente desde la pantalla de reparación.",
+      "Las reparaciones vencidas (sin actualizar en varios días) aparecen en alerta roja en el Dashboard.",
+    ]},
+    {id:"clientes", ic:"👥", titulo:"Clientes", pasos:[
+      "Guardá los datos de tus clientes: nombre, teléfono, NIT y dirección.",
+      "El teléfono es importante — se usa para enviar comprobantes y recordatorios por WhatsApp automáticamente.",
+      "Desde el perfil de un cliente podés ver todas sus compras, cuentas y reparaciones.",
+      "Para agregar un cliente nuevo, tocá '+ Nuevo Cliente'.",
+    ], tips:[
+      "También podés crear clientes directamente desde la pantalla de Nueva Venta al hacer una venta al crédito.",
+    ]},
+    {id:"cuadres", ic:"📈", titulo:"Cuadres y Reportes", pasos:[
+      "Elegí el período: Hoy, Esta semana, Este mes, Mes anterior o un rango personalizado.",
+      "Verás el total de ventas, ingresos por método de pago, devoluciones y ganancia bruta.",
+      "La 'Ganancia bruta' solo aparece si cargaste el costo de los productos en el inventario.",
+      "Podés imprimir el cuadre completo o exportarlo a Excel desde los botones en la parte superior.",
+    ], tips:[
+      "El cuadre es diferente al cierre de caja. El cierre de caja es del día; el cuadre puede abarcar cualquier período.",
+      "La sección 'Más rentables' muestra qué productos generaron más ganancia en el período.",
+    ]},
+    {id:"caja", ic:"💵", titulo:"Apertura y Cierre de Caja", pasos:[
+      "Al inicio del día, andá a '💵 Caja' y tocá 'Abrir caja'. Ingresá el efectivo inicial (fondo de cambio).",
+      "Durante el día, el sistema lleva el saldo automáticamente.",
+      "Al final del día, tocá 'Cerrar caja'. El sistema muestra el resumen del día y genera un respaldo automático.",
+      "El cierre imprime un voucher con el detalle de ventas, abonos y reembolsos del día.",
+    ], tips:[
+      "Si el efectivo físico no cuadra con el sistema, revisá si hay ventas sin registrar o reembolsos.",
+    ]},
+    {id:"respaldo", ic:"💾", titulo:"Respaldo de Datos", pasos:[
+      "Tus datos están guardados en la nube (Supabase) de forma automática.",
+      "Para bajar una copia local, andá a '💾 Respaldo' y tocá 'Descargar Excel completo'.",
+      "El sistema también hace un respaldo automático cada vez que cerrás la caja.",
+      "Se recomienda hacer un respaldo manual una vez por semana.",
+    ], tips:[
+      "El archivo Excel tiene 11 hojas: Ventas, Inventario, Cuentas, Clientes, Reparaciones y más.",
+      "Si aparece la alerta amarilla de respaldo en el Dashboard, significa que hace más de 7 días que no respaldás.",
+    ]},
+  ];
+
+  var visible=secciones.filter(function(s){
+    if(session.role==="cajero") return ["pos","cuentas","reparaciones","clientes","caja"].indexOf(s.id)>=0;
+    if(session.role==="auditor") return ["cuadres","respaldo"].indexOf(s.id)>=0;
+    return true;
+  });
+
+  return (
+    <div>
+      <p style={H1}>📖 Manual de Usuario</p>
+      <div style={Object.assign({},sC,{marginBottom:16,background:"linear-gradient(135deg,"+NAVY+" 0%,#1a3a2a 100%)",padding:"16px 20px"})}>
+        <p style={{color:"#fff",fontWeight:700,fontSize:15,margin:"0 0 4px"}}>Bienvenido a la guía de POSCEL</p>
+        <p style={{color:"rgba(255,255,255,0.7)",fontSize:13,margin:0}}>Tocá cada sección para ver los pasos y consejos. Si tenés dudas, contactá a tu administrador.</p>
+      </div>
+      <div style={{display:"flex",flexDirection:"column",gap:10}}>
+        {visible.map(function(sec){
+          var isOpen=openSec===sec.id;
+          return (
+            <div key={sec.id} style={{borderRadius:12,border:"1px solid "+(isOpen?"#1D9E75":"rgba(0,0,0,0.1)"),overflow:"hidden",transition:"border-color 0.2s"}}>
+              <button
+                onClick={function(){toggle(sec.id);}}
+                style={{width:"100%",display:"flex",alignItems:"center",justifyContent:"space-between",padding:"14px 18px",background:isOpen?"#f0faf6":"#fff",border:"none",cursor:"pointer",textAlign:"left"}}
+              >
+                <span style={{fontWeight:700,fontSize:15,color:isOpen?TEAL:NAVY}}>{sec.ic} {sec.titulo}</span>
+                <span style={{fontSize:18,color:isOpen?TEAL:"#aaa",transition:"transform 0.2s",display:"inline-block",transform:isOpen?"rotate(90deg)":"none"}}>›</span>
+              </button>
+              {isOpen&&(
+                <div style={{padding:"0 18px 18px",background:"#fff"}}>
+                  <p style={{fontWeight:600,fontSize:13,color:"#555",margin:"0 0 10px",borderBottom:"1px solid #eee",paddingBottom:8}}>Pasos</p>
+                  <ol style={{margin:"0 0 16px",paddingLeft:20}}>
+                    {sec.pasos.map(function(p,i){
+                      return <li key={i} style={{fontSize:14,color:"#333",marginBottom:8,lineHeight:1.6}}>{p}</li>;
+                    })}
+                  </ol>
+                  {sec.tips&&sec.tips.length>0&&(
+                    <div style={{background:"#f0faf6",borderRadius:8,padding:"10px 14px",borderLeft:"3px solid "+TEAL}}>
+                      <p style={{fontWeight:700,fontSize:12,color:TEAL,margin:"0 0 6px",textTransform:"uppercase",letterSpacing:"0.5px"}}>💡 Consejos</p>
+                      {sec.tips.map(function(t,i){
+                        return <p key={i} style={{fontSize:13,color:"#444",margin:i<sec.tips.length-1?"0 0 6px":0,lineHeight:1.5}}>• {t}</p>;
+                      })}
+                    </div>
+                  )}
+                </div>
+              )}
+            </div>
+          );
+        })}
+      </div>
+      <div style={Object.assign({},sC,{marginTop:16,textAlign:"center",background:"#f5f4f0"})}>
+        <p style={{fontSize:13,color:"#666",margin:"0 0 4px"}}>¿Necesitás más ayuda?</p>
+        <a href={"https://wa.me/50254707112?text="+encodeURIComponent("Hola, necesito ayuda con el sistema POSCEL.")} target="_blank" rel="noreferrer" style={{color:TEAL,fontWeight:700,fontSize:14,textDecoration:"none"}}>💬 Contactar soporte por WhatsApp →</a>
+      </div>
+    </div>
+  );
+}
+
 /* ── Respaldo ── */
 function BackupScreen(props) {
   var products=props.products||[]; var sales=props.sales||[];
@@ -5523,6 +5665,7 @@ function App(props) {
           {view==="audit"      &&canAccess(session.role,"audit")&&<AuditScreen session={session}/>}
           {view==="suppliers"  &&canAccess(session.role,"suppliers")&&<SuppliersScreen products={products} session={session} showFlash={showFlash} onStockUpdate={function(){ productsAPI.getAll().then(function(p){ setProducts((p||[]).map(function(x){return Object.assign({},x,{price:Number(x.price),cost:Number(x.cost),stock:Number(x.stock)});})); }); }}/>}
           {view==="storeconfig"&&canAccess(session.role,"storeconfig")&&<StoreConfigScreen storeInfo={storeInfo} setStoreInfo={setStoreInfo} session={session} showFlash={showFlash}/>}
+          {view==="ayuda"      &&canAccess(session.role,"ayuda")&&<AyudaScreen session={session}/>}
         </div>
       </div>
   );
