@@ -26,15 +26,21 @@ export default defineConfig({
       },
       workbox: {
         globPatterns: ['**/*.{js,css,html,ico,png,svg,woff2}'],
+        // Forzar que el Service Worker nuevo tome control de inmediato y borre
+        // las cachés viejas (builds anteriores y datos del API cacheados).
+        skipWaiting: true,
+        clientsClaim: true,
+        cleanupOutdatedCaches: true,
+        // IMPORTANTE: el API NUNCA se cachea. Este es un sistema 100% online —
+        // todas las llamadas a /api/ deben ir SIEMPRE al servidor en vivo.
+        // Cachear respuestas del API causaba que se sirvieran datos viejos o
+        // vacíos (respaldos incompletos, listas vacías). El Service Worker solo
+        // cachea la app (JS/CSS/imágenes), nunca los datos.
+        navigateFallbackDenylist: [/^\/api\//],
         runtimeCaching: [
           {
             urlPattern: /\/api\//i,
-            handler: 'NetworkFirst',
-            options: {
-              cacheName: 'api-cache',
-              networkTimeoutSeconds: 10,
-              cacheableResponse: { statuses: [0, 200] },
-            },
+            handler: 'NetworkOnly',
           },
         ],
       },
