@@ -805,11 +805,12 @@ function UsersScreen(props) {
           <MetricBox label="Activos"         value={users.filter(function(u){return u.active;}).length} color="#378ADD"/>
           <MetricBox label="Administradores" value={users.filter(function(u){return u.role==="admin";}).length} color="#7F77DD"/>
         </div>
+        {(function(){var userPag=usePaginator(users,15); return (
         <div style={sC}>
           <table style={{width:"100%",borderCollapse:"collapse"}}>
             <thead><tr>{["Nombre","Email","Rol","Estado","Seguridad","Último acceso",""].map(function(h){return <th key={h} style={sTH}>{h}</th>;})}</tr></thead>
             <tbody>
-            {users.map(function(u){
+            {userPag.paged.map(function(u){
               var isSelf=u.id===session.userId;
               return (
                   <tr key={u.id}>
@@ -830,7 +831,9 @@ function UsersScreen(props) {
             })}
             </tbody>
           </table>
+          <userPag.Pager/>
         </div>
+        );}())}
       </div>
   );
 }
@@ -2636,6 +2639,7 @@ function ReturnsScreen(props) {
 
   var totalReembolsado=returns.filter(function(r){return r.refundAmount>0;}).reduce(function(s,r){return s+r.refundAmount;},0);
   var totalPendReemb=returns.filter(function(r){return r.refundMethod==="Sin reembolso"||r.refundAmount===0;}).length;
+  var retPag=usePaginator(returns,20);
 
   return (
     <div>
@@ -2809,7 +2813,7 @@ function ReturnsScreen(props) {
           <table style={{width:"100%",borderCollapse:"collapse"}}>
             <thead><tr>{["Fecha","Cliente","Motivo","Estado artículo","Reembolso","Monto reimb.","Valor artícs."].map(function(h){return <th key={h} style={sTH}>{h}</th>;})}</tr></thead>
             <tbody>
-              {returns.map(function(r){
+              {retPag.paged.map(function(r){
                 var cond=r.itemCondition||"bueno";
                 return (
                   <tr key={r.id}>
@@ -2826,6 +2830,7 @@ function ReturnsScreen(props) {
             </tbody>
           </table>
         )}
+        <retPag.Pager/>
       </div>
     </div>
   );
@@ -2836,6 +2841,7 @@ function DefectiveScreen(props) {
   var defectives=props.defectives; var onUpdateStatus=props.onUpdateStatus; var onReingress=props.onReingress;
   var _f=useState("defectuoso"); var filter=_f[0]; var setFilter=_f[1];
   var filtered=defectives.filter(function(d){return filter==="todos"||d.status===filter;});
+  var defPag=usePaginator(filtered,20);
   var totalPiezas=defectives.filter(function(d){return d.status==="defectuoso";}).length;
   var totalDadas=defectives.filter(function(d){return d.status==="dado_de_baja";}).length;
   var totalReing=defectives.filter(function(d){return d.status==="reingresado";}).length;
@@ -2860,7 +2866,7 @@ function DefectiveScreen(props) {
               <table style={{width:"100%",borderCollapse:"collapse"}}>
                 <thead><tr>{["Fecha","Código","Pieza","Cant.","Precio","Motivo","Estado","Acciones"].map(function(h){return <th key={h} style={sTH}>{h}</th>;})}</tr></thead>
                 <tbody>
-                {filtered.map(function(d){
+                {defPag.paged.map(function(d){
                   return (
                       <tr key={d.id}>
                         <td style={sTD}>{fmtD(d.date)}</td>
@@ -2889,6 +2895,7 @@ function DefectiveScreen(props) {
                 </tbody>
               </table>
           )}
+          <defPag.Pager/>
         </div>
         {defectives.length>0&&(
             <div style={Object.assign({},sC,{marginTop:16,background:"#f9f8f5"})}>
@@ -2980,6 +2987,7 @@ function ProductsScreen(props) {
     if(sort==="price")return a.price-b.price;
     return a.name.localeCompare(b.name);
   });
+  var prodPag=usePaginator(filtered,25);
   return (
       <div>
         <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:20}}>
@@ -2997,7 +3005,7 @@ function ProductsScreen(props) {
         {editProd&&<ProductForm product={editProd} onSave={function(p){saveProduct(p);setEditProd(null);}} onCancel={function(){setEditProd(null);}}/>}
         <div style={Object.assign({},sC,{marginBottom:14})}>
           <div style={{display:"flex",gap:10,flexWrap:"wrap",alignItems:"center"}}>
-            <input style={Object.assign({},sI,{width:240,flex:"none"})} placeholder="Buscar..." value={search} onChange={function(e){setSearch(e.target.value);}}/>
+            <input style={Object.assign({},sI,{width:240,flex:"none"})} placeholder="Buscar..." value={search} onChange={function(e){setSearch(e.target.value);prodPag.setPage(1);}}/>
             <select style={Object.assign({},sI,{width:150,flex:"none"})} value={cat} onChange={function(e){setCat(e.target.value);}}>
               {cats.map(function(c){return <option key={c}>{c}</option>;})}
             </select>
@@ -3012,7 +3020,7 @@ function ProductsScreen(props) {
           <table style={{width:"100%",borderCollapse:"collapse"}}>
             <thead><tr>{["Código","Nombre","Categoría","Estantería","Precio","Costo","Margen","Stock",""].map(function(h){return <th key={h} style={sTH}>{h}</th>;})}</tr></thead>
             <tbody>
-            {filtered.map(function(p){
+            {prodPag.paged.map(function(p){
               var mg=p.cost>0?Math.round((p.price-p.cost)/p.price*100):0;
               return (
                   <tr key={p.id}>
@@ -3037,6 +3045,7 @@ function ProductsScreen(props) {
             {filtered.length===0&&<tr><td colSpan={9} style={Object.assign({},sTD,{textAlign:"center",color:"#999",padding:32})}>Sin resultados</td></tr>}
             </tbody>
           </table>
+          <prodPag.Pager/>
         </div>
         {priceHistProd&&(
           <div style={{position:"fixed",top:0,left:0,width:"100%",height:"100%",background:"rgba(0,0,0,0.5)",zIndex:1000,display:"flex",alignItems:"center",justifyContent:"center",padding:16,boxSizing:"border-box"}}>
@@ -4023,6 +4032,7 @@ function WarrantiesScreen(props){
     var ql=q.toLowerCase();
     return (w.client||"").toLowerCase().includes(ql)||(w.description||"").toLowerCase().includes(ql)||(w.entityId||"").toLowerCase().includes(ql);
   });
+  var warPag=usePaginator(displayed,20);
 
   function resetForm(){setFEntityType("repair");setFEntityId("");setFClient("");setFDesc("");setFMonths(3);setFStart(new Date().toISOString().slice(0,10));setFErr("");}
 
@@ -4138,7 +4148,7 @@ function WarrantiesScreen(props){
       )}
 
       <div style={Object.assign({},sC,{marginBottom:14})}>
-        <input style={Object.assign({},sI,{marginBottom:12})} placeholder="🔍  Buscar por cliente, descripción o referencia..." value={q} onChange={function(e){setQ(e.target.value);}}/>
+        <input style={Object.assign({},sI,{marginBottom:12})} placeholder="🔍  Buscar por cliente, descripción o referencia..." value={q} onChange={function(e){setQ(e.target.value);warPag.setPage(1);}}/>
         <div style={{display:"flex",gap:8,flexWrap:"wrap"}}>
           {[["todas","Todas"],["vigente","Vigentes"],["vencida","Vencidas"],["reclamada","Reclamadas"]].map(function(p){
             return <button key={p[0]} style={Object.assign({},mB(filter===p[0]?"teal":"gray"),{padding:"6px 14px"})} onClick={function(){setFilter(p[0]);}}>{p[1]}</button>;
@@ -4151,7 +4161,7 @@ function WarrantiesScreen(props){
           <table style={{width:"100%",borderCollapse:"collapse"}}>
             <thead><tr>{["Cliente","Descripción","Referencia","Inicio","Vencimiento","Estado",""].map(function(h){return <th key={h} style={sTH}>{h}</th>;})}</tr></thead>
             <tbody>
-            {displayed.map(function(w){
+            {warPag.paged.map(function(w){
               var wEnd=new Date(w.endDate);
               var dias=Math.ceil((wEnd-now)/86400000);
               var isVig=w.status!=="reclamada"&&wEnd>=now;
@@ -4174,6 +4184,7 @@ function WarrantiesScreen(props){
             </tbody>
           </table>
         )}
+        <warPag.Pager/>
       </div>
     </div>
   );
@@ -4305,6 +4316,9 @@ function SuppliersScreen(props){
 
   if(loading) return <div style={{padding:40,textAlign:"center",color:"#999"}}>Cargando…</div>;
 
+  var supPag=usePaginator(suppliers,20);
+  var purPag=usePaginator(purchases,20);
+
   return (
     <div>
       <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:16,flexWrap:"wrap",gap:8}}>
@@ -4333,7 +4347,7 @@ function SuppliersScreen(props){
             :<table style={{width:"100%",borderCollapse:"collapse"}}>
               <thead><tr>{["Proveedor","Teléfono","Correo","Dirección","Notas",""].map(function(h){return <th key={h} style={sTH}>{h}</th>;})}</tr></thead>
               <tbody>
-              {suppliers.map(function(s){
+              {supPag.paged.map(function(s){
                 return (
                   <tr key={s.id}>
                     <td style={Object.assign({},sTD,{fontWeight:600})}>{s.name}</td>
@@ -4351,8 +4365,8 @@ function SuppliersScreen(props){
                 );
               })}
               </tbody>
-            </table>
-          }
+            </table>}
+          <supPag.Pager/>
         </div>
       )}
 
@@ -4367,7 +4381,7 @@ function SuppliersScreen(props){
             :<table style={{width:"100%",borderCollapse:"collapse"}}>
               <thead><tr>{["Fecha","Proveedor","Artículos","Total","Registrado por"].map(function(h){return <th key={h} style={sTH}>{h}</th>;})}</tr></thead>
               <tbody>
-              {purchases.map(function(p){
+              {purPag.paged.map(function(p){
                 var items=p.purchase_items||[];
                 return (
                   <tr key={p.id}>
@@ -4385,8 +4399,8 @@ function SuppliersScreen(props){
                 );
               })}
               </tbody>
-            </table>
-          }
+            </table>}
+          <purPag.Pager/>
         </div>
       )}
 
