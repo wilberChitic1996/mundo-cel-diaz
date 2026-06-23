@@ -1314,7 +1314,8 @@ function DashboardScreen(props) {
   var _chartRange=useState("7d"); var chartRange=_chartRange[0]; var setChartRange=_chartRange[1];
 
   var now=new Date();
-  var todayRev=todaySales.reduce(function(s,x){return s+x.total;},0);
+  var todayRev=todaySales.reduce(function(s,x){return s+x.total;},0); // total vendido (incluye crédito)
+  var todayRevCobrado=todaySalesCobradas.reduce(function(s,x){return s+x.total;},0); // solo cobrado hoy
   var todayStr=now.toDateString();
 
   // Ventas por día según rango seleccionado
@@ -1324,7 +1325,7 @@ function DashboardScreen(props) {
   var chartData=Array.from({length:chartDays},function(_,i){
     var d=new Date(); d.setDate(d.getDate()-(chartDays-1-i)); d.setHours(0,0,0,0);
     var dStr=d.toDateString();
-    var daySales=sales.filter(function(s){return new Date(s.date).toDateString()===dStr&&s.status==='completado';});
+    var daySales=sales.filter(function(s){return new Date(s.date).toDateString()===dStr&&s.status!=='anulado';});
     var rev=daySales.reduce(function(a,s){return a+s.total;},0);
     var cnt=daySales.length;
     var label=chartDays===7?DIAS[d.getDay()]:(d.getDate()+"/"+(d.getMonth()+1));
@@ -1336,20 +1337,24 @@ function DashboardScreen(props) {
     var d=new Date(now.getFullYear(),now.getMonth()-5+i,1);
     var mStart=new Date(d.getFullYear(),d.getMonth(),1);
     var mEnd=new Date(d.getFullYear(),d.getMonth()+1,0,23,59,59);
-    var rev=sales.filter(function(s){var sd=new Date(s.date);return sd>=mStart&&sd<=mEnd&&s.status==='completado';}).reduce(function(a,s){return a+s.total;},0);
+    var rev=sales.filter(function(s){var sd=new Date(s.date);return sd>=mStart&&sd<=mEnd&&s.status!=='anulado';}).reduce(function(a,s){return a+s.total;},0);
     return {label:MESES[d.getMonth()],ingresos:Math.round(rev*100)/100};
   });
 
-  // Métodos de pago para PieChart
-  var metodoColors={"Efectivo":"#1D9E75","Tarjeta":"#378ADD","Transferencia":"#7C4DFF","Mixto":"#E65100"};
+  // Métodos de pago para PieChart (incluye crédito como categoría, excluye anuladas)
+  var metodoColors={"Efectivo":"#1D9E75","Tarjeta":"#378ADD","Transferencia":"#7C4DFF","Mixto":"#E65100","Crédito":"#F59E0B"};
   var metodosMap={};
-  sales.forEach(function(s){metodosMap[s.method]=(metodosMap[s.method]||0)+s.total;});
+  sales.forEach(function(s){
+    if(s.status==='anulado') return;
+    var key = s.status==='cuenta' ? 'Crédito' : (s.method||'Efectivo');
+    metodosMap[key]=(metodosMap[key]||0)+s.total;
+  });
   var metodosPie=Object.keys(metodosMap).map(function(m){return {name:m,value:Math.round(metodosMap[m]*100)/100,color:metodoColors[m]||"#888"};});
 
   // Top 5 para BarChart
   var top5Bar=top5.slice(0,5).map(function(item){return {name:item[0].length>16?item[0].slice(0,14)+"…":item[0],unidades:item[1]};});
 
-  var cajaDia=todaySales.filter(function(s){return s.method==="Efectivo";}).reduce(function(s,x){return s+x.total;},0);
+  var cajaDia=todaySalesCobradas.filter(function(s){return s.method==="Efectivo";}).reduce(function(s,x){return s+x.total;},0);
   var returnsDia=returns.filter(function(r){return new Date(r.date).toDateString()===todayStr&&r.refundMethod==="Efectivo"&&r.refundAmount>0;}).reduce(function(s,r){return s+r.refundAmount;},0);
   var saldoCaja=cajaDia-returnsDia;
 
@@ -1406,7 +1411,7 @@ function DashboardScreen(props) {
 
   return (
     <div>
-      <p style={H1}>📊 Panel de Control<HelpTip text={"Vista general del negocio en tiempo real.\n\n• Ventas hoy: cantidad de transacciones del día\n• Ingresos hoy: dinero total cobrado hoy\n• Saldo de caja: efectivo que debería haber (ventas − reembolsos)\n• Por cobrar: total de créditos pendientes\n\nLas alertas rojas arriba indican reparaciones vencidas, productos sin stock o cuentas con más de 30 días sin pagar."}/></p>
+      <p style={H1}>📊 Panel de Control<HelpTip text={"Vista general del negocio en tiempo real.\n\n• Ventas hoy: cantidad de transacciones del día (efectivo + crédito)\n• Vendido hoy: valor total de lo vendido hoy (incluye crédito)\n• Saldo de caja: efectivo cobrado hoy menos reembolsos en efectivo\n• Por cobrar: total de créditos pendientes de pago\n\nLas alertas rojas arriba indican reparaciones vencidas, productos sin stock o cuentas con más de 30 días sin pagar."}/></p>
 
       {/* Alertas */}
       {hasAlerts&&(
@@ -1429,10 +1434,10 @@ function DashboardScreen(props) {
 
       {/* KPIs */}
       <div className="rg-4" style={{display:"grid",gridTemplateColumns:"repeat(4,1fr)",gap:14,marginBottom:16}}>
-        <MetricBox label="Ventas hoy"     value={todaySales.length}   color={TEAL}/>
-        <MetricBox label="Ingresos hoy"   value={Q(todayRev)}          color="#378ADD"/>
-        <MetricBox label="Saldo caja hoy" value={Q(saldoCaja)}         color={saldoCaja>=0?TEAL:"#E24B4A"}/>
-        <MetricBox label="Por cobrar"     value={Q(totalPend)}         color="#E24B4A"/>
+        <MetricBox label="Ventas hoy"     value={todaySales.length}      color={TEAL}/>
+        <MetricBox label="Vendido hoy"    value={Q(todayRev)}            color="#378ADD"/>
+        <MetricBox label="Saldo caja hoy" value={Q(saldoCaja)}           color={saldoCaja>=0?TEAL:"#E24B4A"}/>
+        <MetricBox label="Por cobrar"     value={Q(totalPend)}           color="#E24B4A"/>
       </div>
 
       {/* Tarjetas de estado rápido */}
@@ -6164,7 +6169,10 @@ function App(props) {
   }
 
   var todayStr=new Date().toDateString();
-  var todaySales=sales.filter(function(s){return new Date(s.date).toDateString()===todayStr&&s.status==='completado';});
+  // Todas las ventas del día (efectivo + crédito), excluye anuladas
+  var todaySales=sales.filter(function(s){return new Date(s.date).toDateString()===todayStr&&s.status!=='anulado';});
+  // Solo ventas cobradas (efectivo/tarjeta/transferencia completadas) para saldo de caja
+  var todaySalesCobradas=todaySales.filter(function(s){return s.status==='completado';});
   var pendingAccs=accounts.filter(function(a){return a.status!=="pagado";});
   var totalPend=pendingAccs.reduce(function(s,a){return s+a.balance;},0);
   var pqs={};
@@ -7043,8 +7051,11 @@ function CuadresScreen(props){
     return false;
   }
 
-  // Ventas del período
+  // Ventas del período cobradas (para cuadre de caja)
   var periodSales=sales.filter(function(s){return inRange(s.date)&&s.status==='completado';});
+  // Ventas a crédito del período (para resumen de ventas totales)
+  var periodSalesCredito=sales.filter(function(s){return inRange(s.date)&&s.status==='cuenta';});
+  var totalVentasCredito=periodSalesCredito.reduce(function(s,x){return s+x.total;},0);
 
   // Ingresos por método (ventas completas)
   var byMethod={Efectivo:0,Tarjeta:0,Transferencia:0,Mixto:0};
@@ -7282,10 +7293,10 @@ function CuadresScreen(props){
 
       {/* Métricas principales */}
       <div className="rg-4" style={{display:"grid",gridTemplateColumns:"repeat(4,1fr)",gap:14,marginBottom:16}}>
-        <MetricBox label="Ventas del período" value={periodSales.length} color="#378ADD"/>
-        <MetricBox label="Ventas brutas" value={Q(totalVentas)} color={TEAL}/>
+        <MetricBox label="Ventas totales" value={periodSales.length+periodSalesCredito.length} color="#378ADD"/>
+        <MetricBox label="Cobrado (efectivo/tarjeta)" value={Q(totalVentas)} color={TEAL}/>
+        <MetricBox label="Crédito otorgado" value={Q(totalVentasCredito)} color="#F59E0B"/>
         <MetricBox label="Abonos cobrados" value={Q(abonosPeriod)} color="#7F77DD"/>
-        <MetricBox label="Reembolsos salida" value={Q(reembolsosCaja)} color="#E24B4A"/>
       </div>
 
       {/* Por método */}
