@@ -3,7 +3,7 @@ import * as XLSX from 'xlsx';
 import html2canvas from 'html2canvas';
 import { AreaChart, Area, BarChart, Bar, PieChart, Pie, Cell, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend } from 'recharts';
 import { db } from './utils/db.js';
-import { authAPI, productsAPI, salesAPI, accountsAPI, returnsAPI, defectivesAPI, usersAPI, checkAPI, clientsAPI, repairsAPI, auditAPI, warrantiesAPI, cajaAPI, settingsAPI } from './utils/api.js';
+import { authAPI, productsAPI, salesAPI, accountsAPI, returnsAPI, defectivesAPI, usersAPI, checkAPI, clientsAPI, repairsAPI, auditAPI, warrantiesAPI, cajaAPI, settingsAPI, suppliersAPI } from './utils/api.js';
 
 const TEAL = "#1D9E75";
 const NAVY = "#1a2535";
@@ -210,7 +210,7 @@ var UK       = "mnpos-users-v1";
 var SESS_KEY = "mnpos-session-v1";
 
 var PERMS = {
-  admin:   ["dashboard","pos","caja","accounts","returns","defective","products","inventory","history","backup","users","clients","repairs","cuadres","audit","warranties","storeconfig"],
+  admin:   ["dashboard","pos","caja","accounts","returns","defective","products","inventory","history","backup","users","clients","repairs","cuadres","audit","warranties","storeconfig","suppliers"],
   cajero:  ["dashboard","pos","caja","accounts","returns","history","clients","repairs","warranties"],
   auditor: ["dashboard","caja","history","inventory","cuadres"],
 };
@@ -901,6 +901,7 @@ function Sidebar(props) {
     {id:"audit",     ic:"🔍", lb:"Auditoría"},
     {id:"backup",    ic:"💾", lb:"Respaldo"},
     {id:"users",       ic:"👥", lb:"Usuarios"},
+    {id:"suppliers",   ic:"🏭", lb:"Proveedores"},
     {id:"storeconfig", ic:"⚙️", lb:"Mi Tienda"},
   ];
   return (
@@ -3576,6 +3577,316 @@ function WarrantiesScreen(props){
   );
 }
 
+/* ── Proveedores y Compras ── */
+function SuppliersScreen(props){
+  var products=props.products||[]; var session=props.session||{};
+  var showFlash=props.showFlash||function(){};
+  var onStockUpdate=props.onStockUpdate||function(){};
+
+  var _tab=useState("proveedores"); var tab=_tab[0]; var setTab=_tab[1];
+  var _suppliers=useState([]); var suppliers=_suppliers[0]; var setSuppliers=_suppliers[1];
+  var _purchases=useState([]); var purchases=_purchases[0]; var setPurchases=_purchases[1];
+  var _loading=useState(true); var loading=_loading[0]; var setLoading=_loading[1];
+
+  // Modal proveedor
+  var _ms=useState(false); var showSupModal=_ms[0]; var setShowSupModal=_ms[1];
+  var _editSup=useState(null); var editSup=_editSup[0]; var setEditSup=_editSup[1];
+  var _sName=useState(""); var sName=_sName[0]; var setSName=_sName[1];
+  var _sPhone=useState(""); var sPhone=_sPhone[0]; var setSPhone=_sPhone[1];
+  var _sEmail=useState(""); var sEmail=_sEmail[0]; var setSEmail=_sEmail[1];
+  var _sAddr=useState(""); var sAddr=_sAddr[0]; var setSAddr=_sAddr[1];
+  var _sNotes=useState(""); var sNotes=_sNotes[0]; var setSNotes=_sNotes[1];
+
+  // Modal nueva compra
+  var _mp=useState(false); var showPurchModal=_mp[0]; var setShowPurchModal=_mp[1];
+  var _pSup=useState(""); var pSup=_pSup[0]; var setPSup=_pSup[1];
+  var _pSupId=useState(""); var pSupId=_pSupId[0]; var setPSupId=_pSupId[1];
+  var _pNotes=useState(""); var pNotes=_pNotes[0]; var setPNotes=_pNotes[1];
+  var _pItems=useState([]); var pItems=_pItems[0]; var setPItems=_pItems[1];
+  var _saving=useState(false); var saving=_saving[0]; var setSaving=_saving[1];
+
+  // Búsqueda de producto en la compra
+  var _prodQ=useState(""); var prodQ=_prodQ[0]; var setProdQ=_prodQ[1];
+  var _prodRes=useState([]); var prodRes=_prodRes[0]; var setProdRes=_prodRes[1];
+
+  useEffect(function(){
+    Promise.all([
+      suppliersAPI.getAll().catch(function(){return [];}),
+      suppliersAPI.getPurchases().catch(function(){return [];}),
+    ]).then(function(res){
+      setSuppliers(res[0]||[]);
+      setPurchases(res[1]||[]);
+      setLoading(false);
+    });
+  },[]);
+
+  useEffect(function(){
+    if(!prodQ.trim()){setProdRes([]); return;}
+    var q=prodQ.toLowerCase();
+    setProdRes(products.filter(function(p){
+      return p.unit!=="serv"&&(p.name.toLowerCase().includes(q)||p.code.toLowerCase().includes(q));
+    }).slice(0,6));
+  },[prodQ,products]);
+
+  function openNewSup(){
+    setEditSup(null); setSName(""); setSPhone(""); setSEmail(""); setSAddr(""); setSNotes("");
+    setShowSupModal(true);
+  }
+  function openEditSup(s){
+    setEditSup(s); setSName(s.name||""); setSPhone(s.phone||""); setSEmail(s.email||"");
+    setSAddr(s.address||""); setSNotes(s.notes||"");
+    setShowSupModal(true);
+  }
+  function saveSup(){
+    if(!sName.trim()) return alert("Nombre requerido");
+    setSaving(true);
+    var data={name:sName.trim(),phone:sPhone.trim(),email:sEmail.trim(),address:sAddr.trim(),notes:sNotes.trim()};
+    var prom=editSup?suppliersAPI.update(editSup.id,data):suppliersAPI.create(data);
+    prom.then(function(s){
+      if(editSup){
+        setSuppliers(function(prev){return prev.map(function(x){return x.id===s.id?s:x;});});
+      } else {
+        setSuppliers(function(prev){return [s].concat(prev);});
+      }
+      showFlash("✓ Proveedor guardado","ok");
+      setShowSupModal(false); setSaving(false);
+    }).catch(function(){setSaving(false); alert("Error al guardar");});
+  }
+  function deactivateSup(id){
+    if(!window.confirm("¿Archivar este proveedor?")) return;
+    suppliersAPI.update(id,{active:false}).then(function(){
+      setSuppliers(function(prev){return prev.filter(function(s){return s.id!==id;});});
+      showFlash("Proveedor archivado","ok");
+    });
+  }
+
+  function openNewPurch(){
+    setPSup(""); setPSupId(""); setPNotes(""); setPItems([]); setProdQ(""); setProdRes([]);
+    setShowPurchModal(true);
+  }
+  function addProductToOrder(prod){
+    setPItems(function(prev){
+      var exists=prev.find(function(x){return x.productId===prod.id;});
+      if(exists) return prev.map(function(x){return x.productId===prod.id?Object.assign({},x,{qty:x.qty+1,subtotal:(x.qty+1)*x.cost}):x;});
+      return prev.concat([{productId:prod.id,productName:prod.name,productCode:prod.code,qty:1,cost:Number(prod.cost||0),subtotal:Number(prod.cost||0),updateCost:false}]);
+    });
+    setProdQ(""); setProdRes([]);
+  }
+  function updateItem(idx,field,val){
+    setPItems(function(prev){
+      var arr=prev.slice();
+      arr[idx]=Object.assign({},arr[idx]);
+      arr[idx][field]=field==="updateCost"?val:Number(val)||0;
+      if(field==="qty"||field==="cost") arr[idx].subtotal=arr[idx].qty*arr[idx].cost;
+      return arr;
+    });
+  }
+  function removeItem(idx){ setPItems(function(prev){return prev.filter(function(_,i){return i!==idx;});}); }
+
+  function savePurchase(){
+    if(!pSup.trim()) return alert("Seleccione un proveedor");
+    if(!pItems.length) return alert("Agregue al menos un producto");
+    setSaving(true);
+    suppliersAPI.createPurchase({supplierId:pSupId||null,supplierName:pSup,items:pItems,notes:pNotes})
+      .then(function(p){
+        setPurchases(function(prev){return [p].concat(prev);});
+        onStockUpdate();
+        showFlash("✓ Compra registrada y stock actualizado","ok");
+        setShowPurchModal(false); setSaving(false);
+      }).catch(function(e){
+        setSaving(false);
+        alert(e&&e.error?e.error:"Error al registrar compra");
+      });
+  }
+
+  var pTotal=pItems.reduce(function(s,i){return s+i.subtotal;},0);
+
+  if(loading) return <div style={{padding:40,textAlign:"center",color:"#999"}}>Cargando…</div>;
+
+  return (
+    <div>
+      <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:16,flexWrap:"wrap",gap:8}}>
+        <p style={Object.assign({},H1,{margin:0})}>🏭 Proveedores y Compras</p>
+        <div style={{display:"flex",gap:8}}>
+          {tab==="proveedores"&&<button style={mB("teal")} onClick={openNewSup}>+ Nuevo proveedor</button>}
+          {tab==="compras"&&<button style={mB("teal")} onClick={openNewPurch}>+ Registrar compra</button>}
+        </div>
+      </div>
+
+      <div style={{display:"flex",gap:4,marginBottom:14}}>
+        {[["proveedores","🏭 Proveedores ("+suppliers.length+")"],["compras","📦 Historial de compras ("+purchases.length+")"]].map(function(t){
+          return <button key={t[0]} style={Object.assign({},mB(tab===t[0]?"teal":"gray"),{padding:"6px 14px",fontSize:13})} onClick={function(){setTab(t[0]);}}>{t[1]}</button>;
+        })}
+      </div>
+
+      {/* Tab proveedores */}
+      {tab==="proveedores"&&(
+        <div style={sC}>
+          {suppliers.length===0
+            ?<div style={{textAlign:"center",padding:48,color:"#999"}}>
+              <p style={{fontSize:32,marginBottom:8}}>🏭</p>
+              <p style={{fontSize:15,marginBottom:4}}>Sin proveedores registrados</p>
+              <p style={{fontSize:13}}>Agrega tu primer proveedor para registrar compras y actualizar stock</p>
+            </div>
+            :<table style={{width:"100%",borderCollapse:"collapse"}}>
+              <thead><tr>{["Proveedor","Teléfono","Correo","Dirección","Notas",""].map(function(h){return <th key={h} style={sTH}>{h}</th>;})}</tr></thead>
+              <tbody>
+              {suppliers.map(function(s){
+                return (
+                  <tr key={s.id}>
+                    <td style={Object.assign({},sTD,{fontWeight:600})}>{s.name}</td>
+                    <td style={sTD}>{s.phone||"—"}</td>
+                    <td style={sTD}>{s.email||"—"}</td>
+                    <td style={sTD}>{s.address||"—"}</td>
+                    <td style={Object.assign({},sTD,{color:"#666",fontSize:12})}>{s.notes||"—"}</td>
+                    <td style={sTD}>
+                      <div style={{display:"flex",gap:4}}>
+                        <button style={Object.assign({},mB("gray"),{padding:"2px 8px",fontSize:12})} onClick={function(){openEditSup(s);}}>✏️</button>
+                        <button style={Object.assign({},mB("red"),{padding:"2px 8px",fontSize:12})} onClick={function(){deactivateSup(s.id);}}>✕</button>
+                      </div>
+                    </td>
+                  </tr>
+                );
+              })}
+              </tbody>
+            </table>
+          }
+        </div>
+      )}
+
+      {/* Tab historial compras */}
+      {tab==="compras"&&(
+        <div style={sC}>
+          {purchases.length===0
+            ?<div style={{textAlign:"center",padding:48,color:"#999"}}>
+              <p style={{fontSize:32,marginBottom:8}}>📦</p>
+              <p style={{fontSize:15}}>Sin compras registradas aún</p>
+            </div>
+            :<table style={{width:"100%",borderCollapse:"collapse"}}>
+              <thead><tr>{["Fecha","Proveedor","Artículos","Total","Registrado por"].map(function(h){return <th key={h} style={sTH}>{h}</th>;})}</tr></thead>
+              <tbody>
+              {purchases.map(function(p){
+                var items=p.purchase_items||[];
+                return (
+                  <tr key={p.id}>
+                    <td style={sTD}>{fmtD(p.created_at)} {fmtT(p.created_at)}</td>
+                    <td style={Object.assign({},sTD,{fontWeight:600})}>{p.supplier_name}</td>
+                    <td style={sTD}>
+                      <div style={{fontSize:12}}>
+                        {items.slice(0,3).map(function(it,i){return <div key={i}>{it.product_name} ×{it.qty}</div>;})}
+                        {items.length>3&&<div style={{color:"#999"}}>+{items.length-3} más…</div>}
+                      </div>
+                    </td>
+                    <td style={Object.assign({},sTD,{fontWeight:700,color:TEAL})}>Q {Number(p.total).toFixed(2)}</td>
+                    <td style={sTD}>{p.registered_by}</td>
+                  </tr>
+                );
+              })}
+              </tbody>
+            </table>
+          }
+        </div>
+      )}
+
+      {/* Modal proveedor */}
+      {showSupModal&&(
+        <div style={{position:"fixed",inset:0,background:"rgba(0,0,0,0.5)",display:"flex",alignItems:"center",justifyContent:"center",zIndex:1000,padding:16}}>
+          <div style={{background:"#fff",borderRadius:14,padding:28,width:"100%",maxWidth:460}}>
+            <p style={{fontWeight:700,fontSize:18,margin:"0 0 18px",color:NAVY}}>{editSup?"Editar proveedor":"Nuevo proveedor"}</p>
+            {[["Nombre *",sName,setSName,"Ej: Distribuidora XYZ"],["Teléfono",sPhone,setSPhone,"Ej: 5555-0000"],["Correo",sEmail,setSEmail,"Ej: ventas@proveedor.com"],["Dirección",sAddr,setSAddr,"Ej: Zona 4, Guatemala"],["Notas",sNotes,setSNotes,"Observaciones…"]].map(function(f){
+              return (
+                <div key={f[0]} style={{marginBottom:12}}>
+                  <label style={{display:"block",fontWeight:600,fontSize:13,marginBottom:4}}>{f[0]}</label>
+                  <input style={sI} value={f[1]} placeholder={f[3]} onChange={function(e){f[2](e.target.value);}}/>
+                </div>
+              );
+            })}
+            <div style={{display:"flex",gap:10,marginTop:18}}>
+              <button style={Object.assign({},mB("gray"),{flex:1})} onClick={function(){setShowSupModal(false);}}>Cancelar</button>
+              <button style={Object.assign({},mB("teal"),{flex:1})} onClick={saveSup} disabled={saving}>{saving?"Guardando…":"Guardar"}</button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Modal nueva compra */}
+      {showPurchModal&&(
+        <div style={{position:"fixed",inset:0,background:"rgba(0,0,0,0.5)",display:"flex",alignItems:"flex-start",justifyContent:"center",zIndex:1000,padding:16,overflowY:"auto"}}>
+          <div style={{background:"#fff",borderRadius:14,padding:28,width:"100%",maxWidth:600,margin:"20px auto"}}>
+            <p style={{fontWeight:700,fontSize:18,margin:"0 0 18px",color:NAVY}}>📦 Registrar Compra</p>
+
+            <label style={{display:"block",fontWeight:600,fontSize:13,marginBottom:5}}>Proveedor *</label>
+            <select style={sI} value={pSupId} onChange={function(e){
+              var id=e.target.value;
+              var sup=suppliers.find(function(s){return s.id===id;});
+              setPSupId(id); setPSup(sup?sup.name:"");
+            }}>
+              <option value="">— Seleccionar proveedor —</option>
+              {suppliers.map(function(s){return <option key={s.id} value={s.id}>{s.name}</option>;})}
+              <option value="__otro__">Otro (escribir manualmente)</option>
+            </select>
+            {pSupId==="__otro__"&&(
+              <input style={Object.assign({},sI,{marginTop:6})} placeholder="Nombre del proveedor" value={pSup} onChange={function(e){setPSup(e.target.value);}}/>
+            )}
+
+            <label style={{display:"block",fontWeight:600,fontSize:13,margin:"14px 0 5px"}}>Buscar producto para agregar</label>
+            <div style={{position:"relative"}}>
+              <input style={sI} value={prodQ} placeholder="Buscar por nombre o código…" onChange={function(e){setProdQ(e.target.value);}}/>
+              {prodRes.length>0&&(
+                <div style={{position:"absolute",top:"100%",left:0,right:0,background:"#fff",border:"1px solid #ddd",borderRadius:8,zIndex:10,boxShadow:"0 4px 16px rgba(0,0,0,0.12)",marginTop:2}}>
+                  {prodRes.map(function(p){
+                    return <div key={p.id} style={{padding:"10px 14px",cursor:"pointer",borderBottom:"1px solid #f0f0f0",display:"flex",justifyContent:"space-between",alignItems:"center",fontSize:13}} onClick={function(){addProductToOrder(p);}}>
+                      <span><b>{p.code}</b> — {p.name}</span>
+                      <span style={{color:TEAL,fontWeight:600}}>Stock: {p.stock}</span>
+                    </div>;
+                  })}
+                </div>
+              )}
+            </div>
+
+            {pItems.length>0&&(
+              <div style={{marginTop:14}}>
+                <p style={{fontWeight:600,fontSize:13,margin:"0 0 8px"}}>Artículos de la compra</p>
+                <table style={{width:"100%",borderCollapse:"collapse",fontSize:13}}>
+                  <thead><tr>{["Producto","Cant.","Costo unit.","Subtotal","Act. costo",""].map(function(h){return <th key={h} style={Object.assign({},sTH,{fontSize:11})}>{h}</th>;})}</tr></thead>
+                  <tbody>
+                  {pItems.map(function(it,i){
+                    return (
+                      <tr key={i}>
+                        <td style={sTD}><div style={{fontWeight:500}}>{it.productName}</div><div style={{fontSize:11,color:"#999"}}>{it.productCode}</div></td>
+                        <td style={sTD}><input type="number" min="1" style={{width:56,padding:"4px 6px",border:"1px solid #ddd",borderRadius:6,fontSize:13}} value={it.qty} onChange={function(e){updateItem(i,"qty",e.target.value);}}/></td>
+                        <td style={sTD}><input type="number" min="0" step="0.01" style={{width:76,padding:"4px 6px",border:"1px solid #ddd",borderRadius:6,fontSize:13}} value={it.cost} onChange={function(e){updateItem(i,"cost",e.target.value);}}/></td>
+                        <td style={Object.assign({},sTD,{fontWeight:700,color:TEAL})}>Q {it.subtotal.toFixed(2)}</td>
+                        <td style={Object.assign({},sTD,{textAlign:"center"})}>
+                          <input type="checkbox" checked={!!it.updateCost} onChange={function(e){updateItem(i,"updateCost",e.target.checked);}} title="Actualizar costo del producto"/>
+                        </td>
+                        <td style={sTD}><button style={Object.assign({},mB("red"),{padding:"2px 6px",fontSize:12})} onClick={function(){removeItem(i);}}>✕</button></td>
+                      </tr>
+                    );
+                  })}
+                  </tbody>
+                </table>
+                <div style={{textAlign:"right",marginTop:10,fontWeight:700,fontSize:15}}>Total: <span style={{color:TEAL}}>Q {pTotal.toFixed(2)}</span></div>
+                <p style={{fontSize:11,color:"#999",marginTop:4}}>☑ "Act. costo" actualiza el costo del producto en inventario</p>
+              </div>
+            )}
+
+            <label style={{display:"block",fontWeight:600,fontSize:13,margin:"14px 0 5px"}}>Notas (opcional)</label>
+            <input style={sI} placeholder="Ej: factura #1234, pago en efectivo…" value={pNotes} onChange={function(e){setPNotes(e.target.value);}}/>
+
+            <div style={{display:"flex",gap:10,marginTop:20}}>
+              <button style={Object.assign({},mB("gray"),{flex:1})} onClick={function(){setShowPurchModal(false);}}>Cancelar</button>
+              <button style={Object.assign({},mB("teal"),{flex:1})} onClick={savePurchase} disabled={saving||!pItems.length}>
+                {saving?"Guardando…":"✓ Confirmar compra"}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
 /* ── Configuración de tienda ── */
 function StoreConfigScreen(props){
   var storeInfo=props.storeInfo||{}; var setStoreInfo=props.setStoreInfo||function(){};
@@ -4291,6 +4602,7 @@ function App(props) {
           {view==="repairs"    &&canAccess(session.role,"repairs")&&<RepairsScreen repairs={repairs} clients={clients} products={products} saveRepair={saveRepair} updateRepairStatus={updateRepairStatus} onCobrar={cobrarReparacion} session={session} showFlash={showFlash} warranties={warranties} saveWarranty={saveWarranty}/>}
           {view==="warranties" &&canAccess(session.role,"warranties")&&<WarrantiesScreen warranties={warranties} sales={sales} repairs={repairs} updateWarranty={updateWarranty} saveWarranty={saveWarranty} session={session}/>}
           {view==="audit"      &&canAccess(session.role,"audit")&&<AuditScreen session={session}/>}
+          {view==="suppliers"  &&canAccess(session.role,"suppliers")&&<SuppliersScreen products={products} session={session} showFlash={showFlash} onStockUpdate={function(){ productsAPI.getAll().then(function(p){ setProducts((p||[]).map(function(x){return Object.assign({},x,{price:Number(x.price),cost:Number(x.cost),stock:Number(x.stock)});})); }); }}/>}
           {view==="storeconfig"&&canAccess(session.role,"storeconfig")&&<StoreConfigScreen storeInfo={storeInfo} setStoreInfo={setStoreInfo} session={session} showFlash={showFlash}/>}
         </div>
       </div>

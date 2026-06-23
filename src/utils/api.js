@@ -127,6 +127,15 @@ export const auditAPI = {
   },
 };
 
+// ── Proveedores y Compras ─────────────────────────────
+export const suppliersAPI = {
+  getAll:          function()      { return api.get('/suppliers'); },
+  create:          function(data)  { return api.post('/suppliers', data); },
+  update:          function(id, d) { return api.put('/suppliers/' + id, d); },
+  getPurchases:    function()      { return api.get('/suppliers/purchases'); },
+  createPurchase:  function(data)  { return api.post('/suppliers/purchases', data); },
+};
+
 // ── Configuración de tienda ───────────────────────────
 export const settingsAPI = {
   getAll: function()     { return api.get('/settings'); },
