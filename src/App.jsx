@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react';
 import * as XLSX from 'xlsx';
 import html2canvas from 'html2canvas';
+import { AreaChart, Area, BarChart, Bar, PieChart, Pie, Cell, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend } from 'recharts';
 import { db } from './utils/db.js';
 import { authAPI, productsAPI, salesAPI, accountsAPI, returnsAPI, defectivesAPI, usersAPI, checkAPI, clientsAPI, repairsAPI, auditAPI, warrantiesAPI, cajaAPI } from './utils/api.js';
 
@@ -1070,28 +1071,44 @@ function DashboardScreen(props) {
   var setSelectedSale=props.setSelectedSale; var setView=props.setView;
   var accounts=props.accounts; var returns=props.returns;
   var repairs=props.repairs||[]; var warranties=props.warranties||[];
-  var isMobile=useIsMobile();
 
+  var _chartRange=useState("7d"); var chartRange=_chartRange[0]; var setChartRange=_chartRange[1];
+
+  var now=new Date();
   var todayRev=todaySales.reduce(function(s,x){return s+x.total;},0);
-  var todayStr=new Date().toDateString();
+  var todayStr=now.toDateString();
 
-  // Ventas últimos 7 días
+  // Ventas por día según rango seleccionado
   var DIAS=["Dom","Lun","Mar","Mié","Jue","Vie","Sáb"];
-  var last7=Array.from({length:7},function(_,i){
-    var d=new Date(); d.setDate(d.getDate()-(6-i)); d.setHours(0,0,0,0);
+  var MESES=["Ene","Feb","Mar","Abr","May","Jun","Jul","Ago","Sep","Oct","Nov","Dic"];
+  var chartDays=chartRange==="30d"?30:chartRange==="14d"?14:7;
+  var chartData=Array.from({length:chartDays},function(_,i){
+    var d=new Date(); d.setDate(d.getDate()-(chartDays-1-i)); d.setHours(0,0,0,0);
     var dStr=d.toDateString();
-    var rev=sales.filter(function(s){return new Date(s.date).toDateString()===dStr;}).reduce(function(acc,s){return acc+s.total;},0);
-    var cnt=sales.filter(function(s){return new Date(s.date).toDateString()===dStr;}).length;
-    return {label:DIAS[d.getDay()],date:d,rev:rev,cnt:cnt,isToday:dStr===todayStr};
+    var daySales=sales.filter(function(s){return new Date(s.date).toDateString()===dStr;});
+    var rev=daySales.reduce(function(a,s){return a+s.total;},0);
+    var cnt=daySales.length;
+    var label=chartDays===7?DIAS[d.getDay()]:(d.getDate()+"/"+(d.getMonth()+1));
+    return {label:label,ingresos:Math.round(rev*100)/100,ventas:cnt,isToday:dStr===todayStr};
   });
-  var maxRev=Math.max.apply(null,last7.map(function(d){return d.rev;})) || 1;
 
-  // Desglose por método de pago (todas las ventas + abonos)
-  var metodosMap={};
-  sales.forEach(function(s){ metodosMap[s.method]=(metodosMap[s.method]||0)+s.total; });
-  var metodos=Object.keys(metodosMap).map(function(m){return {name:m,total:metodosMap[m]};}).sort(function(a,b){return b.total-a.total;});
+  // Ingresos últimos 6 meses (área)
+  var last6months=Array.from({length:6},function(_,i){
+    var d=new Date(now.getFullYear(),now.getMonth()-5+i,1);
+    var mStart=new Date(d.getFullYear(),d.getMonth(),1);
+    var mEnd=new Date(d.getFullYear(),d.getMonth()+1,0,23,59,59);
+    var rev=sales.filter(function(s){var sd=new Date(s.date);return sd>=mStart&&sd<=mEnd;}).reduce(function(a,s){return a+s.total;},0);
+    return {label:MESES[d.getMonth()],ingresos:Math.round(rev*100)/100};
+  });
+
+  // Métodos de pago para PieChart
   var metodoColors={"Efectivo":"#1D9E75","Tarjeta":"#378ADD","Transferencia":"#7C4DFF","Mixto":"#E65100"};
-  var totalMetodos=metodos.reduce(function(s,m){return s+m.total;},0)||1;
+  var metodosMap={};
+  sales.forEach(function(s){metodosMap[s.method]=(metodosMap[s.method]||0)+s.total;});
+  var metodosPie=Object.keys(metodosMap).map(function(m){return {name:m,value:Math.round(metodosMap[m]*100)/100,color:metodoColors[m]||"#888"};});
+
+  // Top 5 para BarChart
+  var top5Bar=top5.slice(0,5).map(function(item){return {name:item[0].length>16?item[0].slice(0,14)+"…":item[0],unidades:item[1]};});
 
   var cajaDia=todaySales.filter(function(s){return s.method==="Efectivo";}).reduce(function(s,x){return s+x.total;},0);
   var returnsDia=returns.filter(function(r){return new Date(r.date).toDateString()===todayStr&&r.refundMethod==="Efectivo"&&r.refundAmount>0;}).reduce(function(s,r){return s+r.refundAmount;},0);
@@ -1101,149 +1118,215 @@ function DashboardScreen(props) {
   var repsActivas=repairs.filter(function(r){return r.status!=="entregado";});
   var repsListas=repairs.filter(function(r){return r.status==="listo";});
   var repsVencidas=repairs.filter(function(r){
-    return r.status!=="entregado"&&r.promisedDate&&new Date(r.promisedDate+"T23:59:59")<new Date();
+    return r.status!=="entregado"&&r.promisedDate&&new Date(r.promisedDate+"T23:59:59")<now;
   });
 
-  // Stock mínimo
-  var stockAlertas=products.filter(function(p){
-    return p.unit!=="serv"&&p.minStock>0&&p.stock<=p.minStock;
-  });
+  // Stock
+  var stockAlertas=products.filter(function(p){return p.unit!=="serv"&&p.minStock>0&&p.stock<=p.minStock;});
   var stockCero=products.filter(function(p){return p.unit!=="serv"&&p.stock===0;});
 
-  // Cuentas vencidas >30 días sin pagar
-  var now=new Date();
-  var cuentasVencidas=pendingAccs.filter(function(a){
-    return (now-new Date(a.date))>30*86400000;
-  });
+  // Cuentas vencidas >30 días
+  var cuentasVencidas=pendingAccs.filter(function(a){return (now-new Date(a.date))>30*86400000;});
 
-  // Garantías por vencer en 7 días o ya vencidas
+  // Garantías por vencer
   var warPorVencer=warranties.filter(function(w){
     if(w.status==="reclamada") return false;
-    var end=new Date(w.endDate);
-    var diff=(end-now)/(86400000);
+    var diff=(new Date(w.endDate)-now)/86400000;
     return diff<=7;
   });
 
   var hasAlerts=repsVencidas.length>0||stockCero.length>0||cuentasVencidas.length>0||warPorVencer.length>0;
 
+  // Tooltip personalizado para gráficas
+  function CustomTooltipIngresos(p){
+    if(!p.active||!p.payload||!p.payload.length) return null;
+    return (
+      <div style={{background:"#fff",border:"1px solid #eee",borderRadius:8,padding:"8px 12px",fontSize:12,boxShadow:"0 2px 8px rgba(0,0,0,0.12)"}}>
+        <p style={{margin:"0 0 4px",fontWeight:700,color:NAVY}}>{p.label}</p>
+        <p style={{margin:0,color:TEAL}}>Q {Number(p.payload[0].value).toLocaleString("es-GT",{minimumFractionDigits:2})}</p>
+        {p.payload[1]&&<p style={{margin:0,color:"#666"}}>{p.payload[1].value} venta{p.payload[1].value!==1?"s":""}</p>}
+      </div>
+    );
+  }
+
+  function CustomTooltipPie(p){
+    if(!p.active||!p.payload||!p.payload.length) return null;
+    var d=p.payload[0];
+    return (
+      <div style={{background:"#fff",border:"1px solid #eee",borderRadius:8,padding:"8px 12px",fontSize:12,boxShadow:"0 2px 8px rgba(0,0,0,0.12)"}}>
+        <p style={{margin:"0 0 4px",fontWeight:700,color:d.payload.color}}>{d.name}</p>
+        <p style={{margin:0}}>Q {Number(d.value).toLocaleString("es-GT",{minimumFractionDigits:2})}</p>
+      </div>
+    );
+  }
+
   return (
-      <div>
-        <p style={H1}>📊 Panel de Control</p>
+    <div>
+      <p style={H1}>📊 Panel de Control</p>
 
-        {/* Alertas críticas arriba */}
-        {hasAlerts&&(
-          <div style={{background:"#FCEBEB",border:"1px solid #F09595",borderRadius:10,padding:"12px 16px",marginBottom:16}}>
-            <p style={{fontWeight:700,fontSize:13,color:"#791F1F",margin:"0 0 8px"}}>⚠ Atención requerida</p>
-            <div style={{display:"flex",gap:20,flexWrap:"wrap"}}>
-              {repsVencidas.length>0&&<span style={{fontSize:13,color:"#791F1F",cursor:"pointer"}} onClick={function(){setView("repairs");}}>🔧 {repsVencidas.length} reparación{repsVencidas.length>1?"es":""} vencida{repsVencidas.length>1?"s":""} sin entregar →</span>}
-              {stockCero.length>0&&<span style={{fontSize:13,color:"#791F1F",cursor:"pointer"}} onClick={function(){setView("products");}}>📦 {stockCero.length} producto{stockCero.length>1?"s":""} sin stock →</span>}
-              {cuentasVencidas.length>0&&<span style={{fontSize:13,color:"#791F1F",cursor:"pointer"}} onClick={function(){setView("accounts");}}>💳 {cuentasVencidas.length} cuenta{cuentasVencidas.length>1?"s":""} pendiente{cuentasVencidas.length>1?"s":""} +30 días →</span>}
-              {warPorVencer.length>0&&<span style={{fontSize:13,color:"#791F1F",cursor:"pointer"}} onClick={function(){setView("warranties");}}>🛡️ {warPorVencer.length} garantía{warPorVencer.length>1?"s":""} por vencer →</span>}
-            </div>
-          </div>
-        )}
-
-        <div className="rg-4" style={{display:"grid",gridTemplateColumns:"repeat(4,1fr)",gap:14,marginBottom:16}}>
-          <MetricBox label="Ventas hoy"     value={todaySales.length}                  color={TEAL}/>
-          <MetricBox label="Ingresos hoy"   value={Q(todayRev)}                        color="#378ADD"/>
-          <MetricBox label="Saldo caja hoy" value={Q(saldoCaja)}                       color={saldoCaja>=0?"#1D9E75":"#E24B4A"}/>
-          <MetricBox label="Por cobrar"     value={Q(totalPend)}                       color="#E24B4A"/>
-        </div>
-
-        {/* Reparaciones */}
-        <div className="rg-3" style={{display:"grid",gridTemplateColumns:"repeat(3,1fr)",gap:14,marginBottom:16}}>
-          <div onClick={function(){setView("repairs");}} style={Object.assign({},sC,{cursor:"pointer",borderLeft:"4px solid #378ADD"})}>
-            <p style={{fontSize:12,color:"#666",margin:"0 0 6px"}}>🔧 Reparaciones activas</p>
-            <p style={{fontSize:26,fontWeight:700,margin:0,color:"#378ADD"}}>{repsActivas.length}</p>
-          </div>
-          <div onClick={function(){setView("repairs");}} style={Object.assign({},sC,{cursor:"pointer",borderLeft:"4px solid "+TEAL})}>
-            <p style={{fontSize:12,color:"#666",margin:"0 0 6px"}}>✅ Listas para entregar</p>
-            <p style={{fontSize:26,fontWeight:700,margin:0,color:TEAL}}>{repsListas.length}</p>
-            {repsListas.length>0&&<p style={{fontSize:11,color:TEAL,margin:"4px 0 0"}}>¡Notificá a los clientes!</p>}
-          </div>
-          <div onClick={function(){setView("products");}} style={Object.assign({},sC,{cursor:"pointer",borderLeft:"4px solid "+(stockAlertas.length>0?"#E65100":"#ccc")})}>
-            <p style={{fontSize:12,color:"#666",margin:"0 0 6px"}}>📦 Stock bajo mínimo</p>
-            <p style={{fontSize:26,fontWeight:700,margin:0,color:stockAlertas.length>0?"#E65100":"#999"}}>{stockAlertas.length}</p>
-            {stockAlertas.length>0&&<p style={{fontSize:11,color:"#E65100",margin:"4px 0 0"}}>{stockAlertas.slice(0,2).map(function(p){return p.name;}).join(", ")}{stockAlertas.length>2?"...":""}</p>}
+      {/* Alertas */}
+      {hasAlerts&&(
+        <div style={{background:"#FCEBEB",border:"1px solid #F09595",borderRadius:10,padding:"12px 16px",marginBottom:16}}>
+          <p style={{fontWeight:700,fontSize:13,color:"#791F1F",margin:"0 0 8px"}}>⚠ Atención requerida</p>
+          <div style={{display:"flex",gap:20,flexWrap:"wrap"}}>
+            {repsVencidas.length>0&&<span style={{fontSize:13,color:"#791F1F",cursor:"pointer"}} onClick={function(){setView("repairs");}}>🔧 {repsVencidas.length} reparación{repsVencidas.length>1?"es":""} vencida{repsVencidas.length>1?"s":""} →</span>}
+            {stockCero.length>0&&<span style={{fontSize:13,color:"#791F1F",cursor:"pointer"}} onClick={function(){setView("products");}}>📦 {stockCero.length} producto{stockCero.length>1?"s":""} sin stock →</span>}
+            {cuentasVencidas.length>0&&<span style={{fontSize:13,color:"#791F1F",cursor:"pointer"}} onClick={function(){setView("accounts");}}>💳 {cuentasVencidas.length} cuenta{cuentasVencidas.length>1?"s":""} +30 días →</span>}
+            {warPorVencer.length>0&&<span style={{fontSize:13,color:"#791F1F",cursor:"pointer"}} onClick={function(){setView("warranties");}}>🛡️ {warPorVencer.length} garantía{warPorVencer.length>1?"s":""} por vencer →</span>}
           </div>
         </div>
+      )}
 
-        {/* Gráfica ventas últimos 7 días + métodos de pago */}
-        <div className="rg-2" style={{display:"grid",gridTemplateColumns:"2fr 1fr",gap:14,marginBottom:16}}>
-          <div style={sC}>
-            <p style={{fontWeight:600,margin:"0 0 16px",fontSize:15}}>📈 Ventas últimos 7 días</p>
-            <div style={{display:"flex",alignItems:"flex-end",gap:8,height:110}}>
-              {last7.map(function(d,i){
-                var h=maxRev>0?Math.round((d.rev/maxRev)*90):0;
-                var color=d.isToday?TEAL:"#A8D5C2";
-                return (
-                  <div key={i} style={{flex:1,display:"flex",flexDirection:"column",alignItems:"center",gap:4}}>
-                    {d.rev>0&&<span style={{fontSize:9,color:"#666",whiteSpace:"nowrap"}}>{"Q"+Math.round(d.rev)}</span>}
-                    <div style={{width:"100%",height:h||3,background:color,borderRadius:"4px 4px 0 0",minHeight:3,transition:"height 0.3s"}}/>
-                    <span style={{fontSize:10,color:d.isToday?TEAL:"#999",fontWeight:d.isToday?700:400}}>{d.label}</span>
-                    {d.cnt>0&&<span style={{fontSize:9,color:"#bbb"}}>{d.cnt}v</span>}
-                  </div>
-                );
-              })}
-            </div>
-          </div>
-          <div style={sC}>
-            <p style={{fontWeight:600,margin:"0 0 14px",fontSize:15}}>💰 Por método</p>
-            {metodos.length===0?<p style={{color:"#999",fontSize:13}}>Sin ventas aún</p>:metodos.map(function(m,i){
-              var pct=Math.round(m.total/totalMetodos*100);
-              var color=metodoColors[m.name]||"#888";
-              return (
-                <div key={i} style={{marginBottom:10}}>
-                  <div style={{display:"flex",justifyContent:"space-between",fontSize:12,marginBottom:3}}>
-                    <span style={{color:"#555"}}>{m.name}</span>
-                    <span style={{fontWeight:600,color:color}}>{pct}%</span>
-                  </div>
-                  <div style={{background:"#eee",borderRadius:4,height:6}}>
-                    <div style={{width:pct+"%",height:6,background:color,borderRadius:4,transition:"width 0.4s"}}/>
-                  </div>
-                  <div style={{fontSize:10,color:"#999",marginTop:2}}>{Q(m.total)}</div>
-                </div>
-              );
+      {/* KPIs */}
+      <div className="rg-4" style={{display:"grid",gridTemplateColumns:"repeat(4,1fr)",gap:14,marginBottom:16}}>
+        <MetricBox label="Ventas hoy"     value={todaySales.length}   color={TEAL}/>
+        <MetricBox label="Ingresos hoy"   value={Q(todayRev)}          color="#378ADD"/>
+        <MetricBox label="Saldo caja hoy" value={Q(saldoCaja)}         color={saldoCaja>=0?TEAL:"#E24B4A"}/>
+        <MetricBox label="Por cobrar"     value={Q(totalPend)}         color="#E24B4A"/>
+      </div>
+
+      {/* Tarjetas de estado rápido */}
+      <div className="rg-3" style={{display:"grid",gridTemplateColumns:"repeat(3,1fr)",gap:14,marginBottom:16}}>
+        <div onClick={function(){setView("repairs");}} style={Object.assign({},sC,{cursor:"pointer",borderLeft:"4px solid #378ADD"})}>
+          <p style={{fontSize:12,color:"#666",margin:"0 0 6px"}}>🔧 Reparaciones activas</p>
+          <p style={{fontSize:26,fontWeight:700,margin:0,color:"#378ADD"}}>{repsActivas.length}</p>
+          {repsListas.length>0&&<p style={{fontSize:11,color:TEAL,margin:"4px 0 0"}}>✅ {repsListas.length} listas para entregar</p>}
+        </div>
+        <div onClick={function(){setView("products");}} style={Object.assign({},sC,{cursor:"pointer",borderLeft:"4px solid "+(stockAlertas.length>0?"#E65100":"#ccc")})}>
+          <p style={{fontSize:12,color:"#666",margin:"0 0 6px"}}>📦 Stock bajo mínimo</p>
+          <p style={{fontSize:26,fontWeight:700,margin:0,color:stockAlertas.length>0?"#E65100":"#999"}}>{stockAlertas.length}</p>
+          {stockAlertas.length>0&&<p style={{fontSize:11,color:"#E65100",margin:"4px 0 0"}}>{stockAlertas.slice(0,2).map(function(p){return p.name;}).join(", ")}{stockAlertas.length>2?"…":""}</p>}
+        </div>
+        <div onClick={function(){setView("accounts");}} style={Object.assign({},sC,{cursor:"pointer",borderLeft:"4px solid "+(pendingAccs.length>0?"#E24B4A":"#ccc")})}>
+          <p style={{fontSize:12,color:"#666",margin:"0 0 6px"}}>💳 Cuentas pendientes</p>
+          <p style={{fontSize:26,fontWeight:700,margin:0,color:pendingAccs.length>0?"#E24B4A":"#999"}}>{pendingAccs.length}</p>
+          {cuentasVencidas.length>0&&<p style={{fontSize:11,color:"#E24B4A",margin:"4px 0 0"}}>{cuentasVencidas.length} con +30 días</p>}
+        </div>
+      </div>
+
+      {/* Gráfica principal — ingresos por día */}
+      <div style={Object.assign({},sC,{marginBottom:16})}>
+        <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:16,flexWrap:"wrap",gap:8}}>
+          <p style={{fontWeight:600,fontSize:15,margin:0}}>📈 Ingresos diarios</p>
+          <div style={{display:"flex",gap:6}}>
+            {[["7d","7 días"],["14d","14 días"],["30d","30 días"]].map(function(r){
+              return <button key={r[0]} style={Object.assign({},mB(chartRange===r[0]?"teal":"gray"),{padding:"4px 12px",fontSize:12})} onClick={function(){setChartRange(r[0]);}}>{r[1]}</button>;
             })}
           </div>
         </div>
+        <ResponsiveContainer width="100%" height={200}>
+          <AreaChart data={chartData} margin={{top:4,right:8,left:0,bottom:0}}>
+            <defs>
+              <linearGradient id="gradIngresos" x1="0" y1="0" x2="0" y2="1">
+                <stop offset="5%"  stopColor={TEAL} stopOpacity={0.25}/>
+                <stop offset="95%" stopColor={TEAL} stopOpacity={0}/>
+              </linearGradient>
+            </defs>
+            <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0"/>
+            <XAxis dataKey="label" tick={{fontSize:11,fill:"#999"}} axisLine={false} tickLine={false}/>
+            <YAxis tick={{fontSize:11,fill:"#999"}} axisLine={false} tickLine={false} tickFormatter={function(v){return "Q"+v;}} width={55}/>
+            <Tooltip content={CustomTooltipIngresos}/>
+            <Area type="monotone" dataKey="ingresos" stroke={TEAL} strokeWidth={2.5} fill="url(#gradIngresos)" dot={function(p){return p.payload.isToday?<circle key={p.key} cx={p.cx} cy={p.cy} r={5} fill={TEAL} stroke="#fff" strokeWidth={2}/>:<circle key={p.key} cx={p.cx} cy={p.cy} r={3} fill={TEAL} opacity={0.6}/>;}} activeDot={{r:6,fill:TEAL}}/>
+          </AreaChart>
+        </ResponsiveContainer>
+      </div>
 
-        <div className="rg-2" style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:18,marginBottom:18}}>
-          <div style={sC}>
-            <p style={{fontWeight:600,margin:"0 0 14px",fontSize:15}}>🏆 Más vendidos</p>
-            {top5.length===0?<p style={{color:"#999",fontSize:14}}>Sin ventas aún</p>:top5.map(function(item,i){
-              return <div key={i} style={{display:"flex",justifyContent:"space-between",padding:"7px 0",borderBottom:"1px solid rgba(0,0,0,0.06)",fontSize:14}}><span>{item[0]}</span><span style={{color:TEAL,fontWeight:600}}>{item[1]} uds</span></div>;
-            })}
-          </div>
-          <div style={sC}>
-            <p style={{fontWeight:600,margin:"0 0 10px",fontSize:15}}>💳 Pendientes de cobro</p>
-            {pendingAccs.length===0?<p style={{color:TEAL,fontSize:14}}>✓ Sin cuentas pendientes</p>:pendingAccs.slice(0,5).map(function(a){
-              return <div key={a.id} onClick={function(){setView("accounts");}} style={{display:"flex",justifyContent:"space-between",alignItems:"center",padding:"7px 0",borderBottom:"1px solid rgba(0,0,0,0.06)",fontSize:14,cursor:"pointer"}}><div><span style={{fontWeight:500}}>{a.client}</span><span style={{fontSize:11,color:"#999",marginLeft:6}}>{fmtD(a.date)}</span></div><span style={mBg(a.status==="parcial"?"amber":"red")}>{Q(a.balance)}</span></div>;
-            })}
-          </div>
-        </div>
-        {todaySales.length>0&&(
-            <div style={sC}>
-              <p style={{fontWeight:600,margin:"0 0 14px",fontSize:15}}>Ventas de hoy</p>
-              <table style={{width:"100%",borderCollapse:"collapse"}}>
-                <thead><tr>{["Hora","Cliente","Artículos","Método","Total"].map(function(h){return <th key={h} style={sTH}>{h}</th>;})}</tr></thead>
-                <tbody>
-                {todaySales.slice(0,8).map(function(s){
+      {/* Métodos de pago + Top productos */}
+      <div className="rg-2" style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:14,marginBottom:16}}>
+        {/* PieChart métodos de pago */}
+        <div style={sC}>
+          <p style={{fontWeight:600,fontSize:15,margin:"0 0 12px"}}>💰 Por método de pago</p>
+          {metodosPie.length===0
+            ?<p style={{color:"#999",fontSize:13,textAlign:"center",padding:32}}>Sin ventas aún</p>
+            :<>
+              <ResponsiveContainer width="100%" height={160}>
+                <PieChart>
+                  <Pie data={metodosPie} cx="50%" cy="50%" innerRadius={45} outerRadius={70} paddingAngle={3} dataKey="value">
+                    {metodosPie.map(function(entry,i){return <Cell key={i} fill={entry.color}/>;})}</Pie>
+                  <Tooltip content={CustomTooltipPie}/>
+                </PieChart>
+              </ResponsiveContainer>
+              <div style={{display:"flex",flexWrap:"wrap",gap:"6px 14px",justifyContent:"center",marginTop:8}}>
+                {metodosPie.map(function(m,i){
+                  var total=metodosPie.reduce(function(a,x){return a+x.value;},0)||1;
                   return (
-                      <tr key={s.id} style={{cursor:"pointer"}} onClick={function(){setSelectedSale(s);setView("history");}}>
-                        <td style={sTD}>{fmtT(s.date)}</td>
-                        <td style={Object.assign({},sTD,{fontWeight:500})}>{s.client}</td>
-                        <td style={Object.assign({},sTD,{color:"#666"})}>{(s.items||[]).length} art.</td>
-                        <td style={sTD}><span style={mBg("teal")}>{s.method}</span></td>
-                        <td style={Object.assign({},sTD,{fontWeight:600,color:TEAL})}>{Q(s.total)}</td>
-                      </tr>
+                    <div key={i} style={{display:"flex",alignItems:"center",gap:5,fontSize:12}}>
+                      <div style={{width:10,height:10,borderRadius:3,background:m.color,flexShrink:0}}/>
+                      <span style={{color:"#555"}}>{m.name}</span>
+                      <span style={{fontWeight:700,color:m.color}}>{Math.round(m.value/total*100)}%</span>
+                    </div>
                   );
                 })}
-                </tbody>
-              </table>
-            </div>
-        )}
+              </div>
+            </>
+          }
+        </div>
+
+        {/* BarChart top productos */}
+        <div style={sC}>
+          <p style={{fontWeight:600,fontSize:15,margin:"0 0 12px"}}>🏆 Productos más vendidos</p>
+          {top5Bar.length===0
+            ?<p style={{color:"#999",fontSize:13,textAlign:"center",padding:32}}>Sin ventas aún</p>
+            :<ResponsiveContainer width="100%" height={200}>
+              <BarChart data={top5Bar} layout="vertical" margin={{top:0,right:20,left:0,bottom:0}}>
+                <CartesianGrid strokeDasharray="3 3" horizontal={false} stroke="#f0f0f0"/>
+                <XAxis type="number" tick={{fontSize:11,fill:"#999"}} axisLine={false} tickLine={false}/>
+                <YAxis type="category" dataKey="name" tick={{fontSize:11,fill:"#555"}} axisLine={false} tickLine={false} width={100}/>
+                <Tooltip cursor={{fill:"rgba(29,158,117,0.05)"}} formatter={function(v){return [v+" uds","Vendidos"];}}/>
+                <Bar dataKey="unidades" radius={[0,4,4,0]}>
+                  {top5Bar.map(function(_,i){
+                    var colors=[TEAL,"#378ADD","#7C4DFF","#E65100","#F59E0B"];
+                    return <Cell key={i} fill={colors[i%colors.length]}/>;
+                  })}
+                </Bar>
+              </BarChart>
+            </ResponsiveContainer>
+          }
+        </div>
       </div>
+
+      {/* Ingresos últimos 6 meses */}
+      <div style={Object.assign({},sC,{marginBottom:16})}>
+        <p style={{fontWeight:600,fontSize:15,margin:"0 0 12px"}}>📅 Tendencia mensual (6 meses)</p>
+        <ResponsiveContainer width="100%" height={160}>
+          <BarChart data={last6months} margin={{top:4,right:8,left:0,bottom:0}}>
+            <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" vertical={false}/>
+            <XAxis dataKey="label" tick={{fontSize:11,fill:"#999"}} axisLine={false} tickLine={false}/>
+            <YAxis tick={{fontSize:11,fill:"#999"}} axisLine={false} tickLine={false} tickFormatter={function(v){return "Q"+v;}} width={55}/>
+            <Tooltip formatter={function(v){return ["Q "+Number(v).toLocaleString("es-GT",{minimumFractionDigits:2}),"Ingresos"];}}/>
+            <Bar dataKey="ingresos" radius={[4,4,0,0]} fill={TEAL} opacity={0.85}/>
+          </BarChart>
+        </ResponsiveContainer>
+      </div>
+
+      {/* Cuentas pendientes + Ventas de hoy */}
+      <div className="rg-2" style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:14,marginBottom:16}}>
+        <div style={sC}>
+          <p style={{fontWeight:600,margin:"0 0 10px",fontSize:15}}>💳 Pendientes de cobro</p>
+          {pendingAccs.length===0
+            ?<p style={{color:TEAL,fontSize:14}}>✓ Sin cuentas pendientes</p>
+            :pendingAccs.slice(0,5).map(function(a){
+              return <div key={a.id} onClick={function(){setView("accounts");}} style={{display:"flex",justifyContent:"space-between",alignItems:"center",padding:"7px 0",borderBottom:"1px solid rgba(0,0,0,0.06)",fontSize:14,cursor:"pointer"}}>
+                <div><span style={{fontWeight:500}}>{a.client}</span><span style={{fontSize:11,color:"#999",marginLeft:6}}>{fmtD(a.date)}</span></div>
+                <span style={mBg(a.status==="parcial"?"amber":"red")}>{Q(a.balance)}</span>
+              </div>;
+            })
+          }
+        </div>
+        <div style={sC}>
+          <p style={{fontWeight:600,margin:"0 0 10px",fontSize:15}}>🕐 Últimas ventas de hoy</p>
+          {todaySales.length===0
+            ?<p style={{color:"#999",fontSize:14}}>Sin ventas hoy</p>
+            :todaySales.slice(0,5).map(function(s){
+              return <div key={s.id} onClick={function(){setSelectedSale(s);setView("history");}} style={{display:"flex",justifyContent:"space-between",alignItems:"center",padding:"7px 0",borderBottom:"1px solid rgba(0,0,0,0.06)",fontSize:14,cursor:"pointer"}}>
+                <div><span style={{fontWeight:500}}>{s.client}</span><span style={{fontSize:11,color:"#999",marginLeft:6}}>{fmtT(s.date)}</span></div>
+                <span style={{fontWeight:600,color:TEAL}}>{Q(s.total)}</span>
+              </div>;
+            })
+          }
+        </div>
+      </div>
+    </div>
   );
 }
 
