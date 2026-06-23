@@ -2220,6 +2220,10 @@ function AccountsScreen(props) {
   var _n=useState(""); var pmtNote=_n[0]; var setPmtNote=_n[1];
   var _r=useState(""); var pmtErr=_r[0]; var setPmtErr=_r[1];
   var _cq=useState(""); var clientQ=_cq[0]; var setClientQ=_cq[1];
+  var _wam=useState(false); var showWaMasivo=_wam[0]; var setShowWaMasivo=_wam[1];
+  var _wsel=useState({}); var waSel=_wsel[0]; var setWaSel=_wsel[1];
+  var _wtel=useState({}); var waTels=_wtel[0]; var setWaTels=_wtel[1];
+  var _wsend=useState(false); var waSending=_wsend[0]; var setWaSending=_wsend[1];
   var totalCob=accounts.reduce(function(s,a){return s+a.paid;},0);
   var filtered=accounts.filter(function(a){
     if(clientQ){return (a.client||"").toLowerCase().indexOf(clientQ.toLowerCase())>=0;}
@@ -2350,8 +2354,77 @@ function AccountsScreen(props) {
               var rows=filtered.map(function(a){return[a.client||"",fmtD(a.date),"Q"+a.total.toFixed(2),"Q"+a.paid.toFixed(2),"Q"+a.balance.toFixed(2),a.status||""];});
               exportPDF("Cuentas por Cobrar",cols,rows,"cuentas_por_cobrar");
             }}>📄 PDF</button>
+            {(session.role==="admin"||session.role==="superadmin")&&pendingAccs.length>0&&(
+              <button style={Object.assign({},mB("green"),{background:"#25D366",padding:"6px 12px",fontSize:12})} onClick={function(){
+                var initSel={};var initTels={};
+                pendingAccs.forEach(function(a){
+                  initSel[a.id]=true;
+                  var cl=props.clients&&props.clients.find(function(c){return c.id===a.clientId;});
+                  initTels[a.id]=(cl&&cl.phone)||"";
+                });
+                setWaSel(initSel);setWaTels(initTels);setShowWaMasivo(true);
+              }}>📱 Recordatorio masivo</button>
+            )}
           </div>
         </div>
+        {showWaMasivo&&(function(){
+          var selIds=Object.keys(waSel).filter(function(id){return waSel[id];});
+          var allSelected=pendingAccs.length>0&&selIds.length===pendingAccs.length;
+          return (
+            <div style={{position:"fixed",top:0,left:0,right:0,bottom:0,background:"rgba(0,0,0,0.55)",zIndex:9000,display:"flex",alignItems:"center",justifyContent:"center",padding:16}}>
+              <div style={{background:"#fff",borderRadius:14,padding:24,width:"100%",maxWidth:560,maxHeight:"90vh",overflowY:"auto",boxShadow:"0 8px 40px rgba(0,0,0,0.25)"}}>
+                <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:16}}>
+                  <p style={{fontWeight:700,fontSize:17,margin:0}}>📱 Recordatorio masivo por WhatsApp</p>
+                  <button style={mB("gray")} onClick={function(){setShowWaMasivo(false);setWaSending(false);}}>✕ Cerrar</button>
+                </div>
+                <p style={{fontSize:13,color:"#555",marginBottom:12}}>Seleccioná los clientes que recibirán el recordatorio. Se abrirá WhatsApp para cada uno.</p>
+                <div style={{display:"flex",gap:8,marginBottom:14}}>
+                  <button style={Object.assign({},mB("teal"),{padding:"5px 12px",fontSize:12})} onClick={function(){var s={};pendingAccs.forEach(function(a){s[a.id]=true;});setWaSel(s);}}>✓ Todos</button>
+                  <button style={Object.assign({},mB("gray"),{padding:"5px 12px",fontSize:12})} onClick={function(){setWaSel({});}}>✗ Ninguno</button>
+                  <span style={{fontSize:13,color:"#666",alignSelf:"center",marginLeft:4}}>{selIds.length} de {pendingAccs.length} seleccionados</span>
+                </div>
+                <div style={{borderRadius:8,border:"1px solid #eee",overflow:"hidden",marginBottom:16}}>
+                  {pendingAccs.map(function(a,i){
+                    return (
+                      <div key={a.id} style={{display:"flex",alignItems:"center",gap:10,padding:"10px 14px",background:i%2===0?"#fafafa":"#fff",borderBottom:"1px solid #f0f0f0"}}>
+                        <input type="checkbox" checked={!!waSel[a.id]} onChange={function(e){var s=Object.assign({},waSel);s[a.id]=e.target.checked;setWaSel(s);}} style={{width:18,height:18,cursor:"pointer"}}/>
+                        <div style={{flex:1,minWidth:0}}>
+                          <div style={{fontWeight:600,fontSize:14,whiteSpace:"nowrap",overflow:"hidden",textOverflow:"ellipsis"}}>{a.client}</div>
+                          <div style={{fontSize:12,color:"#E24B4A",fontWeight:700}}>Saldo: {Q(a.balance)}</div>
+                        </div>
+                        <input
+                          type="tel"
+                          placeholder="Teléfono"
+                          value={waTels[a.id]||""}
+                          onChange={function(e){var t=Object.assign({},waTels);t[a.id]=e.target.value;setWaTels(t);}}
+                          style={Object.assign({},sI,{width:130,padding:"6px 10px",fontSize:12,margin:0})}
+                        />
+                      </div>
+                    );
+                  })}
+                </div>
+                <button
+                  style={Object.assign({},mB("green"),{background:"#25D366",width:"100%",fontSize:15,padding:"12px",opacity:selIds.length===0||waSending?0.6:1})}
+                  disabled={selIds.length===0||waSending}
+                  onClick={function(){
+                    var toSend=pendingAccs.filter(function(a){return waSel[a.id];});
+                    if(toSend.length===0) return;
+                    setWaSending(true);
+                    var store=getStore();
+                    toSend.forEach(function(a,idx){
+                      setTimeout(function(){
+                        var tel=waTels[a.id]||"";
+                        var msg="Hola "+a.client+", le recordamos que tiene un saldo pendiente de "+Q(a.balance)+" en "+(store.store_name||"nuestro negocio")+". Por favor comuníquese con nosotros para coordinar el pago. Gracias.";
+                        abrirWA(tel,msg);
+                        if(idx===toSend.length-1){setWaSending(false);showFlash("✓ Se abrió WhatsApp para "+toSend.length+" cliente(s)","ok");setShowWaMasivo(false);}
+                      },idx*1200);
+                    });
+                  }}
+                >{waSending?"Enviando...":"💬 Enviar recordatorio a "+selIds.length+" cliente(s)"}</button>
+              </div>
+            </div>
+          );
+        })()}
         <div className="rg-3" style={{display:"grid",gridTemplateColumns:"repeat(3,1fr)",gap:14,marginBottom:16}}>
           <MetricBox label="Total pendiente" value={Q(totalPend)}       color="#E24B4A"/>
           <MetricBox label="Total cobrado"   value={Q(totalCob)}        color={TEAL}/>
