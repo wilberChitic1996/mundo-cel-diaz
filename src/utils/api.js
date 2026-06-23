@@ -127,6 +127,12 @@ export const auditAPI = {
   },
 };
 
+// ── Configuración de tienda ───────────────────────────
+export const settingsAPI = {
+  getAll: function()     { return api.get('/settings'); },
+  update: function(data) { return api.put('/settings', data); },
+};
+
 // ── Caja ──────────────────────────────────────────────
 export const cajaAPI = {
   getSesiones:   function()          { return api.get('/caja/sesiones'); },
