@@ -1021,6 +1021,27 @@ function MetricBox(props) {
   );
 }
 
+/* ── Tooltip de ayuda ── */
+function HelpTip(props) {
+  var _s=useState(false); var show=_s[0]; var setShow=_s[1];
+  return (
+    <span style={{position:"relative",display:"inline-block",marginLeft:6,verticalAlign:"middle"}}>
+      <span
+        onMouseEnter={function(){setShow(true);}}
+        onMouseLeave={function(){setShow(false);}}
+        onClick={function(){setShow(!show);}}
+        style={{display:"inline-flex",alignItems:"center",justifyContent:"center",width:18,height:18,borderRadius:"50%",background:"#e0e0e0",color:"#555",fontSize:11,fontWeight:700,cursor:"pointer",userSelect:"none",flexShrink:0}}
+      >?</span>
+      {show&&(
+        <span style={{position:"absolute",zIndex:9999,bottom:"calc(100% + 6px)",left:"50%",transform:"translateX(-50%)",background:"#1a2535",color:"#fff",fontSize:12,lineHeight:1.5,padding:"8px 12px",borderRadius:8,whiteSpace:"pre-wrap",minWidth:200,maxWidth:280,boxShadow:"0 4px 16px rgba(0,0,0,0.25)",pointerEvents:"none"}}>
+          {props.text}
+          <span style={{position:"absolute",bottom:-5,left:"50%",transform:"translateX(-50%)",width:10,height:10,background:"#1a2535",clipPath:"polygon(0 0,100% 0,50% 100%)"}}/>
+        </span>
+      )}
+    </span>
+  );
+}
+
 /* ── ProductForm ── */
 var FORM_FIELDS = [
   {k:"name",     l:"Nombre",              ph:"Ej: Pantalla...", tp:"text"  },
@@ -1369,7 +1390,7 @@ function DashboardScreen(props) {
 
   return (
     <div>
-      <p style={H1}>📊 Panel de Control</p>
+      <p style={H1}>📊 Panel de Control<HelpTip text={"Vista general del negocio en tiempo real.\n\n• Ventas hoy: cantidad de transacciones del día\n• Ingresos hoy: dinero total cobrado hoy\n• Saldo de caja: efectivo que debería haber (ventas − reembolsos)\n• Por cobrar: total de créditos pendientes\n\nLas alertas rojas arriba indican reparaciones vencidas, productos sin stock o cuentas con más de 30 días sin pagar."}/></p>
 
       {/* Alertas */}
       {hasAlerts&&(
@@ -2342,7 +2363,7 @@ function AccountsScreen(props) {
   return (
       <div>
         <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:4,flexWrap:"wrap",gap:10}}>
-          <p style={Object.assign({},H1,{margin:0})}>💳 Cuentas por Cobrar</p>
+          <p style={Object.assign({},H1,{margin:0})}>💳 Cuentas por Cobrar<HelpTip text={"Clientes que compraron al crédito y aún deben.\n\n• Pendiente: no han pagado nada\n• Abono parcial: pagaron una parte\n• Pagado: saldo en cero\n\nTocá 'Atender →' para registrar un pago. Podés enviar recordatorio de cobro por WhatsApp con el botón 💬 de cada cuenta, o usar '📱 Recordatorio masivo' para enviar a varios clientes a la vez."}/></p>
           <div style={{display:"flex",gap:8}}>
             <button style={Object.assign({},mB("teal"),{padding:"6px 12px",fontSize:12})} onClick={function(){
               var cols=["Cliente","Fecha","Total","Pagado","Saldo","Estado"];
@@ -3054,7 +3075,7 @@ function InventoryScreen(props) {
   return (
       <div>
         <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:20,flexWrap:"wrap",gap:10}}>
-          <p style={H1}>🗄️ Inventario</p>
+          <p style={H1}>🗄️ Inventario<HelpTip text={"Lista completa de productos y servicios.\n\n• Stock: cantidad disponible en físico\n• Stock mínimo: si baja de este número aparece alerta en el Dashboard\n• Costo: precio de compra (para calcular ganancia)\n• Estantería: ubicación física del producto\n\nSolo el administrador puede crear, editar o desactivar productos."}/></p>
           <div style={{display:"flex",gap:8,alignItems:"center",flexWrap:"wrap"}}>
             <div style={{background:"#f5f4f0",borderRadius:8,padding:"8px 14px",fontSize:13,color:"#666"}}>
               <b>{products.filter(function(p){return p.unit!=="serv";}).length}</b> productos · <b style={{color:TEAL}}>{total}</b> uds
@@ -3384,7 +3405,7 @@ function HistoryScreen(props) {
   return (
       <div>
         <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:20,flexWrap:"wrap",gap:10}}>
-          <p style={H1}>📋 Historial de Movimientos</p>
+          <p style={H1}>📋 Historial de Movimientos<HelpTip text={"Registro de todas las transacciones del negocio.\n\n• Ventas: cobros en caja\n• Créditos: ventas al fiado\n• Abonos: pagos parciales de créditos\n• Devoluciones: productos devueltos\n\nPodés filtrar por tipo, fecha o rango personalizado y exportar a Excel o PDF."}/></p>
           <div style={{display:"flex",gap:8,alignItems:"center",flexWrap:"wrap"}}>
             <span style={{fontSize:13,color:"#666"}}>{fmovs.length} registros</span>
             <button style={Object.assign({},mB("teal"),{padding:"6px 12px",fontSize:12})} onClick={function(){
@@ -3725,7 +3746,7 @@ function ClientsScreen(props) {
   return (
     <div>
       <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:20}}>
-        <p style={H1}>👥 Clientes</p>
+        <p style={H1}>👥 Clientes<HelpTip text={"Base de datos de clientes del negocio.\n\nCada cliente puede tener nombre, teléfono, NIT y dirección. El teléfono se usa para enviar comprobantes y recordatorios de cobro por WhatsApp automáticamente.\n\nDesde aquí podés ver el historial de compras de cada cliente."}/></p>
         <button style={mB("teal")} onClick={function(){resetForm();setShowForm(true);}}>+ Nuevo cliente</button>
       </div>
 
@@ -5988,7 +6009,7 @@ function RepairsScreen(props){
   return (
     <div>
       <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:20,flexWrap:"wrap",gap:10}}>
-        <p style={Object.assign({},H1,{margin:0})}>🔧 Reparaciones</p>
+        <p style={Object.assign({},H1,{margin:0})}>🔧 Reparaciones<HelpTip text={"Gestión de equipos en taller.\n\nEstados del flujo:\n• Recibido → En revisión → Esperando repuesto → Listo → Entregado\n\nCada reparación lleva: cliente, equipo, problema, técnico asignado y costo. Al marcar 'Entregado' podés enviar el comprobante por WhatsApp al cliente."}/></p>
         <div style={{display:"flex",gap:8,flexWrap:"wrap"}}>
           {!showForm&&<>
             <button style={Object.assign({},mB("teal"),{padding:"6px 12px",fontSize:12})} onClick={function(){
@@ -6473,7 +6494,7 @@ function CuadresScreen(props){
   return (
     <div>
       <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:20}}>
-        <p style={H1}>📈 Cuadres y Reportes</p>
+        <p style={H1}>📈 Cuadres y Reportes<HelpTip text={"Resumen financiero del negocio por período.\n\n• Ventas brutas: total cobrado en el período\n• Ingresos netos: ventas + abonos recibidos − reembolsos\n• Ganancia bruta: ingresos − costo de productos (solo si cargaste costos al inventario)\n• Antigüedad de cuentas: cuánto tiempo llevan pendientes los créditos\n\nPodés imprimir el cuadre o exportarlo a Excel desde aquí."}/></p>
         <button style={Object.assign({},mB("teal"),{padding:"10px 20px"})} onClick={printCuadre}>🖨 Imprimir / PDF</button>
       </div>
 
