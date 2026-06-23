@@ -4488,8 +4488,35 @@ function StoreConfigScreen(props){
   var _form=useState(Object.assign({store_name:"",store_tagline:"",store_phone:"",store_address:"",store_email:"",store_logo_url:""},storeInfo));
   var form=_form[0]; var setForm=_form[1];
   var _saving=useState(false); var saving=_saving[0]; var setSaving=_saving[1];
+  var _logoLoading=useState(false); var logoLoading=_logoLoading[0]; var setLogoLoading=_logoLoading[1];
 
   function handleChange(k,v){ setForm(function(prev){var n=Object.assign({},prev); n[k]=v; return n;}); }
+
+  function handleLogoFile(e){
+    var file=e.target.files&&e.target.files[0];
+    if(!file) return;
+    if(!file.type.startsWith("image/")){ showFlash("Solo se aceptan imágenes (JPG, PNG, WebP)","err"); return; }
+    setLogoLoading(true);
+    var reader=new FileReader();
+    reader.onload=function(ev){
+      var img=new Image();
+      img.onload=function(){
+        var MAX=300;
+        var w=img.width; var h=img.height;
+        if(w>MAX||h>MAX){ var r=Math.min(MAX/w,MAX/h); w=Math.round(w*r); h=Math.round(h*r); }
+        var canvas=document.createElement("canvas"); canvas.width=w; canvas.height=h;
+        var ctx=canvas.getContext("2d"); ctx.drawImage(img,0,0,w,h);
+        var dataUrl=canvas.toDataURL("image/jpeg",0.82);
+        handleChange("store_logo_url",dataUrl);
+        setLogoLoading(false);
+      };
+      img.onerror=function(){ showFlash("No se pudo leer la imagen","err"); setLogoLoading(false); };
+      img.src=ev.target.result;
+    };
+    reader.onerror=function(){ showFlash("Error al leer el archivo","err"); setLogoLoading(false); };
+    reader.readAsDataURL(file);
+    e.target.value="";
+  }
 
   function handleSave(){
     setSaving(true);
@@ -4510,7 +4537,6 @@ function StoreConfigScreen(props){
     {key:"store_phone",   label:"Teléfono",                placeholder:"Ej: 5555-1234"},
     {key:"store_address", label:"Dirección",               placeholder:"Ej: Zona 1, Guatemala"},
     {key:"store_email",   label:"Correo electrónico",      placeholder:"Ej: info@mitienda.com"},
-    {key:"store_logo_url",label:"URL del logo (imagen)",   placeholder:"https://... (opcional)"},
   ];
 
   return (
@@ -4529,7 +4555,29 @@ function StoreConfigScreen(props){
               </div>
             );
           })}
-          <button style={Object.assign({},mB("teal"),{width:"100%",marginTop:6})} onClick={handleSave} disabled={saving}>
+
+          {/* Logo uploader */}
+          <div style={{marginBottom:14}}>
+            <label style={{display:"block",fontWeight:600,fontSize:13,marginBottom:8}}>Logo del negocio</label>
+            <div style={{display:"flex",alignItems:"center",gap:12}}>
+              {form.store_logo_url
+                ?<img src={form.store_logo_url} alt="logo" style={{width:60,height:60,borderRadius:8,objectFit:"cover",border:"2px solid "+TEAL}}/>
+                :<div style={{width:60,height:60,borderRadius:8,background:"#f0f0f0",display:"flex",alignItems:"center",justifyContent:"center",fontSize:22,color:"#bbb",border:"2px dashed #ccc"}}>🖼️</div>
+              }
+              <div style={{flex:1}}>
+                <label style={{display:"inline-block",cursor:"pointer",background:TEAL,color:"#fff",padding:"7px 14px",borderRadius:6,fontSize:13,fontWeight:600}}>
+                  {logoLoading?"Procesando…":"📁 Subir imagen"}
+                  <input type="file" accept="image/*" style={{display:"none"}} onChange={handleLogoFile} disabled={logoLoading}/>
+                </label>
+                {form.store_logo_url&&(
+                  <button style={{marginLeft:8,background:"none",border:"1px solid #e74c3c",color:"#e74c3c",borderRadius:6,padding:"6px 12px",cursor:"pointer",fontSize:12}} onClick={function(){handleChange("store_logo_url","");}}>Quitar</button>
+                )}
+                <p style={{fontSize:11,color:"#888",margin:"6px 0 0"}}>JPG, PNG o WebP · Máx. 500 KB · Se redimensiona automáticamente</p>
+              </div>
+            </div>
+          </div>
+
+          <button style={Object.assign({},mB("teal"),{width:"100%",marginTop:6})} onClick={handleSave} disabled={saving||logoLoading}>
             {saving?"Guardando…":"💾 Guardar cambios"}
           </button>
         </div>
