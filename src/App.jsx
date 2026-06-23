@@ -3721,9 +3721,9 @@ function BackupScreen(props) {
 
       {/* Excel completo */}
       <div style={Object.assign({},sC,{marginBottom:16,borderLeft:"4px solid "+TEAL})}>
-        <p style={{fontWeight:700,fontSize:15,margin:"0 0 6px"}}>📊 Exportar a Excel completo (.xlsx)</p>
+        <p style={{fontWeight:700,fontSize:15,margin:"0 0 6px"}}>📊 Exportar a Excel completo (.xls)</p>
         <p style={{fontSize:13,color:"#666",margin:"0 0 12px",lineHeight:1.6}}>
-          13 hojas con todo el detalle: Resumen · Productos · Ventas · Detalle Ventas · Cuentas · Historial Pagos · Devoluciones · Clientes · Reparaciones · Garantías · Proveedores · Compras · Piezas Defectuosas. Si algún módulo no se descarga, queda marcado en la hoja Resumen.
+          18 hojas con todo el detalle: Resumen · Productos · Ventas · Detalle Ventas · Cuentas · Historial Pagos · Devoluciones · Clientes · Reparaciones · Garantías · Proveedores · Compras · Piezas Defectuosas. Si algún módulo no se descarga, queda marcado en la hoja Resumen.
         </p>
         <button style={Object.assign({},mB("teal"),{padding:"11px 28px",fontSize:14,opacity:busy?0.6:1})} onClick={doExcelFull} disabled={busy}>
           {busy?"Generando…":"📊 Descargar Excel"}
@@ -6133,7 +6133,7 @@ function App(props) {
     XLSX.utils.book_append_sheet(wb, mkSheet(cajaRows), "Sesiones Caja");
 
     // ── Generar archivo ──
-    XLSX.writeFile(wb, storeName.replace(/\s+/g, "_") + "_respaldo_" + now.toISOString().slice(0, 10) + ".xlsx");
+    XLSX.writeFile(wb, storeName.replace(/\s+/g, "_") + "_respaldo_" + now.toISOString().slice(0, 10) + ".xls", { bookType: 'xls' });
     localStorage.setItem("mnpos-last-backup", now.toISOString());
 
     if(failed.length > 0){
