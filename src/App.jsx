@@ -5778,112 +5778,363 @@ function App(props) {
   }
 
   async function exportExcel(){
-    var now=new Date();
-    var CFG={timeout:60000}; // 60s — descargar TODO sin cortes en servidores lentos
-    // Cada módulo se descarga registrando si falló, para nunca generar una hoja
-    // vacía "en silencio". Si un módulo crítico falla, el respaldo se aborta.
-    var failed=[];
-    function grab(name,promise){ return promise.catch(function(){ failed.push(name); return null; }); }
-    var results=await Promise.all([
-      grab("Productos",   productsAPI.getAll(CFG)),
-      grab("Ventas",      salesAPI.getAll(CFG)),
-      grab("Cuentas",     accountsAPI.getAll(CFG)),
-      grab("Devoluciones",returnsAPI.getAll(CFG)),
-      grab("Defectuosos", defectivesAPI.getAll(CFG)),
-      grab("Clientes",    clientsAPI.getAll(CFG)),
-      grab("Reparaciones",repairsAPI.getAll(CFG)),
-      grab("Garantías",   warrantiesAPI.getAll(CFG)),
-      grab("Proveedores", suppliersAPI.getAll(CFG)),
-      grab("Compras",     suppliersAPI.getPurchases(CFG)),
+    var now = new Date();
+    var CFG = { timeout: 90000 };
+    var failed = [];
+    function grab(name, promise){ return promise.catch(function(){ failed.push(name); return null; }); }
+
+    var results = await Promise.all([
+      grab("Productos",    productsAPI.getAll(CFG)),
+      grab("Ventas",       salesAPI.getAll(CFG)),
+      grab("Cuentas",      accountsAPI.getAll(CFG)),
+      grab("Devoluciones", returnsAPI.getAll(CFG)),
+      grab("Defectuosos",  defectivesAPI.getAll(CFG)),
+      grab("Clientes",     clientsAPI.getAll(CFG)),
+      grab("Reparaciones", repairsAPI.getAll(CFG)),
+      grab("Garantías",    warrantiesAPI.getAll(CFG)),
+      grab("Proveedores",  suppliersAPI.getAll(CFG)),
+      grab("Compras",      suppliersAPI.getPurchases(CFG)),
+      grab("Usuarios",     usersAPI.getAll(CFG)),
+      grab("Caja",         cajaAPI.getSesiones()),
     ]);
-    var prods=results[0],sls=results[1],accs=results[2],rets=results[3],defs=results[4],
-        clis=results[5],reps=results[6],wars=results[7],sups=results[8],purs=results[9];
 
-    // Si TODO falló, no generamos un archivo engañoso: avisamos y abortamos.
-    if(failed.length===results.length){
-      showFlash("⛔ No se pudo conectar con el servidor. Revisá tu internet e intentá de nuevo.","err");
-      throw new Error("backup-fetch-failed");
+    if(failed.length === results.length){
+      showFlash("⛔ No se pudo conectar con el servidor. Verificá tu internet e intentá de nuevo.","err");
+      throw new Error("backup-failed");
     }
-    // Normalizar: un módulo que falló queda como [] pero ya está marcado en 'failed'.
-    prods=prods||[];sls=sls||[];accs=accs||[];rets=rets||[];defs=defs||[];
-    clis=clis||[];reps=reps||[];wars=wars||[];sups=sups||[];purs=purs||[];
 
-    var wb=XLSX.utils.book_new();
-    var storeName=getStore().store_name||STORE_FALLBACK;
-    var pendAcc=accs.filter(function(a){return a.status!=="pagado";});
-    var totalVentas=sls.reduce(function(s,x){return s+Number(x.total||0);},0);
-    var totalPorCobrar=pendAcc.reduce(function(s,a){return s+Number(a.balance||0);},0);
-    var totalReemb=rets.reduce(function(s,r){return s+Number(r.refund_amount||r.refundAmount||0);},0);
-    var totalCompras=purs.reduce(function(s,p){return s+Number(p.total||0);},0);
-    var valorInventario=prods.reduce(function(s,p){return s+Number(p.cost||0)*Number(p.stock||0);},0);
+    var prods  = results[0]  || [];
+    var sls    = results[1]  || [];
+    var accs   = results[2]  || [];
+    var rets   = results[3]  || [];
+    var defs   = results[4]  || [];
+    var clis   = results[5]  || [];
+    var reps   = results[6]  || [];
+    var wars   = results[7]  || [];
+    var sups   = results[8]  || [];
+    var purs   = results[9]  || [];
+    var usrs   = results[10] || [];
+    var caja   = results[11] || [];
 
-    // ── Hoja RESUMEN ──
-    var resumen=[
-      [storeName+" — Respaldo Completo del Sistema"],
-      ["Generado:",fmtD(now)+" "+fmtT(now)],
+    var wb = XLSX.utils.book_new();
+    var storeName = getStore().store_name || STORE_FALLBACK;
+
+    // ── Totales para el resumen ──
+    var totalVentas     = sls.reduce(function(s,x){ return s+Number(x.total||0); }, 0);
+    var pendAcc         = accs.filter(function(a){ return a.status !== "pagado"; });
+    var totalPorCobrar  = pendAcc.reduce(function(s,a){ return s+Number(a.balance||0); }, 0);
+    var totalReemb      = rets.reduce(function(s,r){ return s+Number(r.refund_amount||0); }, 0);
+    var totalCompras    = purs.reduce(function(s,p){ return s+Number(p.total||0); }, 0);
+    var valorInventario = prods.reduce(function(s,p){ return s+Number(p.cost||0)*Number(p.stock||0); }, 0);
+    var repsActivas     = reps.filter(function(r){ return r.status !== "entregado"; }).length;
+
+    // ══════════════════════════════════════════════════════════════
+    //  HOJA 1 — RESUMEN
+    // ══════════════════════════════════════════════════════════════
+    var resumenData = [
+      [storeName + " — Respaldo Completo"],
+      ["Generado:", fmtD(now) + " " + fmtT(now)],
       [],
-      ["MÓDULO","REGISTROS","DETALLE","ESTADO"],
-      ["Productos",       prods.length, "Valor inventario (costo): Q "+valorInventario.toFixed(2), failed.indexOf("Productos")>=0?"⚠ NO SE DESCARGÓ":"OK"],
-      ["Clientes",        clis.length,  "", failed.indexOf("Clientes")>=0?"⚠ NO SE DESCARGÓ":"OK"],
-      ["Ventas",          sls.length,   "Total vendido: Q "+totalVentas.toFixed(2), failed.indexOf("Ventas")>=0?"⚠ NO SE DESCARGÓ":"OK"],
-      ["Cuentas activas", pendAcc.length, "Por cobrar: Q "+totalPorCobrar.toFixed(2), failed.indexOf("Cuentas")>=0?"⚠ NO SE DESCARGÓ":"OK"],
-      ["Devoluciones",    rets.length,  "Reembolsado: Q "+totalReemb.toFixed(2), failed.indexOf("Devoluciones")>=0?"⚠ NO SE DESCARGÓ":"OK"],
-      ["Reparaciones",    reps.length,  "", failed.indexOf("Reparaciones")>=0?"⚠ NO SE DESCARGÓ":"OK"],
-      ["Garantías",       wars.length,  "", failed.indexOf("Garantías")>=0?"⚠ NO SE DESCARGÓ":"OK"],
-      ["Proveedores",     sups.length,  "", failed.indexOf("Proveedores")>=0?"⚠ NO SE DESCARGÓ":"OK"],
-      ["Compras",         purs.length,  "Total comprado: Q "+totalCompras.toFixed(2), failed.indexOf("Compras")>=0?"⚠ NO SE DESCARGÓ":"OK"],
-      ["Piezas defectuosas", defs.length, "", failed.indexOf("Defectuosos")>=0?"⚠ NO SE DESCARGÓ":"OK"],
+      ["MÓDULO", "REGISTROS", "DETALLE", "ESTADO"],
+      ["Productos",          prods.length,    "Valor inventario (costo): Q " + valorInventario.toFixed(2),    failed.indexOf("Productos")    >= 0 ? "⚠ FALLÓ" : "OK"],
+      ["Clientes",           clis.length,     "",                                                               failed.indexOf("Clientes")     >= 0 ? "⚠ FALLÓ" : "OK"],
+      ["Ventas",             sls.length,      "Total vendido: Q " + totalVentas.toFixed(2),                    failed.indexOf("Ventas")       >= 0 ? "⚠ FALLÓ" : "OK"],
+      ["Cuentas por cobrar", pendAcc.length,  "Saldo pendiente: Q " + totalPorCobrar.toFixed(2),               failed.indexOf("Cuentas")      >= 0 ? "⚠ FALLÓ" : "OK"],
+      ["Devoluciones",       rets.length,     "Total reembolsado: Q " + totalReemb.toFixed(2),                 failed.indexOf("Devoluciones") >= 0 ? "⚠ FALLÓ" : "OK"],
+      ["Reparaciones",       reps.length,     "En proceso: " + repsActivas,                                    failed.indexOf("Reparaciones") >= 0 ? "⚠ FALLÓ" : "OK"],
+      ["Garantías",          wars.length,     "",                                                               failed.indexOf("Garantías")    >= 0 ? "⚠ FALLÓ" : "OK"],
+      ["Proveedores",        sups.length,     "",                                                               failed.indexOf("Proveedores")  >= 0 ? "⚠ FALLÓ" : "OK"],
+      ["Compras",            purs.length,     "Total comprado: Q " + totalCompras.toFixed(2),                  failed.indexOf("Compras")      >= 0 ? "⚠ FALLÓ" : "OK"],
+      ["Piezas defectuosas", defs.length,     "",                                                               failed.indexOf("Defectuosos")  >= 0 ? "⚠ FALLÓ" : "OK"],
+      ["Usuarios del sistema",usrs.length,    "",                                                               failed.indexOf("Usuarios")     >= 0 ? "⚠ FALLÓ" : "OK"],
+      ["Sesiones de caja",   caja.length,     "",                                                               failed.indexOf("Caja")         >= 0 ? "⚠ FALLÓ" : "OK"],
     ];
-    if(failed.length>0){
-      resumen.push([]);
-      resumen.push(["⚠ ATENCIÓN: estos módulos no se descargaron del servidor (revisá tu conexión y volvé a respaldar):"]);
-      resumen.push([failed.join(", ")]);
+    if(failed.length > 0){
+      resumenData.push([]);
+      resumenData.push(["⚠ MÓDULOS CON FALLO (respaldá de nuevo después de revisar tu conexión):"]);
+      resumenData.push([failed.join(", ")]);
     }
-    XLSX.utils.book_append_sheet(wb,XLSX.utils.aoa_to_sheet(resumen),"Resumen");
+    XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(resumenData), "Resumen");
 
-    // ── PRODUCTOS (catálogo completo) ──
-    XLSX.utils.book_append_sheet(wb,XLSX.utils.aoa_to_sheet(
-      [["Código","Nombre","Categoría","Estantería","Unidad","Stock","Stock mínimo","Precio venta (Q)","Costo (Q)","Margen","Valor en stock (Q)"]]
-      .concat(prods.slice().sort(function(a,b){return (a.code||"").localeCompare(b.code||"");}).map(function(p){
-        var mg=Number(p.price)>0&&Number(p.cost)>0?Math.round((p.price-p.cost)/p.price*100)+"%":"N/A";
-        var esServ=p.unit==="serv";
-        return [p.code||"",p.name||"",p.category||"",p.shelf||"",esServ?"Servicio":"Unidad",
-          esServ?"—":Number(p.stock||0),esServ?"—":Number(p.min_stock||0),
-          Number(p.price||0).toFixed(2),Number(p.cost||0).toFixed(2),mg,
-          esServ?"—":(Number(p.cost||0)*Number(p.stock||0)).toFixed(2)];
-      }))
-    ),"Productos");
+    // ══════════════════════════════════════════════════════════════
+    //  HOJA 2 — PRODUCTOS
+    //  Campos DB: code, name, category, shelf, unit, stock, min_stock, price, cost
+    // ══════════════════════════════════════════════════════════════
+    var prodRows = [["Código","Nombre","Categoría","Estantería","Unidad","Stock","Stock mínimo","Precio venta (Q)","Costo (Q)","Margen %","Valor en stock (Q)"]];
+    prods.slice().sort(function(a,b){ return (a.code||"").localeCompare(b.code||""); }).forEach(function(p){
+      var esServ = p.unit === "serv";
+      var mg = (!esServ && Number(p.price) > 0 && Number(p.cost) > 0) ? Math.round((p.price - p.cost) / p.price * 100) + "%" : "N/A";
+      prodRows.push([
+        p.code || "", p.name || "", p.category || "", p.shelf || "",
+        esServ ? "Servicio" : "Unidad",
+        esServ ? "—" : Number(p.stock || 0),
+        esServ ? "—" : Number(p.min_stock || 0),
+        Number(p.price || 0).toFixed(2),
+        Number(p.cost || 0).toFixed(2),
+        mg,
+        esServ ? "—" : (Number(p.cost || 0) * Number(p.stock || 0)).toFixed(2),
+      ]);
+    });
+    XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(prodRows), "Productos");
 
-    // ── VENTAS ──
-    XLSX.utils.book_append_sheet(wb,XLSX.utils.aoa_to_sheet([["ID","Fecha","Cliente","Método","Total (Q)","Registrado por"]].concat(sls.map(function(s){return [s.id,fmtD(s.created_at||s.date),s.client,s.method,Number(s.total||0).toFixed(2),(s.registrado_por&&s.registrado_por.name)||""];}))),"Ventas");
-    // ── DETALLE DE VENTAS (artículo por artículo) ──
-    XLSX.utils.book_append_sheet(wb,XLSX.utils.aoa_to_sheet([["ID Venta","Fecha","Cliente","Código","Producto","Cant.","Precio (Q)","Subtotal (Q)"]].concat(sls.reduce(function(arr,s){return arr.concat(((s.sale_items||s.items)||[]).map(function(it){return [s.id,fmtD(s.created_at||s.date),s.client,it.code||"",it.name,it.qty,Number(it.price||0).toFixed(2),(Number(it.price||0)*Number(it.qty||0)).toFixed(2)];}));},[]))),"Detalle Ventas");
-    // ── CUENTAS POR COBRAR ──
-    XLSX.utils.book_append_sheet(wb,XLSX.utils.aoa_to_sheet([["ID","Fecha","Cliente","Total (Q)","Pagado (Q)","Saldo (Q)","Estado"]].concat(accs.map(function(a){return [a.id,fmtD(a.created_at||a.date),a.client,Number(a.total||0).toFixed(2),Number(a.paid||0).toFixed(2),Number(a.balance||0).toFixed(2),a.status||""];}))),"Cuentas");
-    // ── HISTORIAL DE PAGOS / ABONOS ──
-    var pmts=accs.reduce(function(arr,a){return arr.concat(((a.account_payments||a.payments)||[]).map(function(p){return [a.id,a.client,fmtD(p.date||p.created_at),Number(p.amount||0).toFixed(2),p.method||"",p.note||""];}));},[]);
-    XLSX.utils.book_append_sheet(wb,XLSX.utils.aoa_to_sheet([["ID Cuenta","Cliente","Fecha Pago","Monto (Q)","Método","Nota"]].concat(pmts)),"Historial Pagos");
-    // ── DEVOLUCIONES ──
-    XLSX.utils.book_append_sheet(wb,XLSX.utils.aoa_to_sheet([["ID","Fecha","Cliente","Motivo","Condición","Método reemb.","Monto reemb. (Q)"]].concat(rets.map(function(r){return [r.id,fmtD(r.created_at||r.date),r.client,r.reason||"",r.item_condition||r.itemCondition||"",r.refund_method||r.refundMethod||"",Number(r.refund_amount||r.refundAmount||0).toFixed(2)];}))),"Devoluciones");
-    // ── CLIENTES ──
-    XLSX.utils.book_append_sheet(wb,XLSX.utils.aoa_to_sheet([["Código","Nombre","DPI","Teléfono","Dirección","Fecha registro"]].concat(clis.map(function(c){return [c.cli_code||c.cliCode||"",c.name||"",c.dpi||"",c.phone||"",c.address||"",fmtD(c.created_at||c.createdAt||"")];}))),"Clientes");
-    // ── REPARACIONES ──
-    XLSX.utils.book_append_sheet(wb,XLSX.utils.aoa_to_sheet([["Código","Fecha","Cliente","Teléfono","Marca","Modelo","Problema","Técnico","Costo (Q)","Estado"]].concat(reps.map(function(r){return [r.rep_code||r.repCode||"",fmtD(r.created_at||r.date||""),r.client_name||r.clientName||"",r.client_phone||r.clientPhone||"",r.brand||"",r.model||"",r.problem||"",r.tech_name||r.techName||r.tech||"",Number(r.estimated_cost||r.estimatedCost||r.cost||0).toFixed(2),r.status||""];}))),"Reparaciones");
-    // ── GARANTÍAS ──
-    XLSX.utils.book_append_sheet(wb,XLSX.utils.aoa_to_sheet([["ID","Tipo","Descripción","Cliente","Inicio","Vence","Estado"]].concat(wars.map(function(w){return [w.id,w.entity_type||w.entityType||"",w.description||"",w.client_name||"",fmtD(w.start_date||w.startDate||""),fmtD(w.end_date||w.endDate||""),w.status||""];}))),"Garantías");
-    // ── PROVEEDORES ──
-    XLSX.utils.book_append_sheet(wb,XLSX.utils.aoa_to_sheet([["Nombre","Teléfono","Email","Dirección","Notas"]].concat(sups.map(function(s){return [s.name||"",s.phone||"",s.email||"",s.address||"",s.notes||""];}))),"Proveedores");
-    // ── COMPRAS ──
-    XLSX.utils.book_append_sheet(wb,XLSX.utils.aoa_to_sheet([["ID","Fecha","Proveedor","Artículos","Total (Q)","Registrado por"]].concat(purs.map(function(p){return [p.id,fmtD(p.created_at||""),p.supplier_name||"",((p.purchase_items||[]).length),Number(p.total||0).toFixed(2),p.registered_by||""];}))),"Compras");
-    // ── PIEZAS DEFECTUOSAS ──
-    XLSX.utils.book_append_sheet(wb,XLSX.utils.aoa_to_sheet([["ID","Fecha","Código","Pieza","Cant.","Precio (Q)","Motivo","Estado"]].concat(defs.map(function(d){return [d.id,fmtD(d.created_at||d.date||""),d.code||"",d.name,d.qty,Number(d.price||0).toFixed(2),d.reason||"",d.status||""];}))),"Piezas Defectuosas");
+    // ══════════════════════════════════════════════════════════════
+    //  HOJA 3 — VENTAS (cabecera)
+    //  Campos DB: id, created_at, client, method, total, status, registrado_por {name,role}
+    // ══════════════════════════════════════════════════════════════
+    var ventasRows = [["ID","Fecha","Hora","Cliente","Método pago","Total (Q)","Estado","Registrado por","Rol"]];
+    sls.forEach(function(s){
+      var rp = s.registrado_por || {};
+      ventasRows.push([
+        s.id || "", fmtD(s.created_at), fmtT(s.created_at),
+        s.client || "", s.method || "", Number(s.total || 0).toFixed(2),
+        s.status || "", rp.name || "", rp.role || "",
+      ]);
+    });
+    XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(ventasRows), "Ventas");
 
-    XLSX.writeFile(wb,storeName.replace(/\s+/g,"_")+"_respaldo_"+now.toISOString().slice(0,10)+".xlsx");
-    localStorage.setItem("mnpos-last-backup",now.toISOString());
-    if(failed.length>0){
-      showFlash("⚠ Respaldo descargado, pero "+failed.length+" módulo(s) no se pudieron leer ("+failed.join(", ")+"). Revisá tu conexión y respaldá de nuevo.","err");
+    // ══════════════════════════════════════════════════════════════
+    //  HOJA 4 — DETALLE DE VENTAS (artículo por artículo)
+    //  sale_items: sale_id, code, name, price, qty, subtotal
+    // ══════════════════════════════════════════════════════════════
+    var detalleVentasRows = [["ID Venta","Fecha","Cliente","Código producto","Producto","Cant.","Precio unit. (Q)","Subtotal (Q)"]];
+    sls.forEach(function(s){
+      var items = s.sale_items || [];
+      items.forEach(function(it){
+        detalleVentasRows.push([
+          s.id || "", fmtD(s.created_at), s.client || "",
+          it.code || "", it.name || "", Number(it.qty || 0),
+          Number(it.price || 0).toFixed(2),
+          Number(it.subtotal || (it.price * it.qty) || 0).toFixed(2),
+        ]);
+      });
+    });
+    XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(detalleVentasRows), "Detalle Ventas");
+
+    // ══════════════════════════════════════════════════════════════
+    //  HOJA 5 — CUENTAS POR COBRAR
+    //  Campos DB: id, created_at, client, total, paid, balance, status, method, registrado_por
+    // ══════════════════════════════════════════════════════════════
+    var cuentasRows = [["ID","Fecha","Hora","Cliente","Total (Q)","Pagado (Q)","Saldo (Q)","Estado","Método","Registrado por"]];
+    accs.forEach(function(a){
+      var rp = a.registrado_por || {};
+      cuentasRows.push([
+        a.id || "", fmtD(a.created_at), fmtT(a.created_at),
+        a.client || "", Number(a.total || 0).toFixed(2),
+        Number(a.paid || 0).toFixed(2), Number(a.balance || 0).toFixed(2),
+        a.status || "", a.method || "", rp.name || "",
+      ]);
+    });
+    XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(cuentasRows), "Cuentas");
+
+    // ══════════════════════════════════════════════════════════════
+    //  HOJA 6 — ARTÍCULOS DE CUENTAS
+    //  account_items: account_id, code, name, price, qty
+    // ══════════════════════════════════════════════════════════════
+    var artCuentasRows = [["ID Cuenta","Cliente","Código producto","Producto","Precio (Q)","Cant.","Subtotal (Q)"]];
+    accs.forEach(function(a){
+      var items = a.account_items || [];
+      items.forEach(function(it){
+        artCuentasRows.push([
+          a.id || "", a.client || "", it.code || "", it.name || "",
+          Number(it.price || 0).toFixed(2), Number(it.qty || 0),
+          (Number(it.price || 0) * Number(it.qty || 0)).toFixed(2),
+        ]);
+      });
+    });
+    XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(artCuentasRows), "Artículos Cuentas");
+
+    // ══════════════════════════════════════════════════════════════
+    //  HOJA 7 — HISTORIAL DE PAGOS / ABONOS
+    //  account_payments: account_id, amount, method, note, created_at, registrado_por
+    // ══════════════════════════════════════════════════════════════
+    var pagosRows = [["ID Cuenta","Cliente","Fecha pago","Hora","Monto (Q)","Método","Nota","Registrado por"]];
+    accs.forEach(function(a){
+      var pmts = a.account_payments || [];
+      pmts.forEach(function(p){
+        var rp = p.registrado_por || {};
+        pagosRows.push([
+          a.id || "", a.client || "", fmtD(p.created_at), fmtT(p.created_at),
+          Number(p.amount || 0).toFixed(2), p.method || "", p.note || "", rp.name || "",
+        ]);
+      });
+    });
+    XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(pagosRows), "Historial Pagos");
+
+    // ══════════════════════════════════════════════════════════════
+    //  HOJA 8 — DEVOLUCIONES
+    //  Campos DB: id, created_at, client, sale_id, reason, refund_method, refund_amount, item_condition, total
+    // ══════════════════════════════════════════════════════════════
+    var devRows = [["ID","Fecha","Hora","Cliente","ID Venta origen","Motivo","Condición","Método reembolso","Monto reembolso (Q)","Total artículos (Q)"]];
+    rets.forEach(function(r){
+      devRows.push([
+        r.id || "", fmtD(r.created_at), fmtT(r.created_at), r.client || "",
+        r.sale_id || "—", r.reason || "", r.item_condition || "",
+        r.refund_method || "", Number(r.refund_amount || 0).toFixed(2),
+        Number(r.total || 0).toFixed(2),
+      ]);
+    });
+    XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(devRows), "Devoluciones");
+
+    // ══════════════════════════════════════════════════════════════
+    //  HOJA 9 — ARTÍCULOS DE DEVOLUCIONES
+    //  return_items: return_id, code, name, price, qty
+    // ══════════════════════════════════════════════════════════════
+    var artDevRows = [["ID Devolución","Cliente","Código producto","Producto","Precio (Q)","Cant.","Subtotal (Q)"]];
+    rets.forEach(function(r){
+      var items = r.return_items || [];
+      items.forEach(function(it){
+        artDevRows.push([
+          r.id || "", r.client || "", it.code || "", it.name || "",
+          Number(it.price || 0).toFixed(2), Number(it.qty || 0),
+          (Number(it.price || 0) * Number(it.qty || 0)).toFixed(2),
+        ]);
+      });
+    });
+    XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(artDevRows), "Artículos Devoluciones");
+
+    // ══════════════════════════════════════════════════════════════
+    //  HOJA 10 — CLIENTES
+    //  Campos DB: cli_code, name, dpi, phone, address, active, created_at
+    // ══════════════════════════════════════════════════════════════
+    var cliRows = [["Código","Nombre","DPI","Teléfono","Dirección","Activo","Fecha registro"]];
+    clis.forEach(function(c){
+      cliRows.push([
+        c.cli_code || "", c.name || "", c.dpi || "", c.phone || "",
+        c.address || "", c.active ? "Sí" : "No", fmtD(c.created_at),
+      ]);
+    });
+    XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(cliRows), "Clientes");
+
+    // ══════════════════════════════════════════════════════════════
+    //  HOJA 11 — REPARACIONES
+    //  Campos DB: rep_code, created_at, client_name, client_phone, brand, model,
+    //             imei, problem_desc, diagnosis, tech_name, estimated_cost,
+    //             promised_date, internal_note, status, parts
+    // ══════════════════════════════════════════════════════════════
+    var repRows = [["Código","Fecha","Hora","Cliente","Teléfono","Marca","Modelo","IMEI","Problema","Diagnóstico","Técnico","Costo estimado (Q)","Fecha prometida","Nota interna","Estado"]];
+    reps.forEach(function(r){
+      repRows.push([
+        r.rep_code || "", fmtD(r.created_at), fmtT(r.created_at),
+        r.client_name || "", r.client_phone || "",
+        r.brand || "", r.model || "", r.imei || "",
+        r.problem_desc || "", r.diagnosis || "", r.tech_name || "",
+        Number(r.estimated_cost || 0).toFixed(2),
+        r.promised_date || "", r.internal_note || "", r.status || "",
+      ]);
+    });
+    XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(repRows), "Reparaciones");
+
+    // ══════════════════════════════════════════════════════════════
+    //  HOJA 12 — GARANTÍAS
+    //  Campos DB: id, entity_type, entity_id, client, description, start_date, end_date, status
+    // ══════════════════════════════════════════════════════════════
+    var warRows = [["ID","Tipo","ID entidad","Cliente","Descripción","Inicio","Vencimiento","Estado"]];
+    wars.forEach(function(w){
+      warRows.push([
+        w.id || "", w.entity_type || "", w.entity_id || "",
+        w.client || "", w.description || "",
+        w.start_date || "", w.end_date || "", w.status || "",
+      ]);
+    });
+    XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(warRows), "Garantías");
+
+    // ══════════════════════════════════════════════════════════════
+    //  HOJA 13 — PIEZAS DEFECTUOSAS
+    //  Campos DB: id, created_at, code, name, qty, price, reason, status, return_id
+    // ══════════════════════════════════════════════════════════════
+    var defRows = [["ID","Fecha","Código","Pieza / Producto","Cant.","Precio (Q)","Motivo","Estado","ID Devolución origen"]];
+    defs.forEach(function(d){
+      defRows.push([
+        d.id || "", fmtD(d.created_at), d.code || "", d.name || "",
+        Number(d.qty || 0), Number(d.price || 0).toFixed(2),
+        d.reason || "", d.status || "", d.return_id || "—",
+      ]);
+    });
+    XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(defRows), "Piezas Defectuosas");
+
+    // ══════════════════════════════════════════════════════════════
+    //  HOJA 14 — PROVEEDORES
+    //  Campos DB: name, phone, email, address, notes
+    // ══════════════════════════════════════════════════════════════
+    var supRows = [["Nombre","Teléfono","Email","Dirección","Notas"]];
+    sups.forEach(function(s){
+      supRows.push([s.name || "", s.phone || "", s.email || "", s.address || "", s.notes || ""]);
+    });
+    XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(supRows), "Proveedores");
+
+    // ══════════════════════════════════════════════════════════════
+    //  HOJA 15 — COMPRAS (cabecera)
+    //  Campos DB: id, created_at, supplier_name, total, notes, registered_by
+    // ══════════════════════════════════════════════════════════════
+    var comprasRows = [["ID","Fecha","Hora","Proveedor","Total (Q)","Notas","Registrado por"]];
+    purs.forEach(function(p){
+      comprasRows.push([
+        p.id || "", fmtD(p.created_at), fmtT(p.created_at),
+        p.supplier_name || "", Number(p.total || 0).toFixed(2),
+        p.notes || "", p.registered_by || "",
+      ]);
+    });
+    XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(comprasRows), "Compras");
+
+    // ══════════════════════════════════════════════════════════════
+    //  HOJA 16 — DETALLE DE COMPRAS (artículo por artículo)
+    //  purchase_items: purchase_id, product_name, product_code, qty, cost, subtotal
+    // ══════════════════════════════════════════════════════════════
+    var detalleComprasRows = [["ID Compra","Fecha","Proveedor","Código producto","Producto","Cant.","Costo unit. (Q)","Subtotal (Q)"]];
+    purs.forEach(function(p){
+      var items = p.purchase_items || [];
+      items.forEach(function(it){
+        detalleComprasRows.push([
+          p.id || "", fmtD(p.created_at), p.supplier_name || "",
+          it.product_code || "", it.product_name || "",
+          Number(it.qty || 0), Number(it.cost || 0).toFixed(2),
+          Number(it.subtotal || 0).toFixed(2),
+        ]);
+      });
+    });
+    XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(detalleComprasRows), "Detalle Compras");
+
+    // ══════════════════════════════════════════════════════════════
+    //  HOJA 17 — USUARIOS DEL SISTEMA
+    //  Campos DB: id, name, email, role, active, last_login, created_at, sec_question
+    // ══════════════════════════════════════════════════════════════
+    var usrRows = [["ID","Nombre","Email","Rol","Activo","Último ingreso","Fecha creación","Pregunta de seguridad"]];
+    usrs.forEach(function(u){
+      usrRows.push([
+        u.id || "", u.name || "", u.email || "",
+        ROLE_LABEL[u.role] || u.role || "", u.active ? "Sí" : "No",
+        u.last_login ? fmtD(u.last_login) + " " + fmtT(u.last_login) : "Nunca",
+        fmtD(u.created_at), u.sec_question || "—",
+      ]);
+    });
+    XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(usrRows), "Usuarios");
+
+    // ══════════════════════════════════════════════════════════════
+    //  HOJA 18 — SESIONES DE CAJA
+    //  Campos DB: id, created_at, fondo_inicial, nota_apertura, opened_by, opened_role,
+    //             closed_at, closed_by, closed_role, efectivo_contado, nota_cierre
+    // ══════════════════════════════════════════════════════════════
+    var cajaRows = [["ID","Fecha apertura","Fondo inicial (Q)","Abierta por","Rol","Nota apertura","Fecha cierre","Cerrada por","Efectivo contado (Q)","Nota cierre"]];
+    caja.forEach(function(s){
+      cajaRows.push([
+        s.id || "", fmtD(s.created_at) + " " + fmtT(s.created_at),
+        Number(s.fondo_inicial || 0).toFixed(2), s.opened_by || "", s.opened_role || "",
+        s.nota_apertura || "",
+        s.closed_at ? fmtD(s.closed_at) + " " + fmtT(s.closed_at) : "Abierta",
+        s.closed_by || "", s.efectivo_contado !== null && s.efectivo_contado !== undefined ? Number(s.efectivo_contado).toFixed(2) : "—",
+        s.nota_cierre || "",
+      ]);
+    });
+    XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(cajaRows), "Sesiones Caja");
+
+    // ── Generar archivo ──
+    XLSX.writeFile(wb, storeName.replace(/\s+/g, "_") + "_respaldo_" + now.toISOString().slice(0, 10) + ".xlsx");
+    localStorage.setItem("mnpos-last-backup", now.toISOString());
+
+    if(failed.length > 0){
+      showFlash("⚠ Respaldo descargado con " + failed.length + " módulo(s) faltante(s): " + failed.join(", ") + ". Revisá Resumen en el Excel.", "err");
     } else {
-      showFlash("✓ Respaldo completo descargado (13 hojas, todos los módulos)","ok");
+      showFlash("✓ Respaldo completo — 18 hojas, todos los módulos descargados", "ok");
     }
   }
 
