@@ -153,6 +153,15 @@ export const cajaAPI = {
   eliminarGasto: function(id)        { return api.delete('/caja/gastos/' + id); },
 };
 
+// ── Panel Super Admin ─────────────────────────────────
+export const adminAPI = {
+  getTenants:    function()          { return api.get('/admin/tenants'); },
+  createTenant:  function(data)      { return api.post('/admin/tenants', data); },
+  updateTenant:  function(id, data)  { return api.put('/admin/tenants/' + id, data); },
+  getStats:      function()          { return api.get('/admin/stats'); },
+  init:          function(data)      { return api.post('/admin/init', data); },
+};
+
 // ── Health check ──────────────────────────────────────
 export const checkAPI = async function() {
   try {

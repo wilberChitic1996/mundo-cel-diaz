@@ -3,7 +3,7 @@ import * as XLSX from 'xlsx';
 import html2canvas from 'html2canvas';
 import { AreaChart, Area, BarChart, Bar, PieChart, Pie, Cell, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend } from 'recharts';
 import { db } from './utils/db.js';
-import { authAPI, productsAPI, salesAPI, accountsAPI, returnsAPI, defectivesAPI, usersAPI, checkAPI, clientsAPI, repairsAPI, auditAPI, warrantiesAPI, cajaAPI, settingsAPI, suppliersAPI } from './utils/api.js';
+import { authAPI, productsAPI, salesAPI, accountsAPI, returnsAPI, defectivesAPI, usersAPI, checkAPI, clientsAPI, repairsAPI, auditAPI, warrantiesAPI, cajaAPI, settingsAPI, suppliersAPI, adminAPI } from './utils/api.js';
 
 const TEAL = "#1D9E75";
 const NAVY = "#1a2535";
@@ -210,12 +210,13 @@ var UK       = "mnpos-users-v1";
 var SESS_KEY = "mnpos-session-v1";
 
 var PERMS = {
-  admin:   ["dashboard","pos","caja","accounts","returns","defective","products","inventory","history","backup","users","clients","repairs","cuadres","audit","warranties","storeconfig","suppliers"],
-  cajero:  ["dashboard","pos","caja","accounts","returns","history","clients","repairs","warranties"],
-  auditor: ["dashboard","caja","history","inventory","cuadres"],
+  superadmin: ["superadmin"],
+  admin:      ["dashboard","pos","caja","accounts","returns","defective","products","inventory","history","backup","users","clients","repairs","cuadres","audit","warranties","storeconfig","suppliers"],
+  cajero:     ["dashboard","pos","caja","accounts","returns","history","clients","repairs","warranties"],
+  auditor:    ["dashboard","caja","history","inventory","cuadres"],
 };
-var ROLE_LABEL = { admin:"Administrador", cajero:"Cajero", auditor:"Auditor" };
-var ROLE_COLOR = { admin:TEAL, cajero:"#378ADD", auditor:"#7F77DD" };
+var ROLE_LABEL = { superadmin:"Super Admin", admin:"Administrador", cajero:"Cajero", auditor:"Auditor" };
+var ROLE_COLOR = { superadmin:"#9B59B6", admin:TEAL, cajero:"#378ADD", auditor:"#7F77DD" };
 
 function canAccess(role, view) {
   var p = PERMS[role] || [];
@@ -3989,6 +3990,168 @@ function StoreConfigScreen(props){
 }
 
 /* ══════════════════════════════════════════════════════════════════════
+   SUPER ADMIN PANEL
+   ══════════════════════════════════════════════════════════════════════ */
+function SuperAdminPanel(props){
+  var session=props.session||{};
+  var _tenants=useState([]); var tenants=_tenants[0]; var setTenants=_tenants[1];
+  var _stats=useState(null); var stats=_stats[0]; var setStats=_stats[1];
+  var _loading=useState(true); var loading=_loading[0]; var setLoading=_loading[1];
+  var _tab=useState("tenants"); var tab=_tab[0]; var setTab=_tab[1];
+  var _showNew=useState(false); var showNew=_showNew[0]; var setShowNew=_showNew[1];
+  var _saving=useState(false); var saving=_saving[0]; var setSaving=_saving[1];
+  var _flash=useState(null); var flash=_flash[0]; var setFlash=_flash[1];
+
+  // Form nuevo tenant
+  var _fn=useState(""); var fName=_fn[0]; var setFName=_fn[1];
+  var _fp=useState("basic"); var fPlan=_fp[0]; var setFPlan=_fp[1];
+  var _fe=useState(""); var fEmail=_fe[0]; var setFEmail=_fe[1];
+  var _fph=useState(""); var fPhone=_fph[0]; var setFPhone=_fph[1];
+  var _fo=useState(""); var fOwner=_fo[0]; var setFOwner=_fo[1];
+  var _fae=useState(""); var fAdminEmail=_fae[0]; var setFAdminEmail=_fae[1];
+  var _fap=useState(""); var fAdminPass=_fap[0]; var setFAdminPass=_fap[1];
+
+  function showMsg(msg,type){ setFlash({msg,type}); setTimeout(function(){setFlash(null);},3500); }
+
+  useEffect(function(){
+    Promise.all([adminAPI.getTenants(), adminAPI.getStats()])
+      .then(function(res){ setTenants(res[0]||[]); setStats(res[1]); })
+      .catch(function(){ showMsg("Error cargando datos","error"); })
+      .finally(function(){ setLoading(false); });
+  },[]);
+
+  async function createTenant(){
+    if(!fName||!fAdminEmail||!fAdminPass){ showMsg("Nombre, email admin y contraseña son requeridos","error"); return; }
+    setSaving(true);
+    try {
+      var res = await adminAPI.createTenant({ name:fName, plan:fPlan, email:fEmail, phone:fPhone, ownerName:fOwner, adminEmail:fAdminEmail, adminPassword:fAdminPass });
+      setTenants(function(prev){ return [res.tenant].concat(prev); });
+      showMsg("Tenant creado exitosamente","ok");
+      setShowNew(false);
+      setFName(""); setFPlan("basic"); setFEmail(""); setFPhone(""); setFOwner(""); setFAdminEmail(""); setFAdminPass("");
+    } catch(e){ showMsg(e.error||"Error al crear tenant","error"); }
+    setSaving(false);
+  }
+
+  async function toggleActive(t){
+    try {
+      var updated = await adminAPI.updateTenant(t.id, { active: !t.active });
+      setTenants(function(prev){ return prev.map(function(x){ return x.id===t.id?updated:x; }); });
+      showMsg("Tenant "+(updated.active?"activado":"desactivado"),"ok");
+    } catch(e){ showMsg("Error actualizando tenant","error"); }
+  }
+
+  var PLANS = { basic:"Básico", professional:"Profesional", enterprise:"Empresarial" };
+  var PLAN_COLOR = { basic:"#888", professional:TEAL, enterprise:"#9B59B6" };
+
+  return (
+    <div style={{padding:"clamp(16px,3vw,32px)",maxWidth:1100,margin:"0 auto"}}>
+      {flash&&<div style={{position:"fixed",top:20,right:20,zIndex:9999,padding:"12px 20px",borderRadius:10,background:flash.type==="ok"?"#1D9E75":"#E24B4A",color:"#fff",fontWeight:700,fontSize:13,boxShadow:"0 4px 20px rgba(0,0,0,0.25)"}}>{flash.msg}</div>}
+
+      {/* Header */}
+      <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:24,flexWrap:"wrap",gap:12}}>
+        <div>
+          <h1 style={{margin:0,fontSize:22,fontWeight:800,color:NAVY}}>🏢 Panel Super Administrador</h1>
+          <p style={{margin:"4px 0 0",fontSize:13,color:"#888"}}>Gestión de negocios clientes de la plataforma</p>
+        </div>
+        <span style={Object.assign({},mBg("#9B59B6"),{fontSize:12})}>SUPERADMIN: {session.name}</span>
+      </div>
+
+      {/* Stats */}
+      {stats&&<div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(160px,1fr))",gap:12,marginBottom:24}}>
+        {[
+          {lb:"Total negocios", val:stats.total_tenants, ic:"🏢"},
+          {lb:"Negocios activos", val:stats.active_tenants, ic:"✅"},
+          {lb:"Usuarios activos", val:stats.total_users, ic:"👥"},
+          {lb:"Ingresos 30d", val:"Q "+Number(stats.revenue_30d||0).toLocaleString("es-GT",{minimumFractionDigits:2}), ic:"💰"},
+        ].map(function(s){ return <div key={s.lb} style={Object.assign({},sC,{padding:"16px 20px"})}>
+          <div style={{fontSize:24,marginBottom:4}}>{s.ic}</div>
+          <div style={{fontSize:22,fontWeight:800,color:NAVY}}>{s.val}</div>
+          <div style={{fontSize:11,color:"#888",marginTop:2}}>{s.lb}</div>
+        </div>; })}
+      </div>}
+
+      {/* Tabs */}
+      <div style={{display:"flex",gap:8,marginBottom:20}}>
+        {[["tenants","🏢 Negocios"],["crear","➕ Nuevo negocio"]].map(function(t){ return <button key={t[0]} onClick={function(){setTab(t[0]);}} style={{padding:"8px 18px",borderRadius:20,border:"none",background:tab===t[0]?TEAL:"#e8e8e8",color:tab===t[0]?"#fff":"#333",fontWeight:tab===t[0]?700:400,fontSize:13,cursor:"pointer"}}>{t[1]}</button>; })}
+      </div>
+
+      {/* Lista de tenants */}
+      {tab==="tenants"&&<div>
+        {loading?<p style={{color:"#888",textAlign:"center",padding:40}}>Cargando…</p>:
+        tenants.length===0?<p style={{color:"#888",textAlign:"center",padding:40}}>Sin negocios registrados</p>:
+        <div style={{overflowX:"auto"}}>
+          <table style={{width:"100%",borderCollapse:"collapse"}}>
+            <thead>
+              <tr>{["Negocio","Plan","Usuarios","Email","Estado","Acciones"].map(function(h){ return <th key={h} style={sTH}>{h}</th>; })}</tr>
+            </thead>
+            <tbody>
+              {tenants.map(function(t){ return <tr key={t.id} style={{borderBottom:"1px solid #eee"}}>
+                <td style={sTD}>
+                  <div style={{fontWeight:700,fontSize:13,color:NAVY}}>{t.name}</div>
+                  {t.owner_name&&<div style={{fontSize:11,color:"#888"}}>{t.owner_name}</div>}
+                  <div style={{fontSize:10,color:"#bbb",marginTop:2}}>{t.id}</div>
+                </td>
+                <td style={sTD}><span style={Object.assign({},mBg(PLAN_COLOR[t.plan]||"#888"),{fontSize:11})}>{PLANS[t.plan]||t.plan}</span></td>
+                <td style={sTD}><span style={{fontWeight:700,color:NAVY}}>{t.user_count||0}</span></td>
+                <td style={sTD}><span style={{fontSize:12,color:"#666"}}>{t.email||"—"}</span></td>
+                <td style={sTD}><span style={Object.assign({},mBg(t.active?TEAL:"#ccc"),{fontSize:11})}>{t.active?"Activo":"Inactivo"}</span></td>
+                <td style={sTD}>
+                  <button onClick={function(){ toggleActive(t); }} style={{padding:"5px 12px",borderRadius:6,border:"1px solid #ddd",background:"#fff",fontSize:12,cursor:"pointer",color:t.active?"#E24B4A":TEAL,fontWeight:600}}>
+                    {t.active?"Desactivar":"Activar"}
+                  </button>
+                </td>
+              </tr>; })}
+            </tbody>
+          </table>
+        </div>}
+      </div>}
+
+      {/* Crear tenant */}
+      {tab==="crear"&&<div style={Object.assign({},sC,{maxWidth:520,padding:28})}>
+        <h3 style={{margin:"0 0 20px",fontSize:16,fontWeight:700,color:NAVY}}>➕ Registrar nuevo negocio</h3>
+        <label style={{display:"block",fontSize:12,fontWeight:600,color:"#555",marginBottom:4}}>Nombre del negocio *</label>
+        <input value={fName} onChange={function(e){setFName(e.target.value);}} style={Object.assign({},sI,{marginBottom:12})} placeholder="Ej: Celulería Pérez"/>
+        <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:12,marginBottom:12}}>
+          <div>
+            <label style={{display:"block",fontSize:12,fontWeight:600,color:"#555",marginBottom:4}}>Plan *</label>
+            <select value={fPlan} onChange={function(e){setFPlan(e.target.value);}} style={sI}>
+              <option value="basic">Básico</option>
+              <option value="professional">Profesional</option>
+              <option value="enterprise">Empresarial</option>
+            </select>
+          </div>
+          <div>
+            <label style={{display:"block",fontSize:12,fontWeight:600,color:"#555",marginBottom:4}}>Nombre del propietario</label>
+            <input value={fOwner} onChange={function(e){setFOwner(e.target.value);}} style={sI} placeholder="Carlos López"/>
+          </div>
+        </div>
+        <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:12,marginBottom:12}}>
+          <div>
+            <label style={{display:"block",fontSize:12,fontWeight:600,color:"#555",marginBottom:4}}>Email del negocio</label>
+            <input type="email" value={fEmail} onChange={function(e){setFEmail(e.target.value);}} style={sI} placeholder="negocio@email.com"/>
+          </div>
+          <div>
+            <label style={{display:"block",fontSize:12,fontWeight:600,color:"#555",marginBottom:4}}>Teléfono</label>
+            <input value={fPhone} onChange={function(e){setFPhone(e.target.value);}} style={sI} placeholder="55551234"/>
+          </div>
+        </div>
+        <div style={{background:"#f0f9f5",borderRadius:10,padding:"14px 16px",marginBottom:16}}>
+          <p style={{margin:"0 0 10px",fontSize:12,fontWeight:700,color:TEAL}}>🔑 Credenciales del admin del negocio</p>
+          <label style={{display:"block",fontSize:12,fontWeight:600,color:"#555",marginBottom:4}}>Email admin *</label>
+          <input type="email" value={fAdminEmail} onChange={function(e){setFAdminEmail(e.target.value);}} style={Object.assign({},sI,{marginBottom:10})} placeholder="admin@negocio.com"/>
+          <label style={{display:"block",fontSize:12,fontWeight:600,color:"#555",marginBottom:4}}>Contraseña inicial *</label>
+          <input type="password" value={fAdminPass} onChange={function(e){setFAdminPass(e.target.value);}} style={sI} placeholder="Mínimo 6 caracteres"/>
+        </div>
+        <button onClick={createTenant} disabled={saving||!fName||!fAdminEmail||!fAdminPass} style={Object.assign({},mB(TEAL),{width:"100%",padding:"13px",fontSize:15,opacity:saving||!fName||!fAdminEmail||!fAdminPass?0.6:1})}>
+          {saving?"Creando…":"Crear negocio ✓"}
+        </button>
+      </div>}
+    </div>
+  );
+}
+
+/* ══════════════════════════════════════════════════════════════════════
    ONBOARDING WIZARD
    ══════════════════════════════════════════════════════════════════════ */
 function OnboardingWizard(props){
@@ -4730,6 +4893,19 @@ function App(props) {
   var pqs={};
   sales.forEach(function(s){(s.items||[]).forEach(function(i){pqs[i.name]=(pqs[i.name]||0)+i.qty;});});
   var top5=Object.keys(pqs).map(function(k){return [k,pqs[k]];}).sort(function(a,b){return b[1]-a[1];}).slice(0,5);
+
+  // Superadmin: vista dedicada sin sidebar ni módulos POS
+  if(session.role==="superadmin"){
+    return (
+      <div style={{minHeight:"100vh",background:"var(--bg-main,#eceae4)"}}>
+        <div style={{background:NAVY,padding:"12px 24px",display:"flex",alignItems:"center",justifyContent:"space-between"}}>
+          <span style={{color:"#fff",fontWeight:800,fontSize:16}}>🏢 MUNDO CEL DIAZ — Panel de Control</span>
+          <button onClick={onLogout} style={{background:"transparent",border:"1px solid rgba(255,255,255,0.3)",color:"#fff",padding:"6px 14px",borderRadius:6,cursor:"pointer",fontSize:13}}>Cerrar sesión</button>
+        </div>
+        <SuperAdminPanel session={session}/>
+      </div>
+    );
+  }
 
   return (
       <div style={{display:"flex",minHeight:"100vh",background:"var(--bg-main,#eceae4)"}}>
