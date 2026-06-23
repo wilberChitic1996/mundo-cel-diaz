@@ -480,16 +480,20 @@ function LoginScreen(props) {
         onLogin(createSession({id:apiResp.user.id,name:apiResp.user.name,email:apiResp.user.email,role:apiResp.user.role}));
         return;
       }
-    } catch(e){ console.warn("API no disponible, intentando local:",e); }
-    var users=await db.load(UK,[]);
-    var user=(users||[]).find(function(u){return u.email.toLowerCase()===email.trim().toLowerCase()&&u.active;});
-    if(!user){var na=attempts+1;setAttempts(na);if(na>=5){setBlocked(true);setErr("5 intentos fallidos — bloqueado 5 minutos.");setTimeout(function(){setBlocked(false);setAttempts(0);setErr("");},5*60*1000);}else{setErr("Email o contraseña incorrectos. Intentos: "+(5-na));}setLoading(false);return;}
-    var hash=await hashPass(pass);
-    if(hash!==user.passwordHash){var na2=attempts+1;setAttempts(na2);if(na2>=5){setBlocked(true);setErr("5 intentos fallidos — bloqueado 5 minutos.");setTimeout(function(){setBlocked(false);setAttempts(0);setErr("");},5*60*1000);}else{setErr("Contraseña incorrecta. Intentos restantes: "+(5-na2));}setLoading(false);return;}
-    var updated=(users||[]).map(function(u){return u.id===user.id?Object.assign({},u,{lastLogin:new Date().toISOString()}):u;});
-    await db.save(UK,updated);
-    setLoading(false);
-    onLogin(createSession(user));
+      setLoading(false);
+      setErr("Error inesperado. Intenta de nuevo.");
+    } catch(e){
+      setLoading(false);
+      var msg=(e&&e.error)?e.error:(e&&e.message)?e.message:"";
+      var isNetwork=!msg||msg.toLowerCase().includes("network")||msg.toLowerCase().includes("conexion")||msg.toLowerCase().includes("fetch")||msg.toLowerCase().includes("failed");
+      if(isNetwork){
+        setErr("Sin conexión al servidor. Verifica tu internet e intenta de nuevo.");
+      } else {
+        var na=attempts+1;setAttempts(na);
+        if(na>=5){setBlocked(true);setErr("5 intentos fallidos — bloqueado 5 minutos.");setTimeout(function(){setBlocked(false);setAttempts(0);setErr("");},5*60*1000);}
+        else{setErr((msg||"Email o contraseña incorrectos.")+" Intentos restantes: "+(5-na));}
+      }
+    }
   }
   async function doFindUser(){
     setRecErr("");
