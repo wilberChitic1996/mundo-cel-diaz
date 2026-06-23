@@ -1339,6 +1339,11 @@ function DashboardScreen(props) {
 
   var hasAlerts=repsVencidas.length>0||stockCero.length>0||cuentasVencidas.length>0||warPorVencer.length>0;
 
+  // Recordatorio de respaldo semanal
+  var lastBackupTs=null; try{ lastBackupTs=localStorage.getItem("mnpos-last-backup"); }catch(e){}
+  var backupDaysSince=lastBackupTs?Math.floor((new Date()-new Date(lastBackupTs))/86400000):null;
+  var needsBackupAlert=backupDaysSince===null||backupDaysSince>=7;
+
   // Tooltip personalizado para gráficas
   function CustomTooltipIngresos(p){
     if(!p.active||!p.payload||!p.payload.length) return null;
@@ -1378,6 +1383,12 @@ function DashboardScreen(props) {
           </div>
         </div>
       )}
+
+      {/* Recordatorio respaldo */}
+      {needsBackupAlert&&<div style={{background:"#FFF8E6",border:"1px solid #F5C842",borderRadius:10,padding:"10px 16px",marginBottom:14,display:"flex",alignItems:"center",justifyContent:"space-between",gap:12,flexWrap:"wrap"}}>
+        <span style={{fontSize:13,color:"#7A5000"}}>💾 {lastBackupTs?"Hace "+backupDaysSince+" días sin respaldo — ":"Sin respaldo registrado — "}se recomienda respaldar semanalmente.</span>
+        <span style={{fontSize:12,color:"#7A5000",fontWeight:600,cursor:"pointer",textDecoration:"underline"}} onClick={function(){props.setView&&props.setView("backup");}}>Ir a Respaldo →</span>
+      </div>}
 
       {/* KPIs */}
       <div className="rg-4" style={{display:"grid",gridTemplateColumns:"repeat(4,1fr)",gap:14,marginBottom:16}}>
@@ -1656,6 +1667,8 @@ function CajaScreen(props) {
         setShowCierre(false);
         setEfectivoContado(""); setNotaCierre("");
         setSaving(false);
+        // Auto-respaldo al cerrar caja
+        exportExcel().catch(function(){});
       }).catch(function(e){
         alert(e&&e.error?e.error:"Error al cerrar caja");
         setSaving(false);
@@ -3354,59 +3367,103 @@ function HistoryScreen(props) {
 
 /* ── Respaldo ── */
 function BackupScreen(props) {
-  var products=props.products; var sales=props.sales;
-  var accounts=props.accounts; var returns=props.returns; var defectives=props.defectives;
-  var onExportJSON=props.onExportJSON; var onExportExcel=props.onExportExcel; var onImport=props.onImport;
+  var products=props.products||[]; var sales=props.sales||[];
+  var accounts=props.accounts||[]; var returns=props.returns||[]; var defectives=props.defectives||[];
+  var clients=props.clients||[]; var repairs=props.repairs||[]; var warranties=props.warranties||[];
+  var onExportJSON=props.onExportJSON; var onExportExcel=props.onExportExcel;
   var _m=useState(""); var msg=_m[0]; var setMsg=_m[1];
-  var _i=useState(false); var importing=_i[0]; var setImporting=_i[1];
-  var lastBackup=null; try{ lastBackup=JSON.parse(localStorage.getItem("mnpos-last-backup")); }catch(e){}
-  var sizeKB=Math.round(JSON.stringify({products:products,sales:sales,accounts:accounts,returns:returns,defectives:defectives}).length/1024);
-  var bm={ok:{bg:"#EAF3DE",border:"#97C459",color:"#27500A",text:"✓ Descargado correctamente"},imported:{bg:"#EAF3DE",border:"#97C459",color:"#27500A",text:"✓ Datos restaurados"},error:{bg:"#FCEBEB",border:"#F09595",color:"#791F1F",text:"✗ Archivo inválido"}}[msg];
-  function doImport(file){
-    if(!file)return;
-    setImporting(true);
-    var reader=new FileReader();
-    reader.onload=function(e){
-      var ok=onImport(e.target.result);
-      setMsg(ok?"imported":"error");
-      setImporting(false);
-      setTimeout(function(){setMsg("");},4000);
-    };
-    reader.readAsText(file);
+  var _busy=useState(false); var busy=_busy[0]; var setBusy=_busy[1];
+
+  var lastBackupStr=null;
+  try{ lastBackupStr=localStorage.getItem("mnpos-last-backup"); }catch(e){}
+  var lastBackup=lastBackupStr?new Date(lastBackupStr):null;
+  var daysSince=lastBackup?Math.floor((new Date()-lastBackup)/86400000):null;
+  var needsBackup=daysSince===null||daysSince>=7;
+
+  var bm={ok:{bg:"#EAF3DE",border:"#97C459",color:"#27500A",text:"✓ Respaldo descargado correctamente"},error:{bg:"#FCEBEB",border:"#F09595",color:"#791F1F",text:"✗ Error al generar respaldo"}}[msg];
+
+  async function doExcelFull(){
+    setBusy(true);
+    try { await onExportExcel(); setMsg("ok"); } catch(e){ setMsg("error"); }
+    setBusy(false);
+    setTimeout(function(){setMsg("");},3500);
   }
-  function doExportJSON(){ onExportJSON(); setMsg("ok"); setTimeout(function(){setMsg("");},3000); }
+  async function doJSON(){
+    setBusy(true);
+    try { await onExportJSON(); setMsg("ok"); } catch(e){ setMsg("error"); }
+    setBusy(false);
+    setTimeout(function(){setMsg("");},3500);
+  }
+
+  var metrics=[
+    {lb:"Productos",    val:products.length,    c:TEAL},
+    {lb:"Clientes",     val:clients.length,     c:"#378ADD"},
+    {lb:"Ventas",       val:sales.length,       c:"#7F77DD"},
+    {lb:"Reparaciones", val:repairs.length,     c:"#E65100"},
+    {lb:"Garantías",    val:warranties.length,  c:"#27AE60"},
+    {lb:"Cuentas",      val:accounts.length,    c:"#8E44AD"},
+    {lb:"Devoluciones", val:returns.length,     c:"#E24B4A"},
+    {lb:"Defectuosas",  val:defectives.length,  c:"#999"},
+  ];
+
   return (
-      <div>
-        <p style={H1}>💾 Respaldo y Exportación</p>
-        {bm&&<div style={{background:bm.bg,border:"1px solid "+bm.border,borderRadius:8,padding:"10px 16px",marginBottom:20,color:bm.color,fontSize:14,fontWeight:500}}>{bm.text}</div>}
-        <div style={{display:"grid",gridTemplateColumns:"repeat(6,1fr)",gap:14,marginBottom:24}}>
-          <MetricBox label="Productos"    value={products.length}                  color={TEAL}/>
-          <MetricBox label="Clientes"     value={props.clients?props.clients.length:0}  color="#378ADD"/>
-          <MetricBox label="Ventas"       value={sales.length}                     color="#7F77DD"/>
-          <MetricBox label="Reparaciones" value={props.repairs?props.repairs.length:0}  color="#E65100"/>
-          <MetricBox label="Defectuosas"  value={defectives.length}                color="#E24B4A"/>
-          <MetricBox label="Tamaño data"  value={sizeKB+" KB"}                    color="#666"/>
+    <div>
+      <p style={H1}>💾 Respaldo y Exportación</p>
+
+      {/* Alerta si no hay respaldo reciente */}
+      {needsBackup&&<div style={{background:"#FFF8E6",border:"1px solid #F5C842",borderRadius:10,padding:"12px 18px",marginBottom:20,display:"flex",alignItems:"center",gap:12}}>
+        <span style={{fontSize:22}}>⚠️</span>
+        <div>
+          <p style={{margin:0,fontWeight:700,fontSize:14,color:"#7A5000"}}>{lastBackup?"Hace "+daysSince+" días sin respaldo":"Sin respaldo registrado"}</p>
+          <p style={{margin:"3px 0 0",fontSize:12,color:"#7A5000"}}>Se recomienda respaldar al menos una vez por semana.</p>
         </div>
-        <div style={Object.assign({},sC,{marginBottom:20,borderLeft:"4px solid "+TEAL})}>
-          <p style={{fontWeight:700,fontSize:16,margin:"0 0 6px"}}>📊 Exportar a Excel (.xlsx)</p>
-          <p style={{fontSize:13,color:"#666",margin:"0 0 10px",lineHeight:1.6}}>8 hojas: Resumen · Ventas · Detalle Ventas · Cuentas · Historial Pagos · Devoluciones · Piezas Defectuosas · Inventario.</p>
-          <button style={Object.assign({},mB("teal"),{padding:"11px 28px",fontSize:14})} onClick={onExportExcel}>📊 Descargar Excel</button>
-        </div>
-        <div style={Object.assign({},sC,{marginBottom:20,borderLeft:"4px solid #378ADD"})}>
-          <p style={{fontWeight:700,fontSize:16,margin:"0 0 6px"}}>💾 Respaldo completo (.json)</p>
-          <p style={{fontSize:13,color:"#666",margin:"0 0 12px",lineHeight:1.6}}>Toda la base de datos incluyendo piezas defectuosas.</p>
-          {lastBackup&&<p style={{fontSize:12,color:"#999",margin:"0 0 12px"}}>Último respaldo: {fmtD(lastBackup)} a las {fmtT(lastBackup)}</p>}
-          <button style={Object.assign({},mB("blue"),{padding:"11px 28px",fontSize:14})} onClick={doExportJSON}>💾 Descargar .json</button>
-        </div>
-        <div style={Object.assign({},sC,{marginBottom:20,borderLeft:"4px solid #7F77DD"})}>
-          <p style={{fontWeight:700,fontSize:16,margin:"0 0 6px"}}>📥 Restaurar desde respaldo</p>
-          <div style={{background:"#FAEEDA",border:"1px solid #EF9F27",borderRadius:8,padding:"8px 14px",marginBottom:14,fontSize:13,color:"#633806"}}>⚠ Esto reemplaza los datos actuales.</div>
-          <label style={{display:"inline-block",padding:"10px 22px",borderRadius:8,background:importing?"#ccc":"#7F77DD",color:"#fff",cursor:importing?"not-allowed":"pointer",fontSize:14,fontWeight:500}}>
-            {importing?"Procesando...":"📂 Seleccionar archivo .json"}
-            <input type="file" accept=".json" style={{display:"none"}} onChange={function(e){doImport(e.target.files[0]);}}/>
-          </label>
-        </div>
+      </div>}
+
+      {bm&&<div style={{background:bm.bg,border:"1px solid "+bm.border,borderRadius:8,padding:"10px 16px",marginBottom:16,color:bm.color,fontSize:14,fontWeight:500}}>{bm.text}</div>}
+
+      {/* Métricas de lo que se va a respaldar */}
+      <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fill,minmax(130px,1fr))",gap:12,marginBottom:24}}>
+        {metrics.map(function(m){ return <div key={m.lb} style={Object.assign({},sC,{padding:"12px 16px"})}>
+          <div style={{fontSize:20,fontWeight:800,color:m.c}}>{m.val}</div>
+          <div style={{fontSize:11,color:"#888",marginTop:2}}>{m.lb}</div>
+        </div>; })}
       </div>
+
+      {/* Último respaldo */}
+      {lastBackup&&<div style={{background:"#f0f9f5",borderRadius:8,padding:"10px 16px",marginBottom:20,fontSize:13,color:"#444"}}>
+        🕐 Último respaldo: <b>{fmtD(lastBackup)}</b> a las <b>{fmtT(lastBackup)}</b>
+        {daysSince===0&&<span style={{marginLeft:8,color:TEAL,fontWeight:700}}>✓ Al día</span>}
+      </div>}
+
+      {/* Excel completo */}
+      <div style={Object.assign({},sC,{marginBottom:16,borderLeft:"4px solid "+TEAL})}>
+        <p style={{fontWeight:700,fontSize:15,margin:"0 0 6px"}}>📊 Exportar a Excel completo (.xlsx)</p>
+        <p style={{fontSize:13,color:"#666",margin:"0 0 12px",lineHeight:1.6}}>
+          11 hojas: Resumen · Ventas · Detalle Ventas · Cuentas · Pagos · Devoluciones · Inventario · Clientes · Reparaciones · Garantías · Proveedores y Compras.
+        </p>
+        <button style={Object.assign({},mB("teal"),{padding:"11px 28px",fontSize:14,opacity:busy?0.6:1})} onClick={doExcelFull} disabled={busy}>
+          {busy?"Generando…":"📊 Descargar Excel"}
+        </button>
+      </div>
+
+      {/* JSON */}
+      <div style={Object.assign({},sC,{marginBottom:16,borderLeft:"4px solid #378ADD"})}>
+        <p style={{fontWeight:700,fontSize:15,margin:"0 0 6px"}}>💾 Respaldo completo (.json)</p>
+        <p style={{fontSize:13,color:"#666",margin:"0 0 12px",lineHeight:1.6}}>
+          Archivo con todos los datos del sistema. Útil para migración o auditoría externa.
+        </p>
+        <button style={Object.assign({},mB("blue"),{padding:"11px 28px",fontSize:14,opacity:busy?0.6:1})} onClick={doJSON} disabled={busy}>
+          {busy?"Generando…":"💾 Descargar .json"}
+        </button>
+      </div>
+
+      {/* Nota sobre restauración */}
+      <div style={{background:"#f5f4f0",borderRadius:10,padding:"14px 18px",border:"1px solid #e0ddd7"}}>
+        <p style={{margin:0,fontSize:13,color:"#888",lineHeight:1.6}}>
+          ℹ️ <b>¿Cómo funciona el respaldo?</b> Tus datos están almacenados de forma segura en la nube (Supabase). Este respaldo es una copia local para tu propio resguardo. Para restaurar datos ante un problema, contactá al administrador del sistema.
+        </p>
+      </div>
+    </div>
   );
 }
 
@@ -5150,32 +5207,89 @@ function App(props) {
     else { setClients(function(p){return p.concat([obj]);}); }
   }
 
-  function exportJSON(){
-    var data={version:"2.1",exportDate:new Date().toISOString(),negocio:"MUNDO CEL DIAZ",products:products,sales:sales,accounts:accounts,returns:returns,defectives:defectives,clients:clients,repairs:repairs};
+  async function exportJSON(){
+    var now=new Date();
+    var [prods,sls,accs,rets,defs,clis,reps,wars,sups,purs]=await Promise.all([
+      productsAPI.getAll().catch(function(){return products;}),
+      salesAPI.getAll().catch(function(){return [];}),
+      accountsAPI.getAll().catch(function(){return [];}),
+      returnsAPI.getAll().catch(function(){return [];}),
+      defectivesAPI.getAll().catch(function(){return [];}),
+      clientsAPI.getAll().catch(function(){return [];}),
+      repairsAPI.getAll().catch(function(){return [];}),
+      warrantiesAPI.getAll().catch(function(){return [];}),
+      suppliersAPI.getAll().catch(function(){return [];}),
+      suppliersAPI.getPurchases().catch(function(){return [];}),
+    ]);
+    var data={version:"2.2",exportDate:now.toISOString(),negocio:getStore().store_name||"MUNDO CEL DIAZ",products:prods,sales:sls,accounts:accs,returns:rets,defectives:defs,clients:clis,repairs:reps,warranties:wars,suppliers:sups,purchases:purs};
     var blob=new Blob([JSON.stringify(data,null,2)],{type:"application/json"});
     var url=URL.createObjectURL(blob);
-    var a=document.createElement("a");a.href=url;a.download="MundoCelDiaz_backup_"+new Date().toISOString().slice(0,10)+".json";
+    var a=document.createElement("a");a.href=url;a.download=(getStore().store_name||"backup").replace(/\s+/g,"_")+"_"+now.toISOString().slice(0,10)+".json";
     document.body.appendChild(a);a.click();document.body.removeChild(a);URL.revokeObjectURL(url);
-    db.save("mnpos-last-backup",new Date().toISOString());
+    localStorage.setItem("mnpos-last-backup",now.toISOString());
   }
 
-  function exportExcel(){
-    var wb=XLSX.utils.book_new();
+  async function exportExcel(){
     var now=new Date();
-    var pendAcc=accounts.filter(function(a){return a.status!=="pagado";});
-    var totalReemb=returns.filter(function(r){return r.refundAmount>0;}).reduce(function(s,r){return s+r.refundAmount;},0);
-    XLSX.utils.book_append_sheet(wb,XLSX.utils.aoa_to_sheet([["MUNDO CEL DIAZ — Reporte v2.1"],["Generado:",fmtD(now)+" "+fmtT(now)],[],["CLIENTES"],["Total clientes",clients.length],[],["VENTAS"],["Total ventas",sales.length],["Ingresos totales (Q)",sales.reduce(function(s,x){return s+x.total;},0)],[],["CUENTAS"],["Cuentas activas",pendAcc.length],["Por cobrar (Q)",pendAcc.reduce(function(s,a){return s+a.balance;},0)],[],["DEVOLUCIONES"],["Total devoluciones",returns.length],["Total reembolsado (Q)",totalReemb],[],["PIEZAS DEFECTUOSAS"],["En revisión",defectives.filter(function(d){return d.status==="defectuoso";}).length],["Dados de baja",defectives.filter(function(d){return d.status==="dado_de_baja";}).length]]),"Resumen");
-    XLSX.utils.book_append_sheet(wb,XLSX.utils.aoa_to_sheet([["ID","Fecha","Cliente","Método","Total (Q)"]].concat(sales.map(function(s){return [s.id,fmtD(s.date),s.client,s.method,s.total];}))),"Ventas");
-    XLSX.utils.book_append_sheet(wb,XLSX.utils.aoa_to_sheet([["ID Venta","Fecha","Cliente","Código","Producto","Cant.","Precio","Subtotal"]].concat(sales.reduce(function(arr,s){return arr.concat((s.items||[]).map(function(it){return [s.id,fmtD(s.date),s.client,it.code,it.name,it.qty,it.price,it.price*it.qty];}));},[]))),  "Detalle Ventas");
-    XLSX.utils.book_append_sheet(wb,XLSX.utils.aoa_to_sheet([["ID","Fecha","Cliente","Total","Pagado","Saldo","Estado"]].concat(accounts.map(function(a){return [a.id,fmtD(a.date),a.client,a.total,a.paid,a.balance,a.status];}))),"Cuentas");
-    var pmts=accounts.reduce(function(arr,a){return arr.concat((a.payments||[]).map(function(p){return [a.id,a.client,fmtD(p.date),p.amount,p.method,p.note||""];}));},[]);
-    XLSX.utils.book_append_sheet(wb,XLSX.utils.aoa_to_sheet([["ID Cuenta","Cliente","Fecha","Monto","Método","Nota"]].concat(pmts)),"Historial Pagos");
-    XLSX.utils.book_append_sheet(wb,XLSX.utils.aoa_to_sheet([["ID","Fecha","Cliente","Motivo","Estado artículo","Reembolso","Monto reemb.","Valor artícs."]].concat(returns.map(function(r){return [r.id,fmtD(r.date),r.client,r.reason,r.itemCondition||"bueno",r.refundMethod,r.refundAmount||0,r.total];}))),"Devoluciones");
-    XLSX.utils.book_append_sheet(wb,XLSX.utils.aoa_to_sheet([["ID","Fecha","Código","Pieza","Cant.","Precio","Motivo","Estado"]].concat(defectives.map(function(d){return [d.id,fmtD(d.date),d.code,d.name,d.qty,d.price,d.reason,d.status];}))),"Piezas Defectuosas");
-    XLSX.utils.book_append_sheet(wb,XLSX.utils.aoa_to_sheet([["Código","Nombre","DPI","Teléfono","Dirección","Fecha registro"]].concat(clients.map(function(c){return [c.cliCode||"",c.name||"",c.dpi||"",c.phone||"",c.address||"",c.createdAt?fmtD(c.createdAt):""];}))),"Clientes");
-    XLSX.utils.book_append_sheet(wb,XLSX.utils.aoa_to_sheet([["Código","Nombre","Categoría","Estantería","Stock","Precio","Costo","Margen"]].concat(products.slice().sort(function(a,b){return a.code.localeCompare(b.code);}).map(function(p){var mg=p.cost>0?Math.round((p.price-p.cost)/p.price*100)+"%" :"N/A";return [p.code,p.name,p.category,p.shelf,p.unit==="serv"?"N/A":p.stock,p.price,p.cost,mg];}))),"Inventario");
-    XLSX.writeFile(wb,"MundoCelDiaz_"+now.toISOString().slice(0,10)+".xlsx");
-    showFlash("✓ Excel descargado","ok");
+    var [prods,sls,accs,rets,defs,clis,reps,wars,sups,purs]=await Promise.all([
+      productsAPI.getAll().catch(function(){return products;}),
+      salesAPI.getAll().catch(function(){return [];}),
+      accountsAPI.getAll().catch(function(){return [];}),
+      returnsAPI.getAll().catch(function(){return [];}),
+      defectivesAPI.getAll().catch(function(){return [];}),
+      clientsAPI.getAll().catch(function(){return [];}),
+      repairsAPI.getAll().catch(function(){return [];}),
+      warrantiesAPI.getAll().catch(function(){return [];}),
+      suppliersAPI.getAll().catch(function(){return [];}),
+      suppliersAPI.getPurchases().catch(function(){return [];}),
+    ]);
+    var wb=XLSX.utils.book_new();
+    var storeName=getStore().store_name||"MUNDO CEL DIAZ";
+    var pendAcc=(accs||[]).filter(function(a){return a.status!=="pagado";});
+    var totalReemb=(rets||[]).reduce(function(s,r){return s+Number(r.refund_amount||r.refundAmount||0);},0);
+    // Resumen
+    XLSX.utils.book_append_sheet(wb,XLSX.utils.aoa_to_sheet([
+      [storeName+" — Reporte Completo"],["Generado:",fmtD(now)+" "+fmtT(now)],[],
+      ["MÓDULO","CANTIDAD","DETALLE"],
+      ["Productos",(prods||[]).length,""],
+      ["Clientes",(clis||[]).length,""],
+      ["Ventas",(sls||[]).length,"Total Q "+(sls||[]).reduce(function(s,x){return s+Number(x.total||0);},0).toFixed(2)],
+      ["Cuentas activas",pendAcc.length,"Por cobrar Q "+pendAcc.reduce(function(s,a){return s+Number(a.balance||0);},0).toFixed(2)],
+      ["Devoluciones",(rets||[]).length,"Reembolsado Q "+totalReemb.toFixed(2)],
+      ["Reparaciones",(reps||[]).length,""],
+      ["Garantías",(wars||[]).length,""],
+      ["Proveedores",(sups||[]).length,""],
+      ["Compras",(purs||[]).length,"Total Q "+(purs||[]).reduce(function(s,p){return s+Number(p.total||0);},0).toFixed(2)],
+      ["Piezas defectuosas",(defs||[]).length,""],
+    ]),"Resumen");
+    // Ventas
+    XLSX.utils.book_append_sheet(wb,XLSX.utils.aoa_to_sheet([["ID","Fecha","Cliente","Método","Total (Q)","Registrado por"]].concat((sls||[]).map(function(s){return [s.id,fmtD(s.created_at||s.date),s.client,s.method,Number(s.total||0).toFixed(2),(s.registrado_por&&s.registrado_por.name)||""];}))),"Ventas");
+    // Detalle ventas
+    XLSX.utils.book_append_sheet(wb,XLSX.utils.aoa_to_sheet([["ID Venta","Fecha","Cliente","Código","Producto","Cant.","Precio","Subtotal"]].concat((sls||[]).reduce(function(arr,s){return arr.concat(((s.sale_items||s.items)||[]).map(function(it){return [s.id,fmtD(s.created_at||s.date),s.client,it.code||"",it.name,it.qty,Number(it.price||0).toFixed(2),(Number(it.price||0)*Number(it.qty||0)).toFixed(2)];}));},[]))),  "Detalle Ventas");
+    // Cuentas
+    XLSX.utils.book_append_sheet(wb,XLSX.utils.aoa_to_sheet([["ID","Fecha","Cliente","Total","Pagado","Saldo","Estado"]].concat((accs||[]).map(function(a){return [a.id,fmtD(a.created_at||a.date),a.client,Number(a.total||0).toFixed(2),Number(a.paid||0).toFixed(2),Number(a.balance||0).toFixed(2),a.status||""];}))),"Cuentas");
+    // Pagos
+    var pmts=(accs||[]).reduce(function(arr,a){return arr.concat(((a.account_payments||a.payments)||[]).map(function(p){return [a.id,a.client,fmtD(p.date||p.created_at),Number(p.amount||0).toFixed(2),p.method||"",p.note||""];}));},[]);
+    XLSX.utils.book_append_sheet(wb,XLSX.utils.aoa_to_sheet([["ID Cuenta","Cliente","Fecha Pago","Monto","Método","Nota"]].concat(pmts)),"Historial Pagos");
+    // Devoluciones
+    XLSX.utils.book_append_sheet(wb,XLSX.utils.aoa_to_sheet([["ID","Fecha","Cliente","Motivo","Condición","Método reemb.","Monto reemb."]].concat((rets||[]).map(function(r){return [r.id,fmtD(r.created_at||r.date),r.client,r.reason||"",r.item_condition||r.itemCondition||"",r.refund_method||r.refundMethod||"",Number(r.refund_amount||r.refundAmount||0).toFixed(2)];}))),"Devoluciones");
+    // Inventario
+    XLSX.utils.book_append_sheet(wb,XLSX.utils.aoa_to_sheet([["Código","Nombre","Categoría","Estantería","Stock","Precio","Costo","Margen"]].concat((prods||[]).slice().sort(function(a,b){return (a.code||"").localeCompare(b.code||"");}).map(function(p){var mg=p.cost>0?Math.round((p.price-p.cost)/p.price*100)+"%":"N/A";return [p.code,p.name,p.category||"",p.shelf||"",p.unit==="serv"?"Servicio":p.stock,Number(p.price||0).toFixed(2),Number(p.cost||0).toFixed(2),mg];}))),"Inventario");
+    // Clientes
+    XLSX.utils.book_append_sheet(wb,XLSX.utils.aoa_to_sheet([["Código","Nombre","DPI","Teléfono","Dirección","Fecha registro"]].concat((clis||[]).map(function(c){return [c.cli_code||c.cliCode||"",c.name||"",c.dpi||"",c.phone||"",c.address||"",fmtD(c.created_at||c.createdAt||"")];}))),"Clientes");
+    // Reparaciones
+    XLSX.utils.book_append_sheet(wb,XLSX.utils.aoa_to_sheet([["Código","Fecha","Cliente","Teléfono","Marca","Modelo","Problema","Técnico","Costo","Estado"]].concat((reps||[]).map(function(r){return [r.rep_code||r.repCode||"",fmtD(r.created_at||r.date||""),r.client_name||r.clientName||"",r.client_phone||r.clientPhone||"",r.brand||"",r.model||"",r.problem||"",r.tech_name||r.techName||r.tech||"",Number(r.estimated_cost||r.estimatedCost||r.cost||0).toFixed(2),r.status||""];}))),"Reparaciones");
+    // Garantías
+    XLSX.utils.book_append_sheet(wb,XLSX.utils.aoa_to_sheet([["ID","Tipo","Descripción","Cliente","Inicio","Vence","Estado"]].concat((wars||[]).map(function(w){return [w.id,w.entity_type||w.entityType||"",w.description||"",w.client_name||"",fmtD(w.start_date||w.startDate||""),fmtD(w.end_date||w.endDate||""),w.status||""];}))),"Garantías");
+    // Proveedores
+    XLSX.utils.book_append_sheet(wb,XLSX.utils.aoa_to_sheet([["Nombre","Teléfono","Email","Dirección","Notas"]].concat((sups||[]).map(function(s){return [s.name||"",s.phone||"",s.email||"",s.address||"",s.notes||""];}))),"Proveedores");
+    // Compras
+    XLSX.utils.book_append_sheet(wb,XLSX.utils.aoa_to_sheet([["ID","Fecha","Proveedor","Artículos","Total","Registrado por"]].concat((purs||[]).map(function(p){return [p.id,fmtD(p.created_at||""),p.supplier_name||"",((p.purchase_items||[]).length),Number(p.total||0).toFixed(2),p.registered_by||""];}))),"Compras");
+    // Piezas defectuosas
+    XLSX.utils.book_append_sheet(wb,XLSX.utils.aoa_to_sheet([["ID","Fecha","Código","Pieza","Cant.","Precio","Motivo","Estado"]].concat((defs||[]).map(function(d){return [d.id,fmtD(d.created_at||d.date||""),d.code||"",d.name,d.qty,Number(d.price||0).toFixed(2),d.reason||"",d.status||""];}))),"Piezas Defectuosas");
+    XLSX.writeFile(wb,storeName.replace(/\s+/g,"_")+"_"+now.toISOString().slice(0,10)+".xlsx");
+    localStorage.setItem("mnpos-last-backup",now.toISOString());
+    showFlash("✓ Excel completo descargado (12 hojas)","ok");
   }
 
   function importData(text){
@@ -5275,7 +5389,7 @@ function App(props) {
           {view==="inventory"&&canAccess(session.role,"inventory")&&<InventoryScreen products={products}/>}
           {view==="history"  &&canAccess(session.role,"history")&&<HistoryScreen sales={sales} selectedSale={selSale} setSelectedSale={setSelSale} accounts={accounts} returns={returns} products={products} session={session} clients={clients}/>}
           {view==="cuadres"  &&canAccess(session.role,"cuadres")&&<CuadresScreen sales={sales} accounts={accounts} returns={returns} products={products} repairs={repairs} session={session}/>}
-          {view==="backup"   &&canAccess(session.role,"backup")&&<BackupScreen products={products} sales={sales} accounts={accounts} returns={returns} defectives={defectives} clients={clients} repairs={repairs} onExportJSON={exportJSON} onExportExcel={exportExcel} onImport={importData}/>}
+          {view==="backup"   &&canAccess(session.role,"backup")&&<BackupScreen products={products} sales={sales} accounts={accounts} returns={returns} defectives={defectives} clients={clients} repairs={repairs} warranties={warranties} onExportJSON={exportJSON} onExportExcel={exportExcel}/>}
           {view==="users"    &&canAccess(session.role,"users")&&<UsersScreen session={session} showFlash={showFlash}/>}
           {view==="clients"  &&canAccess(session.role,"clients")&&<ClientsScreen clients={clients} sales={sales} accounts={accounts} returns={returns} saveClient={saveClient} session={session} showFlash={showFlash}/>}
           {view==="repairs"    &&canAccess(session.role,"repairs")&&<RepairsScreen repairs={repairs} clients={clients} products={products} saveRepair={saveRepair} updateRepairStatus={updateRepairStatus} onCobrar={cobrarReparacion} session={session} showFlash={showFlash} warranties={warranties} saveWarranty={saveWarranty}/>}
