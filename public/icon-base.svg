@@ -1,8 +1,6 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512">
   <rect width="512" height="512" rx="96" fill="#1a2535"/>
-  <rect x="156" y="80" width="200" height="352" rx="24" fill="#1D9E75"/>
-  <rect x="176" y="110" width="160" height="260" rx="8" fill="#1a2535"/>
-  <circle cx="256" cy="396" r="16" fill="#fff" opacity="0.9"/>
-  <text x="256" y="270" font-family="Arial,sans-serif" font-size="80" font-weight="bold" fill="#1D9E75" text-anchor="middle" dominant-baseline="middle">$</text>
-  <text x="256" y="190" font-family="Arial,sans-serif" font-size="32" font-weight="bold" fill="#fff" text-anchor="middle" dominant-baseline="middle">MCD</text>
+  <rect x="80" y="80" width="352" height="352" rx="64" fill="#1D9E75"/>
+  <text x="256" y="290" font-family="Arial,sans-serif" font-size="180" font-weight="900" fill="#fff" text-anchor="middle" dominant-baseline="middle">P</text>
+  <text x="340" y="370" font-family="Arial,sans-serif" font-size="80" font-weight="700" fill="#1a2535" text-anchor="middle" dominant-baseline="middle">G</text>
 </svg>
