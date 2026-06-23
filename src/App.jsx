@@ -5308,85 +5308,54 @@ function App(props) {
 
   useEffect(function(){
     async function loadAll(){
-      // Verificar si el backend esta disponible
       var online = await checkAPI();
       setIsOnline(online);
-
-      if(online){
-        // Modo online: cargar datos desde el API
-        try {
+      try {
         var [prods, sls, accs, rets, defs, clis, reps] = await Promise.all([
-            productsAPI.getAll(),
-            salesAPI.getAll(),
-            accountsAPI.getAll(),
-            returnsAPI.getAll(),
-            defectivesAPI.getAll(),
-            clientsAPI.getAll(),
-            repairsAPI.getAll(),
-          ]);
-          var wars = await warrantiesAPI.getAll().catch(function(){return [];});
-          var cfg  = await settingsAPI.getAll().catch(function(){return {};});
-          if(cfg&&cfg.store_name){ setStoreInfo(function(prev){return Object.assign({},prev,cfg);}); setStore(cfg); }
-          if(session.role==="admin"&&(!cfg||cfg.onboarding_done!=="true")){
-            if((prods||[]).length>0){
-              // negocio ya tiene datos — marcar onboarding como completado silenciosamente
-              settingsAPI.update({onboarding_done:"true"}).catch(function(){});
-            } else {
-              setShowOnboarding(true);
-            }
+          productsAPI.getAll(),
+          salesAPI.getAll(),
+          accountsAPI.getAll(),
+          returnsAPI.getAll(),
+          defectivesAPI.getAll(),
+          clientsAPI.getAll(),
+          repairsAPI.getAll(),
+        ]);
+        var wars = await warrantiesAPI.getAll().catch(function(){return [];});
+        var cfg  = await settingsAPI.getAll().catch(function(){return {};});
+        if(cfg&&cfg.store_name){ setStoreInfo(function(prev){return Object.assign({},prev,cfg);}); setStore(cfg); }
+        if(session.role==="admin"&&(!cfg||cfg.onboarding_done!=="true")){
+          if((prods||[]).length>0){
+            settingsAPI.update({onboarding_done:"true"}).catch(function(){});
+          } else {
+            setShowOnboarding(true);
           }
-          if(session.role!=="superadmin"){
-            adminAPI.getSubscription().then(function(s){ setSubInfo(s); }).catch(function(){});
-          }
-          var normalProds = (prods||[]).map(function(p){return Object.assign({},p,{id:p.id,code:p.code,name:p.name,category:p.category||'',shelf:p.shelf||'',price:Number(p.price),cost:Number(p.cost),stock:Number(p.stock),unit:p.unit||'uni'});});
-          var normalSales = (sls||[]).map(function(s){return Object.assign({},s,{items:s.sale_items||[],total:Number(s.total),date:s.created_at,registradoPor:s.registrado_por||null});});
-          var normalAccs  = (accs||[]).map(function(a){return Object.assign({},a,{items:a.account_items||[],payments:(a.account_payments||[]).map(function(_pp){return Object.assign({},_pp,{date:_pp.date||_pp.created_at,amount:Number(_pp.amount),registradoPor:_pp.registrado_por||_pp.registradoPor||null});}),total:Number(a.total),paid:Number(a.paid),balance:Number(a.balance),date:a.created_at,registradoPor:a.registrado_por||null});});
-          var normalRets  = (rets||[]).map(function(r){return Object.assign({},r,{items:r.return_items||[],refundAmount:Number(r.refund_amount),itemCondition:r.item_condition,refundMethod:r.refund_method,date:r.created_at,saleId:r.sale_id||null});});
-          var normalDefs  = (defs||[]).map(function(d){return Object.assign({},d,{price:Number(d.price||0)});});
-          var normalClis  = (clis||[]).map(function(c){return Object.assign({},c,{cliCode:c.cli_code,createdAt:c.created_at});});
-          var normalReps  = (reps||[]).map(function(r){return Object.assign({},r,{repCode:r.rep_code,clientId:r.client_id,clientName:r.client_name,clientPhone:r.client_phone,clientCli:r.client_cli,problemDesc:r.problem_desc,techName:r.tech_name,estimatedCost:Number(r.estimated_cost||0),promisedDate:r.promised_date,internalNote:r.internal_note,registradoPor:r.registrado_por||{},parts:r.parts||[],createdAt:r.created_at});});
-          setProducts(normalProds);
-          setSales(normalSales);
-          setAccounts(normalAccs);
-          setReturns(normalRets);
-          setDefectives(normalDefs);
-          setClients(normalClis);
-          setRepairs(normalReps);
-          setWarranties((wars||[]).map(function(w){return Object.assign({},w,{entityType:w.entity_type,entityId:w.entity_id,startDate:w.start_date,endDate:w.end_date,createdBy:w.created_by});}));
-        } catch(e) {
-          console.warn("Error cargando del API, usando local:", e);
-          setIsOnline(false);
-          var p2 = await db.load(PK, []);
-          var s2 = await db.load(SK, []);
-          var a2 = await db.load(AK, []);
-          var r2 = await db.load(RK, []);
-          var d2 = await db.load(DFK, []);
-          setProducts(p2); setSales(s2); setAccounts(a2); setReturns(r2); setDefectives(d2);
         }
-      } else {
-        // Modo offline: cargar desde almacenamiento local
-        var p = await db.load(PK, DEMO);
-        var s = await db.load(SK, []);
-        var a = await db.load(AK, []);
-        var r = await db.load(RK, []);
-        var d = await db.load(DFK, []);
-        var cl = await db.load(CK, []);
-        var rp = await db.load(REK, []);
-        setProducts(p); setSales(s); setAccounts(a); setReturns(r); setDefectives(d); setClients(cl); setRepairs(rp);
+        if(session.role!=="superadmin"){
+          adminAPI.getSubscription().then(function(s){ setSubInfo(s); }).catch(function(){});
+        }
+        var normalProds = (prods||[]).map(function(p){return Object.assign({},p,{id:p.id,code:p.code,name:p.name,category:p.category||'',shelf:p.shelf||'',price:Number(p.price),cost:Number(p.cost),stock:Number(p.stock),unit:p.unit||'uni'});});
+        var normalSales = (sls||[]).map(function(s){return Object.assign({},s,{items:s.sale_items||[],total:Number(s.total),date:s.created_at,registradoPor:s.registrado_por||null});});
+        var normalAccs  = (accs||[]).map(function(a){return Object.assign({},a,{items:a.account_items||[],payments:(a.account_payments||[]).map(function(_pp){return Object.assign({},_pp,{date:_pp.date||_pp.created_at,amount:Number(_pp.amount),registradoPor:_pp.registrado_por||_pp.registradoPor||null});}),total:Number(a.total),paid:Number(a.paid),balance:Number(a.balance),date:a.created_at,registradoPor:a.registrado_por||null});});
+        var normalRets  = (rets||[]).map(function(r){return Object.assign({},r,{items:r.return_items||[],refundAmount:Number(r.refund_amount),itemCondition:r.item_condition,refundMethod:r.refund_method,date:r.created_at,saleId:r.sale_id||null});});
+        var normalDefs  = (defs||[]).map(function(d){return Object.assign({},d,{price:Number(d.price||0)});});
+        var normalClis  = (clis||[]).map(function(c){return Object.assign({},c,{cliCode:c.cli_code,createdAt:c.created_at});});
+        var normalReps  = (reps||[]).map(function(r){return Object.assign({},r,{repCode:r.rep_code,clientId:r.client_id,clientName:r.client_name,clientPhone:r.client_phone,clientCli:r.client_cli,problemDesc:r.problem_desc,techName:r.tech_name,estimatedCost:Number(r.estimated_cost||0),promisedDate:r.promised_date,internalNote:r.internal_note,registradoPor:r.registrado_por||{},parts:r.parts||[],createdAt:r.created_at});});
+        setProducts(normalProds);
+        setSales(normalSales);
+        setAccounts(normalAccs);
+        setReturns(normalRets);
+        setDefectives(normalDefs);
+        setClients(normalClis);
+        setRepairs(normalReps);
+        setWarranties((wars||[]).map(function(w){return Object.assign({},w,{entityType:w.entity_type,entityId:w.entity_id,startDate:w.start_date,endDate:w.end_date,createdBy:w.created_by});}));
+      } catch(e) {
+        console.error("Error cargando datos del servidor:", e);
+        showFlash("⚠️ Error al conectar con el servidor. Verifica tu conexión e intenta recargar la página.","err");
       }
       setLoaded(true);
     }
     loadAll();
   },[]);
-
-  // Guardar local solo en modo offline
-  useEffect(function(){ if(loaded&&!isOnline) db.save(PK,products);    },[products,loaded,isOnline]);
-  useEffect(function(){ if(loaded&&!isOnline) db.save(SK,sales);       },[sales,loaded,isOnline]);
-  useEffect(function(){ if(loaded&&!isOnline) db.save(AK,accounts);    },[accounts,loaded,isOnline]);
-  useEffect(function(){ if(loaded&&!isOnline) db.save(RK,returns);     },[returns,loaded,isOnline]);
-  useEffect(function(){ if(loaded&&!isOnline) db.save(DFK,defectives); },[defectives,loaded,isOnline]);
-  useEffect(function(){ if(loaded)            db.save(CK,clients);     },[clients,loaded]);
-  useEffect(function(){ if(loaded)            db.save(REK,repairs);    },[repairs,loaded]);
 
   var _v=useState(function(){ return canAccess(session.role,"pos")?"pos":"dashboard"; }); var view=_v[0]; var setView=_v[1];
   var _fl=useState({msg:"",type:"ok"}); var flash=_fl[0]; var setFlash=_fl[1];
@@ -5510,48 +5479,30 @@ function App(props) {
     function deduct(){ setProducts(function(p){return p.map(function(x){var ci=cart.find(function(i){return i.id===x.id;});return ci&&x.unit!=="serv"?Object.assign({},x,{stock:x.stock-ci.qty}):x;}); }); }
     var idempotencyKey=gid()+"-"+Date.now();
     if(payType==="completo"){
-      if(isOnline){
-        var ok=false;
-        try {
-          await salesAPI.create({client:client,total:cartTotal,method:payMethod,items:cart,idempotencyKey:idempotencyKey});
-          var freshSales = await salesAPI.getAll();
-          var ns = (freshSales||[]).map(function(s){return Object.assign({},s,{items:s.sale_items||[],total:Number(s.total),date:s.created_at,registradoPor:s.registrado_por||null});});
-          setSales(ns);
-          ok=true;
-        } catch(e){
-          var errMsg=e&&e.error?e.error:null;
-          if(errMsg){showFlash("⛔ "+errMsg,"err");return;}
-          console.warn("Error API venta:",e); setSales(function(p){return [Object.assign({},base)].concat(p);}); ok=true;
-        }
-        if(!ok)return;
-      } else {
-        setSales(function(p){return [Object.assign({},base)].concat(p);});
+      try {
+        await salesAPI.create({client:client,total:cartTotal,method:payMethod,items:cart,idempotencyKey:idempotencyKey});
+        var freshSales = await salesAPI.getAll();
+        var ns = (freshSales||[]).map(function(s){return Object.assign({},s,{items:s.sale_items||[],total:Number(s.total),date:s.created_at,registradoPor:s.registrado_por||null});});
+        setSales(ns);
+      } catch(e){
+        var errMsg=e&&e.error?e.error:null;
+        showFlash("⛔ "+(errMsg||"Error al registrar la venta. Verifica tu conexión."),"err");
+        return;
       }
       deduct();
       showFlash("✓ Venta cobrada — "+Q(cartTotal),"ok");
     } else {
       var paid=payType==="parcial"?Math.min(initPaidVal,cartTotal):0;
       var balance=cartTotal-paid;
-      var status=balance<=0?"pagado":paid>0?"parcial":"pendiente";
-      var pmts=paid>0?[{id:gid(),date:new Date().toISOString(),amount:paid,method:payMethod,note:"Abono inicial",registradoPor:registradoPor}]:[];
-      if(isOnline){
-        var ok2=false;
-        try{
-          await salesAPI.create({client:client,total:cartTotal,method:payMethod,items:cart,payType:payType,initialPay:paid,idempotencyKey:idempotencyKey});
-          var freshAccs = await accountsAPI.getAll();
-          var na=(freshAccs||[]).map(function(a){return Object.assign({},a,{items:a.account_items||[],payments:(a.account_payments||[]).map(function(_pp){return Object.assign({},_pp,{date:_pp.date||_pp.created_at,amount:Number(_pp.amount),registradoPor:_pp.registrado_por||_pp.registradoPor||null});}),total:Number(a.total),paid:Number(a.paid),balance:Number(a.balance),date:a.created_at,registradoPor:a.registrado_por||null});});
-          setAccounts(na);
-          ok2=true;
-        }catch(e){
-          var errMsg2=e&&e.error?e.error:null;
-          if(errMsg2){showFlash("⛔ "+errMsg2,"err");return;}
-          console.warn("Error API cuenta:",e);
-          setAccounts(function(p){return [Object.assign({},base,{paid:paid,balance:balance,status:status,payments:pmts})].concat(p);});
-          ok2=true;
-        }
-        if(!ok2)return;
-      } else {
-        setAccounts(function(p){return [Object.assign({},base,{paid:paid,balance:balance,status:status,payments:pmts})].concat(p);});
+      try{
+        await salesAPI.create({client:client,total:cartTotal,method:payMethod,items:cart,payType:payType,initialPay:paid,idempotencyKey:idempotencyKey});
+        var freshAccs = await accountsAPI.getAll();
+        var na=(freshAccs||[]).map(function(a){return Object.assign({},a,{items:a.account_items||[],payments:(a.account_payments||[]).map(function(_pp){return Object.assign({},_pp,{date:_pp.date||_pp.created_at,amount:Number(_pp.amount),registradoPor:_pp.registrado_por||_pp.registradoPor||null});}),total:Number(a.total),paid:Number(a.paid),balance:Number(a.balance),date:a.created_at,registradoPor:a.registrado_por||null});});
+        setAccounts(na);
+      }catch(e){
+        var errMsg2=e&&e.error?e.error:null;
+        showFlash("⛔ "+(errMsg2||"Error al registrar la cuenta. Verifica tu conexión."),"err");
+        return;
       }
       deduct();
       showFlash(payType==="pendiente"?"⏳ Pendiente — "+Q(cartTotal)+" por cobrar":"💰 Abono "+Q(paid)+" — Saldo: "+Q(balance),"warn");
@@ -5560,37 +5511,16 @@ function App(props) {
   }
 
   async function addPayment(accountId,amount,method,note){
-    var registradoPor={userId:session.userId,name:session.name,role:session.role};
-    if(isOnline){
-      try{
-        await accountsAPI.addPayment(accountId,{amount:amount,method:method||'Efectivo',note:note||''});
-        var freshAccs2 = await accountsAPI.getAll();
-        var na2=(freshAccs2||[]).map(function(a){return Object.assign({},a,{items:a.account_items||[],payments:(a.account_payments||[]).map(function(_pp){return Object.assign({},_pp,{date:_pp.date||_pp.created_at,amount:Number(_pp.amount),registradoPor:_pp.registrado_por||_pp.registradoPor||null});}),total:Number(a.total),paid:Number(a.paid),balance:Number(a.balance),date:a.created_at,registradoPor:a.registrado_por||null});});
-        setAccounts(na2);
-      }catch(e){
-        console.warn("Error API addPayment:",e);
-        var pmt2={id:gid(),date:new Date().toISOString(),amount:amount,method:method,note:note,registradoPor:registradoPor};
-        setAccounts(function(prev){return prev.map(function(acc){
-          if(acc.id!==accountId)return acc;
-          var pmts=(acc.payments||[]).concat([pmt2]);
-          var paid=pmts.reduce(function(s,p){return s+p.amount;},0);
-          var balance=Math.max(0,acc.total-paid);
-          var status=balance<=0?"pagado":paid>0?"parcial":"pendiente";
-          return Object.assign({},acc,{payments:pmts,paid:paid,balance:balance,status:status});
-        });});
-      }
-    } else {
-      var pmtOff={id:gid(),date:new Date().toISOString(),amount:amount,method:method,note:note,registradoPor:registradoPor};
-      setAccounts(function(prev){return prev.map(function(acc){
-        if(acc.id!==accountId)return acc;
-        var pmts=(acc.payments||[]).concat([pmtOff]);
-        var paid=pmts.reduce(function(s,p){return s+p.amount;},0);
-        var balance=Math.max(0,acc.total-paid);
-        var status=balance<=0?"pagado":paid>0?"parcial":"pendiente";
-        return Object.assign({},acc,{payments:pmts,paid:paid,balance:balance,status:status});
-      });});
+    try{
+      await accountsAPI.addPayment(accountId,{amount:amount,method:method||'Efectivo',note:note||''});
+      var freshAccs2 = await accountsAPI.getAll();
+      var na2=(freshAccs2||[]).map(function(a){return Object.assign({},a,{items:a.account_items||[],payments:(a.account_payments||[]).map(function(_pp){return Object.assign({},_pp,{date:_pp.date||_pp.created_at,amount:Number(_pp.amount),registradoPor:_pp.registrado_por||_pp.registradoPor||null});}),total:Number(a.total),paid:Number(a.paid),balance:Number(a.balance),date:a.created_at,registradoPor:a.registrado_por||null});});
+      setAccounts(na2);
+      showFlash("✓ Pago registrado","ok");
+    }catch(e){
+      var em=e&&e.error?e.error:null;
+      showFlash("⛔ "+(em||"Error al registrar el pago. Verifica tu conexión."),"err");
     }
-    showFlash("✓ Pago registrado","ok");
   }
 
   async function processReturn(data){
@@ -5599,42 +5529,28 @@ function App(props) {
     var registradoPor={userId:session.userId,name:session.name,role:session.role};
     var ret=Object.assign({},data,{id:newId,date:new Date().toISOString(),total:total,registradoPor:registradoPor});
 
-    if(isOnline){
-      try{
-        await returnsAPI.create({
-          client:data.client,
-          saleId:data.saleId||null,
-          reason:data.reason,
-          refundMethod:data.refundMethod,
-          refundAmount:data.refundAmount,
-          itemCondition:data.itemCondition,
-          items:data.items
-        });
-        // Recargar returns, defectives y productos desde API
-        var [freshRets, freshDefs, freshProds] = await Promise.all([
-          returnsAPI.getAll(),
-          defectivesAPI.getAll(),
-          productsAPI.getAll(),
-        ]);
-        setReturns((freshRets||[]).map(function(r){return Object.assign({},r,{items:r.return_items||[],refundAmount:Number(r.refund_amount),itemCondition:r.item_condition,refundMethod:r.refund_method,date:r.created_at,saleId:r.sale_id||null});}));
-        setDefectives((freshDefs||[]).map(function(d){return Object.assign({},d,{price:Number(d.price||0)});}));
-        setProducts((freshProds||[]).map(function(p){return Object.assign({},p,{price:Number(p.price),cost:Number(p.cost),stock:Number(p.stock)});}));
-      }catch(e){
-        console.warn("Error API return:",e);
-        setReturns(function(p){return [ret].concat(p);});
-        if(data.itemCondition==="bueno"){
-          setProducts(function(p){return p.map(function(x){var ri=data.items.find(function(i){return i.code===x.code;});return ri&&x.unit!=="serv"?Object.assign({},x,{stock:x.stock+ri.qty}):x;});});
-        } else {
-          setDefectives(function(p){return data.items.map(function(item){return {id:gid(),date:new Date().toISOString(),returnId:newId,code:item.code,name:item.name,qty:item.qty,price:item.price,reason:data.reason,status:"defectuoso"};}).concat(p);});
-        }
-      }
-    } else {
-      setReturns(function(p){return [ret].concat(p);});
-      if(data.itemCondition==="bueno"){
-        setProducts(function(p){return p.map(function(x){var ri=data.items.find(function(i){return i.code===x.code;});return ri&&x.unit!=="serv"?Object.assign({},x,{stock:x.stock+ri.qty}):x;});});
-      } else {
-        setDefectives(function(p){return data.items.map(function(item){return {id:gid(),date:new Date().toISOString(),returnId:newId,code:item.code,name:item.name,qty:item.qty,price:item.price,reason:data.reason,status:"defectuoso"};}).concat(p);});
-      }
+    try{
+      await returnsAPI.create({
+        client:data.client,
+        saleId:data.saleId||null,
+        reason:data.reason,
+        refundMethod:data.refundMethod,
+        refundAmount:data.refundAmount,
+        itemCondition:data.itemCondition,
+        items:data.items
+      });
+      var [freshRets, freshDefs, freshProds] = await Promise.all([
+        returnsAPI.getAll(),
+        defectivesAPI.getAll(),
+        productsAPI.getAll(),
+      ]);
+      setReturns((freshRets||[]).map(function(r){return Object.assign({},r,{items:r.return_items||[],refundAmount:Number(r.refund_amount),itemCondition:r.item_condition,refundMethod:r.refund_method,date:r.created_at,saleId:r.sale_id||null});}));
+      setDefectives((freshDefs||[]).map(function(d){return Object.assign({},d,{price:Number(d.price||0)});}));
+      setProducts((freshProds||[]).map(function(p){return Object.assign({},p,{price:Number(p.price),cost:Number(p.cost),stock:Number(p.stock)});}));
+    }catch(e){
+      var emR=e&&e.error?e.error:null;
+      showFlash("⛔ "+(emR||"Error al registrar la devolución. Verifica tu conexión."),"err");
+      return;
     }
     var msg=data.itemCondition==="bueno"
         ?"🔄 Devolución registrada — artículo reintegrado al stock"
@@ -5643,21 +5559,17 @@ function App(props) {
   }
 
   async function updateDefectiveStatus(id,status){
-    if(isOnline){
-      try{
-        await defectivesAPI.update(id,status);
-        var freshDefs = await defectivesAPI.getAll();
-        setDefectives((freshDefs||[]).map(function(d){return Object.assign({},d,{price:Number(d.price||0)});}));
-        if(status==="reingresado"){
-          var freshProds2 = await productsAPI.getAll();
-          setProducts((freshProds2||[]).map(function(p){return Object.assign({},p,{price:Number(p.price),cost:Number(p.cost),stock:Number(p.stock)});}));
-        }
-      }catch(e){
-        console.warn("Error API defective:",e);
-        setDefectives(function(p){return p.map(function(d){return d.id===id?Object.assign({},d,{status:status}):d;});});
+    try{
+      await defectivesAPI.update(id,status);
+      var freshDefs = await defectivesAPI.getAll();
+      setDefectives((freshDefs||[]).map(function(d){return Object.assign({},d,{price:Number(d.price||0)});}));
+      if(status==="reingresado"){
+        var freshProds2 = await productsAPI.getAll();
+        setProducts((freshProds2||[]).map(function(p){return Object.assign({},p,{price:Number(p.price),cost:Number(p.cost),stock:Number(p.stock)});}));
       }
-    } else {
-      setDefectives(function(p){return p.map(function(d){return d.id===id?Object.assign({},d,{status:status}):d;});});
+    }catch(e){
+      var emD=e&&e.error?e.error:null;
+      showFlash("⛔ "+(emD||"Error al actualizar. Verifica tu conexión."),"err");
     }
   }
 
@@ -5667,34 +5579,28 @@ function App(props) {
   }
   async function saveProduct(prod){
     var isNew=!prod.id;
-    if(!isNew&&isOnline){
-      try{
+    try{
+      if(!isNew){
         await productsAPI.update(prod.id,{code:prod.code,name:prod.name,category:prod.category||'',shelf:prod.shelf||'',price:prod.price,cost:prod.cost||0,stock:prod.stock||0,unit:prod.unit||'uni'});
         setProducts(function(p){return p.map(function(x){return x.id===prod.id?prod:x;});});
-      }catch(e){
-        console.warn("Error API updateProduct:",e);
-        setProducts(function(p){return p.map(function(x){return x.id===prod.id?prod:x;});});
-      }
-    } else if(isNew&&isOnline){
-      try{
+      } else {
         var saved=await productsAPI.create({code:prod.code,name:prod.name,category:prod.category||'',shelf:prod.shelf||'',price:prod.price,cost:prod.cost||0,stock:prod.stock||0,unit:prod.unit||'uni'});
         setProducts(function(p){return p.concat([Object.assign({},prod,{id:saved.id})]);});
-      }catch(e){
-        console.warn("Error API createProduct:",e);
-        setProducts(function(p){return p.concat([Object.assign({},prod,{id:gid()})]);});
       }
-    } else {
-      if(prod.id) setProducts(function(p){return p.map(function(x){return x.id===prod.id?prod:x;});});
-      else setProducts(function(p){return p.concat([Object.assign({},prod,{id:gid()})]);});
+    }catch(e){
+      var emP=e&&e.error?e.error:null;
+      showFlash("⛔ "+(emP||"Error al guardar el producto. Verifica tu conexión."),"err");
     }
   }
   async function deleteProduct(id){
-    if(isOnline){
-      try{ await productsAPI.remove(id); }
-      catch(e){ console.warn("Error API deleteProduct:",e); }
+    try{
+      await productsAPI.remove(id);
+      setProducts(function(p){return p.filter(function(x){return x.id!==id;});});
+      showFlash("Producto eliminado","ok");
+    }catch(e){
+      var emDel=e&&e.error?e.error:null;
+      showFlash("⛔ "+(emDel||"Error al eliminar. Verifica tu conexión."),"err");
     }
-    setProducts(function(p){return p.filter(function(x){return x.id!==id;});});
-    showFlash("Producto eliminado","ok");
   }
 
   async function importProducts(prods, callback){
@@ -5702,16 +5608,12 @@ function App(props) {
     for(var i=0;i<prods.length;i++){
       var prod=prods[i];
       try{
-        if(isOnline){
-          var saved=await productsAPI.create({
-            name:prod.name,category:prod.category||"",shelf:prod.shelf||"",
-            price:prod.price,cost:prod.cost||0,stock:prod.stock||0,
-            unit:prod.unit||"uni"
-          });
-          setProducts(function(p){return p.concat([Object.assign({},prod,{id:saved.id,code:saved.code})]);});
-        } else {
-          setProducts(function(p){return p.concat([Object.assign({},prod,{id:gid(),code:"P"+(p.length+1).toString().padStart(3,"0")})]);});
-        }
+        var savedImp=await productsAPI.create({
+          name:prod.name,category:prod.category||"",shelf:prod.shelf||"",
+          price:prod.price,cost:prod.cost||0,stock:prod.stock||0,
+          unit:prod.unit||"uni"
+        });
+        setProducts(function(p){return p.concat([Object.assign({},prod,{id:savedImp.id,code:savedImp.code})]);});
         count++;
       } catch(e){
         console.warn("Error importando:",prod.name,e);
@@ -5740,26 +5642,24 @@ function App(props) {
   }
 
   async function saveRepair(rep){
-    if(isOnline){
-      try{
-        await repairsAPI.create({id:rep.id,repCode:rep.repCode,clientId:rep.clientId||null,clientName:rep.clientName,clientPhone:rep.clientPhone||null,clientCli:rep.clientCli||null,brand:rep.brand,model:rep.model,imei:rep.imei||null,problemDesc:rep.problemDesc,diagnosis:rep.diagnosis||null,techName:rep.techName||null,estimatedCost:rep.estimatedCost||0,promisedDate:rep.promisedDate||null,internalNote:rep.internalNote||null,status:rep.status||'recibido',registradoPor:rep.registradoPor||{},parts:rep.parts||[],createdAt:rep.createdAt});
-        var fr=await repairsAPI.getAll();
-        setRepairs((fr||[]).map(function(r){return Object.assign({},r,{repCode:r.rep_code,clientId:r.client_id,clientName:r.client_name,clientPhone:r.client_phone,clientCli:r.client_cli,problemDesc:r.problem_desc,techName:r.tech_name,estimatedCost:Number(r.estimated_cost||0),promisedDate:r.promised_date,internalNote:r.internal_note,registradoPor:r.registrado_por||{},parts:r.parts||[],createdAt:r.created_at});}));
-        return;
-      }catch(e){ console.warn('Error API saveRepair:',e); }
+    try{
+      await repairsAPI.create({id:rep.id,repCode:rep.repCode,clientId:rep.clientId||null,clientName:rep.clientName,clientPhone:rep.clientPhone||null,clientCli:rep.clientCli||null,brand:rep.brand,model:rep.model,imei:rep.imei||null,problemDesc:rep.problemDesc,diagnosis:rep.diagnosis||null,techName:rep.techName||null,estimatedCost:rep.estimatedCost||0,promisedDate:rep.promisedDate||null,internalNote:rep.internalNote||null,status:rep.status||'recibido',registradoPor:rep.registradoPor||{},parts:rep.parts||[],createdAt:rep.createdAt});
+      var fr=await repairsAPI.getAll();
+      setRepairs((fr||[]).map(function(r){return Object.assign({},r,{repCode:r.rep_code,clientId:r.client_id,clientName:r.client_name,clientPhone:r.client_phone,clientCli:r.client_cli,problemDesc:r.problem_desc,techName:r.tech_name,estimatedCost:Number(r.estimated_cost||0),promisedDate:r.promised_date,internalNote:r.internal_note,registradoPor:r.registrado_por||{},parts:r.parts||[],createdAt:r.created_at});}));
+    }catch(e){
+      var emRep=e&&e.error?e.error:null;
+      showFlash("⛔ "+(emRep||"Error al guardar la reparación. Verifica tu conexión."),"err");
     }
-    setRepairs(function(p){return [rep].concat(p);});
   }
   async function updateRepairStatus(id, status){
-    if(isOnline){
-      try{
-        await repairsAPI.updateStatus(id, status);
-        var fr2=await repairsAPI.getAll();
-        setRepairs((fr2||[]).map(function(r){return Object.assign({},r,{repCode:r.rep_code,clientId:r.client_id,clientName:r.client_name,clientPhone:r.client_phone,clientCli:r.client_cli,problemDesc:r.problem_desc,techName:r.tech_name,estimatedCost:Number(r.estimated_cost||0),promisedDate:r.promised_date,internalNote:r.internal_note,registradoPor:r.registrado_por||{},parts:r.parts||[],createdAt:r.created_at});}));
-        return;
-      }catch(e){ console.warn('Error API updateRepairStatus:',e); }
+    try{
+      await repairsAPI.updateStatus(id, status);
+      var fr2=await repairsAPI.getAll();
+      setRepairs((fr2||[]).map(function(r){return Object.assign({},r,{repCode:r.rep_code,clientId:r.client_id,clientName:r.client_name,clientPhone:r.client_phone,clientCli:r.client_cli,problemDesc:r.problem_desc,techName:r.tech_name,estimatedCost:Number(r.estimated_cost||0),promisedDate:r.promised_date,internalNote:r.internal_note,registradoPor:r.registrado_por||{},parts:r.parts||[],createdAt:r.created_at});}));
+    }catch(e){
+      var emRS=e&&e.error?e.error:null;
+      showFlash("⛔ "+(emRS||"Error al actualizar la reparación. Verifica tu conexión."),"err");
     }
-    setRepairs(function(p){return p.map(function(r){return r.id===id?Object.assign({},r,{status:status,updatedAt:new Date().toISOString()}):r;});});
   }
   function cobrarReparacion(rep){
     // Pre-carga el POS con los datos de la reparación
@@ -5788,17 +5688,15 @@ function App(props) {
   }
 
   async function saveClient(obj, isEdit){
-    if(isOnline){
-      try{
-        if(isEdit){ await clientsAPI.update(obj.id,{cliCode:obj.cliCode,name:obj.name,dpi:obj.dpi||null,phone:obj.phone||null,address:obj.address||null,active:obj.active!==false}); }
-        else { await clientsAPI.create({id:obj.id,cliCode:obj.cliCode,name:obj.name,dpi:obj.dpi||null,phone:obj.phone||null,address:obj.address||null,active:true,createdAt:obj.createdAt}); }
-        var fc=await clientsAPI.getAll();
-        setClients((fc||[]).map(function(c){return Object.assign({},c,{cliCode:c.cli_code,createdAt:c.created_at});}));
-        return;
-      }catch(e){ console.warn('Error API saveClient:',e); }
+    try{
+      if(isEdit){ await clientsAPI.update(obj.id,{cliCode:obj.cliCode,name:obj.name,dpi:obj.dpi||null,phone:obj.phone||null,address:obj.address||null,active:obj.active!==false}); }
+      else { await clientsAPI.create({id:obj.id,cliCode:obj.cliCode,name:obj.name,dpi:obj.dpi||null,phone:obj.phone||null,address:obj.address||null,active:true,createdAt:obj.createdAt}); }
+      var fc=await clientsAPI.getAll();
+      setClients((fc||[]).map(function(c){return Object.assign({},c,{cliCode:c.cli_code,createdAt:c.created_at});}));
+    }catch(e){
+      var emC=e&&e.error?e.error:null;
+      showFlash("⛔ "+(emC||"Error al guardar el cliente. Verifica tu conexión."),"err");
     }
-    if(isEdit){ setClients(function(p){return p.map(function(c){return c.id===obj.id?obj:c;});}); }
-    else { setClients(function(p){return p.concat([obj]);}); }
   }
 
   async function exportJSON(){
