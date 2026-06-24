@@ -4419,10 +4419,10 @@ function SuppliersScreen(props){
 
   var pTotal=pItems.reduce(function(s,i){return s+i.subtotal;},0);
 
-  if(loading) return <div style={{padding:40,textAlign:"center",color:"#999"}}>Cargando…</div>;
-
   var supPag=usePaginator(suppliers,20);
   var purPag=usePaginator(purchases,20);
+
+  if(loading) return <div style={{padding:40,textAlign:"center",color:"#999"}}>Cargando…</div>;
 
   return (
     <div>
