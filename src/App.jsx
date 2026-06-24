@@ -3081,9 +3081,9 @@ function ProductsScreen(props) {
   var cats=["Todas"].concat(Array.from(new Set(products.map(function(p){return p.category;}))));
   var filtered=products.filter(function(p){
     var q=search.toLowerCase();
-    return(!search||p.name.toLowerCase().includes(q)||p.code.toLowerCase().includes(q)||p.shelf.toLowerCase().includes(q))&&(cat==="Todas"||p.category===cat);
+    return(!search||p.name.toLowerCase().includes(q)||(p.code||"").toLowerCase().includes(q)||(p.shelf||"").toLowerCase().includes(q))&&(cat==="Todas"||p.category===cat);
   }).sort(function(a,b){
-    if(sort==="code")return a.code.localeCompare(b.code);
+    if(sort==="code")return (a.code||"").localeCompare(b.code||"");
     if(sort==="stock")return a.stock-b.stock;
     if(sort==="price")return a.price-b.price;
     return a.name.localeCompare(b.name);
@@ -4342,7 +4342,7 @@ function SuppliersScreen(props){
     if(!prodQ.trim()){setProdRes([]); return;}
     var q=prodQ.toLowerCase();
     setProdRes(products.filter(function(p){
-      return p.unit!=="serv"&&(p.name.toLowerCase().includes(q)||p.code.toLowerCase().includes(q));
+      return p.unit!=="serv"&&(p.name.toLowerCase().includes(q)||(p.code||"").toLowerCase().includes(q));
     }).slice(0,6));
   },[prodQ,products]);
 
@@ -5612,7 +5612,7 @@ function App(props) {
   var filteredPOS=products.filter(function(p){
     if(!posQ)return true;
     var q=posQ.toLowerCase();
-    return p.name.toLowerCase().includes(q)||p.code.toLowerCase().includes(q)||p.shelf.toLowerCase().includes(q);
+    return p.name.toLowerCase().includes(q)||(p.code||"").toLowerCase().includes(q)||(p.shelf||"").toLowerCase().includes(q);
   });
 
   function addToCart(p){
