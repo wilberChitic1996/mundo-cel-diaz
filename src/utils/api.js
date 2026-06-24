@@ -49,6 +49,7 @@ export const authAPI = {
   getSession: getLocalSession,
 
   // ── Recuperación de contraseña (endpoints públicos, sin JWT) ──
+  verify2fa:     function(email, code)                { return api.post('/auth/verify-2fa', { email, code }); },
   findUser:      function(email)                      { return api.post('/auth/find-user', { email }); },
   verifyAnswer:  function(email, answer)              { return api.post('/auth/verify-answer', { email, answer }); },
   resetPassword: function(email, answer, newPassword) { return api.post('/auth/reset-password', { email, answer, newPassword }); },

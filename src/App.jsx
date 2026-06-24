@@ -455,6 +455,13 @@ function LoginScreen(props) {
   var _at=useState(0); var attempts=_at[0]; var setAttempts=_at[1];
   var _bl=useState(false); var blocked=_bl[0]; var setBlocked=_bl[1];
 
+  // Flujo 2FA
+  var _2fa=useState(false); var needs2fa=_2fa[0]; var setNeeds2fa=_2fa[1];
+  var _2fe=useState(""); var twoFaEmail=_2fe[0]; var setTwoFaEmail=_2fe[1];
+  var _2fc=useState(""); var twoFaCode=_2fc[0]; var setTwoFaCode=_2fc[1];
+  var _2fl=useState(false); var twoFaLoading=_2fl[0]; var setTwoFaLoading=_2fl[1];
+  var _2fer=useState(""); var twoFaErr=_2fer[0]; var setTwoFaErr=_2fer[1];
+
   // Flujo recuperación
   var _rm=useState("login"); var recMode=_rm[0]; var setRecMode=_rm[1];
   var _re=useState(""); var recEmail=_re[0]; var setRecEmail=_re[1];
@@ -475,6 +482,12 @@ function LoginScreen(props) {
     setLoading(true);setErr("");
     try {
       var apiResp=await authAPI.login(email.trim(),pass);
+      if(apiResp&&apiResp.requires2fa){
+        setLoading(false);
+        setTwoFaEmail(apiResp.email);
+        setNeeds2fa(true);
+        return;
+      }
       if(apiResp&&apiResp.user){
         setLoading(false);
         onLogin(createSession({id:apiResp.user.id,name:apiResp.user.name,email:apiResp.user.email,role:apiResp.user.role}));
@@ -495,6 +508,21 @@ function LoginScreen(props) {
       }
     }
   }
+  async function doVerify2fa(){
+    if(!twoFaCode.trim()){setTwoFaErr("Ingresá el código.");return;}
+    setTwoFaLoading(true);setTwoFaErr("");
+    try {
+      var r=await authAPI.verify2fa(twoFaEmail,twoFaCode.trim());
+      if(r&&r.user){
+        setTwoFaLoading(false);
+        onLogin(createSession({id:r.user.id,name:r.user.name,email:r.user.email,role:r.user.role}));
+      }
+    } catch(e){
+      setTwoFaLoading(false);
+      setTwoFaErr((e&&e.error)?e.error:"Código incorrecto o expirado.");
+    }
+  }
+
   async function doFindUser(){
     setRecErr("");
     if(!recEmail.trim()){setRecErr("Ingresá tu email.");return;}
@@ -583,8 +611,31 @@ function LoginScreen(props) {
 
           <div style={{background:"rgba(255,255,255,0.05)",borderRadius:16,border:"1px solid rgba(255,255,255,0.1)",padding:32}}>
 
+            {/* ── MODO 2FA ── */}
+            {needs2fa&&(
+              <div>
+                <p style={{color:"#fff",fontSize:18,fontWeight:700,margin:"0 0 8px",textAlign:"center"}}>Verificación en dos pasos</p>
+                <p style={{color:"#aaa",fontSize:13,textAlign:"center",margin:"0 0 24px"}}>Ingresá el código de 6 dígitos que enviamos a tu correo. Válido por 10 minutos.</p>
+                {twoFaErr&&<div style={{background:"rgba(226,75,74,0.15)",border:"1px solid rgba(226,75,74,0.4)",borderRadius:8,padding:"10px 14px",marginBottom:16,color:"#F09595",fontSize:13}}>⚠ {twoFaErr}</div>}
+                <input
+                  value={twoFaCode} onChange={function(e){setTwoFaCode(e.target.value);}}
+                  onKeyDown={function(e){if(e.key==="Enter")doVerify2fa();}}
+                  placeholder="Código de 6 dígitos"
+                  maxLength={6}
+                  inputMode="numeric"
+                  style={{width:"100%",padding:"12px 14px",borderRadius:8,border:"1px solid rgba(255,255,255,0.15)",background:"rgba(255,255,255,0.08)",color:"#fff",fontSize:22,textAlign:"center",letterSpacing:8,outline:"none",boxSizing:"border-box",marginBottom:16}}
+                />
+                <button onClick={doVerify2fa} disabled={twoFaLoading} style={{width:"100%",padding:"13px",borderRadius:8,border:"none",background:TEAL,color:"#fff",fontWeight:700,fontSize:15,cursor:"pointer"}}>
+                  {twoFaLoading?"Verificando...":"Verificar código"}
+                </button>
+                <button onClick={function(){setNeeds2fa(false);setTwoFaCode("");setTwoFaErr("");}} style={{width:"100%",marginTop:10,padding:"10px",borderRadius:8,border:"1px solid rgba(255,255,255,0.15)",background:"transparent",color:"#aaa",fontSize:13,cursor:"pointer"}}>
+                  ← Volver al login
+                </button>
+              </div>
+            )}
+
             {/* ── MODO LOGIN ── */}
-            {recMode==="login"&&(
+            {!needs2fa&&recMode==="login"&&(
                 <div>
                   <p style={{color:"#fff",fontSize:18,fontWeight:700,margin:"0 0 24px",textAlign:"center"}}>Iniciar sesión</p>
                   {err&&<div style={{background:"rgba(226,75,74,0.15)",border:"1px solid rgba(226,75,74,0.4)",borderRadius:8,padding:"10px 14px",marginBottom:16,color:"#F09595",fontSize:13}}>⚠ {err}</div>}
