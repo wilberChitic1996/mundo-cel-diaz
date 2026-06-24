@@ -1852,7 +1852,7 @@ function CajaScreen(props) {
       '<div class="row"><span>Fondo inicial</span><span>Q '+Number(s.fondo_inicial||0).toFixed(2)+'</span></div>'+
       '<div class="row"><span>Ventas en efectivo</span><span>Q '+movements.filter(function(m){return m.type==="entrada"&&m.desc==="Venta";}).reduce(function(a,m){return a+m.amount;},0).toFixed(2)+'</span></div>'+
       '<div class="row"><span>Abonos en efectivo</span><span>Q '+movements.filter(function(m){return m.type==="entrada"&&m.desc==="Abono cuenta";}).reduce(function(a,m){return a+m.amount;},0).toFixed(2)+'</span></div>'+
-      '<div class="row neg"><span>Reembolsos</span><span>−Q '+movements.filter(function(m){return m.type==="salida"&&m.desc.startsWith("Reembolso");}).reduce(function(a,m){return a+m.amount;},0).toFixed(2)+'</span></div>'+
+      '<div class="row neg"><span>Reembolsos</span><span>−Q '+movements.filter(function(m){return m.type==="salida"&&(m.desc||"").startsWith("Reembolso");}).reduce(function(a,m){return a+m.amount;},0).toFixed(2)+'</span></div>'+
       '<div class="row neg"><span>Gastos de caja</span><span>−Q '+totalGastos.toFixed(2)+'</span></div>'+
       '<div class="row total"><span>Saldo esperado</span><span>Q '+saldoEsperado.toFixed(2)+'</span></div>'+
       (contado!=null?'<div class="row"><span>Efectivo contado</span><span>Q '+contado.toFixed(2)+'</span></div>':'')+
@@ -3081,12 +3081,12 @@ function ProductsScreen(props) {
   var cats=["Todas"].concat(Array.from(new Set(products.map(function(p){return p.category;}))));
   var filtered=products.filter(function(p){
     var q=search.toLowerCase();
-    return(!search||p.name.toLowerCase().includes(q)||(p.code||"").toLowerCase().includes(q)||(p.shelf||"").toLowerCase().includes(q))&&(cat==="Todas"||p.category===cat);
+    return(!search||(p.name||"").toLowerCase().includes(q)||(p.code||"").toLowerCase().includes(q)||(p.shelf||"").toLowerCase().includes(q))&&(cat==="Todas"||p.category===cat);
   }).sort(function(a,b){
     if(sort==="code")return (a.code||"").localeCompare(b.code||"");
     if(sort==="stock")return a.stock-b.stock;
     if(sort==="price")return a.price-b.price;
-    return a.name.localeCompare(b.name);
+    return (a.name||"").localeCompare(b.name||"");
   });
   var prodPag=usePaginator(filtered,25);
   return (
@@ -3200,7 +3200,7 @@ function InventoryScreen(props) {
   var products=props.products;
   var secs={};
   products.filter(function(p){return p.unit!=="serv";}).forEach(function(p){
-    var s=p.shelf.split("-")[0];
+    var s=(p.shelf||"").split("-")[0];
     if(!secs[s])secs[s]=[];
     secs[s].push(p);
   });
@@ -4342,7 +4342,7 @@ function SuppliersScreen(props){
     if(!prodQ.trim()){setProdRes([]); return;}
     var q=prodQ.toLowerCase();
     setProdRes(products.filter(function(p){
-      return p.unit!=="serv"&&(p.name.toLowerCase().includes(q)||(p.code||"").toLowerCase().includes(q));
+      return p.unit!=="serv"&&((p.name||"").toLowerCase().includes(q)||(p.code||"").toLowerCase().includes(q));
     }).slice(0,6));
   },[prodQ,products]);
 
@@ -5612,7 +5612,7 @@ function App(props) {
   var filteredPOS=products.filter(function(p){
     if(!posQ)return true;
     var q=posQ.toLowerCase();
-    return p.name.toLowerCase().includes(q)||(p.code||"").toLowerCase().includes(q)||(p.shelf||"").toLowerCase().includes(q);
+    return (p.name||"").toLowerCase().includes(q)||(p.code||"").toLowerCase().includes(q)||(p.shelf||"").toLowerCase().includes(q);
   });
 
   function addToCart(p){
