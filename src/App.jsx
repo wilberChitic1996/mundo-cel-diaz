@@ -808,12 +808,13 @@ function UsersScreen(props) {
         {(function(){var userPag=usePaginator(users,15); return (
         <div style={sC}>
           <table style={{width:"100%",borderCollapse:"collapse"}}>
-            <thead><tr>{["Nombre","Email","Rol","Estado","Seguridad","Último acceso",""].map(function(h){return <th key={h} style={sTH}>{h}</th>;})}</tr></thead>
+            <thead><tr>{["#","Nombre","Email","Rol","Estado","Seguridad","Último acceso",""].map(function(h){return <th key={h} style={h==="#"?Object.assign({},sTH,{width:40,textAlign:"center"}):sTH}>{h}</th>;})}</tr></thead>
             <tbody>
-            {userPag.paged.map(function(u){
+            {userPag.paged.map(function(u,index){
               var isSelf=u.id===session.userId;
               return (
                   <tr key={u.id}>
+                    <td style={{...sTD,textAlign:"center",color:"#999",fontSize:12}}>{userPag.offset+index+1}</td>
                     <td style={Object.assign({},sTD,{fontWeight:600})}>{u.name}{isSelf&&<span style={{fontSize:11,color:TEAL,marginLeft:6}}>(tú)</span>}</td>
                     <td style={Object.assign({},sTD,{fontFamily:"monospace",fontSize:12})}>{u.email}</td>
                     <td style={sTD}><span style={mBg(u.role==="admin"?"teal":u.role==="cajero"?"blue":"purple")}>{ROLE_LABEL[u.role]||u.role}</span></td>
@@ -1238,7 +1239,8 @@ function usePaginator(items, perPage){
       </div>
     );
   }
-  return {paged:paged, Pager:Pager, resetPage:function(){setPage(1);}};
+  var offset=(safePage-1)*perPage;
+  return {paged:paged, Pager:Pager, resetPage:function(){setPage(1);}, offset:offset};
 }
 
 /* ── Búsqueda global ────────────────────────────────────────────────── */
@@ -2516,11 +2518,12 @@ function AccountsScreen(props) {
         <div style={sC}>
           {filtered.length===0?<p style={{textAlign:"center",color:"#999",padding:40}}>Sin cuentas en esta categoría</p>:(
               <table style={{width:"100%",borderCollapse:"collapse"}}>
-                <thead><tr>{["Fecha","Cliente","Total","Pagado","Saldo","Estado",""].map(function(h){return <th key={h} style={sTH}>{h}</th>;})}</tr></thead>
+                <thead><tr>{["#","Fecha","Cliente","Total","Pagado","Saldo","Estado",""].map(function(h){return <th key={h} style={h==="#"?Object.assign({},sTH,{width:40,textAlign:"center"}):sTH}>{h}</th>;})}</tr></thead>
                 <tbody>
-                {accPag.paged.map(function(a){
+                {accPag.paged.map(function(a,index){
                   return (
                       <tr key={a.id} style={{cursor:"pointer"}} onClick={function(){setSelAcc(a.id);}}>
+                        <td style={{...sTD,textAlign:"center",color:"#999",fontSize:12}}>{accPag.offset+index+1}</td>
                         <td style={sTD}>{fmtD(a.date)}</td>
                         <td style={Object.assign({},sTD,{fontWeight:600})}>{a.client}</td>
                         <td style={sTD}>{Q(a.total)}</td>
@@ -2811,12 +2814,13 @@ function ReturnsScreen(props) {
       <div style={sC}>
         {returns.length===0?<p style={{textAlign:"center",color:"#999",padding:40}}>Sin devoluciones registradas</p>:(
           <table style={{width:"100%",borderCollapse:"collapse"}}>
-            <thead><tr>{["Fecha","Cliente","Motivo","Estado artículo","Reembolso","Monto reimb.","Valor artícs."].map(function(h){return <th key={h} style={sTH}>{h}</th>;})}</tr></thead>
+            <thead><tr>{["#","Fecha","Cliente","Motivo","Estado artículo","Reembolso","Monto reimb.","Valor artícs."].map(function(h){return <th key={h} style={h==="#"?Object.assign({},sTH,{width:40,textAlign:"center"}):sTH}>{h}</th>;})}</tr></thead>
             <tbody>
-              {retPag.paged.map(function(r){
+              {retPag.paged.map(function(r,index){
                 var cond=r.itemCondition||"bueno";
                 return (
                   <tr key={r.id}>
+                    <td style={{...sTD,textAlign:"center",color:"#999",fontSize:12}}>{retPag.offset+index+1}</td>
                     <td style={sTD}>{fmtD(r.date)}</td>
                     <td style={Object.assign({},sTD,{fontWeight:600})}>{r.client}</td>
                     <td style={sTD}>{r.reason}</td>
@@ -2864,11 +2868,12 @@ function DefectiveScreen(props) {
         <div style={sC}>
           {filtered.length===0?<p style={{textAlign:"center",color:"#999",padding:40}}>Sin piezas en esta categoría</p>:(
               <table style={{width:"100%",borderCollapse:"collapse"}}>
-                <thead><tr>{["Fecha","Código","Pieza","Cant.","Precio","Motivo","Estado","Acciones"].map(function(h){return <th key={h} style={sTH}>{h}</th>;})}</tr></thead>
+                <thead><tr>{["#","Fecha","Código","Pieza","Cant.","Precio","Motivo","Estado","Acciones"].map(function(h){return <th key={h} style={h==="#"?Object.assign({},sTH,{width:40,textAlign:"center"}):sTH}>{h}</th>;})}</tr></thead>
                 <tbody>
-                {defPag.paged.map(function(d){
+                {defPag.paged.map(function(d,index){
                   return (
                       <tr key={d.id}>
+                        <td style={{...sTD,textAlign:"center",color:"#999",fontSize:12}}>{defPag.offset+index+1}</td>
                         <td style={sTD}>{fmtD(d.date)}</td>
                         <td style={Object.assign({},sTD,{fontFamily:"monospace",fontSize:12})}>{d.code}</td>
                         <td style={Object.assign({},sTD,{fontWeight:600})}>{d.name}</td>
@@ -3018,12 +3023,13 @@ function ProductsScreen(props) {
         </div>
         <div style={sC}>
           <table style={{width:"100%",borderCollapse:"collapse"}}>
-            <thead><tr>{["Código","Nombre","Categoría","Estantería","Precio","Costo","Margen","Stock",""].map(function(h){return <th key={h} style={sTH}>{h}</th>;})}</tr></thead>
+            <thead><tr>{["#","Código","Nombre","Categoría","Estantería","Precio","Costo","Margen","Stock",""].map(function(h){return <th key={h} style={h==="#"?Object.assign({},sTH,{width:40,textAlign:"center"}):sTH}>{h}</th>;})}</tr></thead>
             <tbody>
-            {prodPag.paged.map(function(p){
+            {prodPag.paged.map(function(p,index){
               var mg=p.cost>0?Math.round((p.price-p.cost)/p.price*100):0;
               return (
                   <tr key={p.id}>
+                    <td style={{...sTD,textAlign:"center",color:"#999",fontSize:12}}>{prodPag.offset+index+1}</td>
                     <td style={Object.assign({},sTD,{fontFamily:"monospace",fontSize:12})}>{p.code}</td>
                     <td style={Object.assign({},sTD,{fontWeight:600})}>{p.name} <span style={{fontSize:11,color:"#999",fontWeight:400}}>{p.unit}</span></td>
                     <td style={sTD}><span style={mBg("teal")}>{p.category}</span></td>
@@ -3487,12 +3493,13 @@ function HistoryScreen(props) {
         <div style={sC}>
           {fmovs.length===0?<p style={{textAlign:"center",color:"#999",padding:48}}>Sin movimientos en esta categoria</p>:(
               <table style={{width:"100%",borderCollapse:"collapse"}}>
-                <thead><tr>{["Fecha","Hora","Tipo","Cliente","Metodo","Atendio","Monto",""].map(function(h){return <th key={h} style={sTH}>{h}</th>;})}</tr></thead>
+                <thead><tr>{["#","Fecha","Hora","Tipo","Cliente","Metodo","Atendio","Monto",""].map(function(h){return <th key={h} style={h==="#"?Object.assign({},sTH,{width:40,textAlign:"center"}):sTH}>{h}</th>;})}</tr></thead>
                 <tbody>
-                {histPag.paged.map(function(m){
+                {histPag.paged.map(function(m,index){
                   var clickable=m.kind==="sale";
                   return (
                       <tr key={m.k} style={{cursor:clickable?"pointer":"default"}} onClick={clickable?function(){setSelectedSale(m.obj);}:undefined}>
+                        <td style={{...sTD,textAlign:"center",color:"#999",fontSize:12}}>{histPag.offset+index+1}</td>
                         <td style={sTD}>{fmtD(m.date)}</td>
                         <td style={sTD}>{fmtT(m.date)}</td>
                         <td style={sTD}><span style={mBg(m.color)}>{m.tipo}</span></td>
@@ -3968,14 +3975,15 @@ function ClientsScreen(props) {
           </div>
         ):(
           <table style={{width:"100%",borderCollapse:"collapse"}}>
-            <thead><tr>{["Código","Nombre","DPI","Teléfono","Compras","Deuda",""].map(function(h){return <th key={h} style={sTH}>{h}</th>;})}</tr></thead>
+            <thead><tr>{["#","Código","Nombre","DPI","Teléfono","Compras","Deuda",""].map(function(h){return <th key={h} style={h==="#"?Object.assign({},sTH,{width:40,textAlign:"center"}):sTH}>{h}</th>;})}</tr></thead>
             <tbody>
-              {cliPag.paged.map(function(c){
+              {cliPag.paged.map(function(c,index){
                 var cliSalesCount=sales.filter(function(s){return s.clientId===c.id||(s.client===c.name&&!s.clientId);}).length;
                 var cliDeuda=accounts.filter(function(a){return (a.clientId===c.id||(a.client===c.name&&!a.clientId))&&a.status!=="pagado";}).reduce(function(s,a){return s+a.balance;},0);
                 var esFrecuente=cliSalesCount>=5||sales.filter(function(s){return s.clientId===c.id||(s.client===c.name&&!s.clientId);}).reduce(function(s,x){return s+x.total;},0)>=1000;
                 return (
                   <tr key={c.id} style={{cursor:"pointer"}} onClick={function(){setSelCli(c.id);}}>
+                    <td style={{...sTD,textAlign:"center",color:"#999",fontSize:12}}>{cliPag.offset+index+1}</td>
                     <td style={Object.assign({},sTD,{fontFamily:"monospace",fontSize:12,color:TEAL,fontWeight:600})}>{c.cliCode}</td>
                     <td style={Object.assign({},sTD,{fontWeight:600})}>
                       {c.name}
@@ -4159,14 +4167,15 @@ function WarrantiesScreen(props){
       <div style={sC}>
         {displayed.length===0?<p style={{textAlign:"center",color:"#999",padding:40}}>Sin garantías en esta categoría</p>:(
           <table style={{width:"100%",borderCollapse:"collapse"}}>
-            <thead><tr>{["Cliente","Descripción","Referencia","Inicio","Vencimiento","Estado",""].map(function(h){return <th key={h} style={sTH}>{h}</th>;})}</tr></thead>
+            <thead><tr>{["#","Cliente","Descripción","Referencia","Inicio","Vencimiento","Estado",""].map(function(h){return <th key={h} style={h==="#"?Object.assign({},sTH,{width:40,textAlign:"center"}):sTH}>{h}</th>;})}</tr></thead>
             <tbody>
-            {warPag.paged.map(function(w){
+            {warPag.paged.map(function(w,index){
               var wEnd=new Date(w.endDate);
               var dias=Math.ceil((wEnd-now)/86400000);
               var isVig=w.status!=="reclamada"&&wEnd>=now;
               return (
                 <tr key={w.id} style={{cursor:"pointer"}} onClick={function(){setSelWar(w.id);}}>
+                  <td style={{...sTD,textAlign:"center",color:"#999",fontSize:12}}>{warPag.offset+index+1}</td>
                   <td style={Object.assign({},sTD,{fontWeight:600})}>{w.client}</td>
                   <td style={Object.assign({},sTD,{color:"#666",maxWidth:180})}>{w.description}</td>
                   <td style={Object.assign({},sTD,{fontFamily:"monospace",fontSize:12,color:TEAL})}>{w.entityId||"—"}</td>
@@ -4345,11 +4354,12 @@ function SuppliersScreen(props){
               <p style={{fontSize:13}}>Agrega tu primer proveedor para registrar compras y actualizar stock</p>
             </div>
             :<table style={{width:"100%",borderCollapse:"collapse"}}>
-              <thead><tr>{["Proveedor","Teléfono","Correo","Dirección","Notas",""].map(function(h){return <th key={h} style={sTH}>{h}</th>;})}</tr></thead>
+              <thead><tr>{["#","Proveedor","Teléfono","Correo","Dirección","Notas",""].map(function(h){return <th key={h} style={h==="#"?Object.assign({},sTH,{width:40,textAlign:"center"}):sTH}>{h}</th>;})}</tr></thead>
               <tbody>
-              {supPag.paged.map(function(s){
+              {supPag.paged.map(function(s,index){
                 return (
                   <tr key={s.id}>
+                    <td style={{...sTD,textAlign:"center",color:"#999",fontSize:12}}>{supPag.offset+index+1}</td>
                     <td style={Object.assign({},sTD,{fontWeight:600})}>{s.name}</td>
                     <td style={sTD}>{s.phone||"—"}</td>
                     <td style={sTD}>{s.email||"—"}</td>
@@ -4379,12 +4389,13 @@ function SuppliersScreen(props){
               <p style={{fontSize:15}}>Sin compras registradas aún</p>
             </div>
             :<table style={{width:"100%",borderCollapse:"collapse"}}>
-              <thead><tr>{["Fecha","Proveedor","Artículos","Total","Registrado por"].map(function(h){return <th key={h} style={sTH}>{h}</th>;})}</tr></thead>
+              <thead><tr>{["#","Fecha","Proveedor","Artículos","Total","Registrado por"].map(function(h){return <th key={h} style={h==="#"?Object.assign({},sTH,{width:40,textAlign:"center"}):sTH}>{h}</th>;})}</tr></thead>
               <tbody>
-              {purPag.paged.map(function(p){
+              {purPag.paged.map(function(p,index){
                 var items=p.purchase_items||[];
                 return (
                   <tr key={p.id}>
+                    <td style={{...sTD,textAlign:"center",color:"#999",fontSize:12}}>{purPag.offset+index+1}</td>
                     <td style={sTD}>{fmtD(p.created_at)} {fmtT(p.created_at)}</td>
                     <td style={Object.assign({},sTD,{fontWeight:600})}>{p.supplier_name}</td>
                     <td style={sTD}>
@@ -6424,13 +6435,13 @@ function AuditScreen(props){
           <table style={{width:"100%",borderCollapse:"collapse"}}>
             <thead>
               <tr>
-                {["Fecha/Hora","Usuario","Rol","Acción","Tipo","Detalles"].map(function(h){return <th key={h} style={sTH}>{h}</th>;})}
+                {["#","Fecha/Hora","Usuario","Rol","Acción","Tipo","Detalles"].map(function(h){return <th key={h} style={h==="#"?Object.assign({},sTH,{width:40,textAlign:"center"}):sTH}>{h}</th>;})}
               </tr>
             </thead>
             <tbody>
-              {loading&&<tr><td colSpan={6} style={{padding:24,textAlign:"center",color:"var(--text-secondary,#888)"}}>Cargando…</td></tr>}
-              {!loading&&logs.length===0&&<tr><td colSpan={6} style={{padding:24,textAlign:"center",color:"var(--text-secondary,#888)"}}>Sin registros</td></tr>}
-              {!loading&&logs.map(function(log){
+              {loading&&<tr><td colSpan={7} style={{padding:24,textAlign:"center",color:"var(--text-secondary,#888)"}}>Cargando…</td></tr>}
+              {!loading&&logs.length===0&&<tr><td colSpan={7} style={{padding:24,textAlign:"center",color:"var(--text-secondary,#888)"}}>Sin registros</td></tr>}
+              {!loading&&logs.map(function(log,index){
                 var c=AUDIT_COLORS[log.action]||"gray";
                 var detail="";
                 var detailNode=null;
@@ -6470,6 +6481,7 @@ function AuditScreen(props){
                 }
                 return(
                   <tr key={log.id} style={{background:"var(--bg-row,transparent)"}}>
+                    <td style={{...sTD,textAlign:"center",color:"#999",fontSize:12}}>{(page-1)*LIMIT+index+1}</td>
                     <td style={sTD}><div>{fmtD(log.created_at)}</div><div style={{fontSize:12,color:"var(--text-secondary,#888)"}}>{fmtT(log.created_at)}</div></td>
                     <td style={sTD}>{log.user_name||"—"}</td>
                     <td style={sTD}><span style={mBg(log.user_role==="admin"?"teal":log.user_role==="cajero"?"blue":"purple")}>{ROLE_LABEL[log.user_role]||log.user_role||"—"}</span></td>
@@ -6985,13 +6997,14 @@ function RepairsScreen(props){
       <div style={sC}>
         {filtered.length===0?<p style={{textAlign:"center",color:"#999",padding:40}}>Sin órdenes en esta categoría</p>:(
           <table style={{width:"100%",borderCollapse:"collapse"}}>
-            <thead><tr>{["Orden","Cliente","Dispositivo","Técnico","Estado","Costo","Entrega",""].map(function(h){return <th key={h} style={sTH}>{h}</th>;})}</tr></thead>
+            <thead><tr>{["#","Orden","Cliente","Dispositivo","Técnico","Estado","Costo","Entrega",""].map(function(h){return <th key={h} style={h==="#"?Object.assign({},sTH,{width:40,textAlign:"center"}):sTH}>{h}</th>;})}</tr></thead>
             <tbody>
-              {repPag.paged.slice().sort(function(a,b){return new Date(b.createdAt)-new Date(a.createdAt);}).map(function(r){
+              {repPag.paged.slice().sort(function(a,b){return new Date(b.createdAt)-new Date(a.createdAt);}).map(function(r,index){
                 var info=REP_STATUS[r.status]||{label:r.status,color:"gray"};
                 var vencida=r.promisedDate&&r.status!=="entregado"&&new Date(r.promisedDate+"T23:59:59")<new Date();
                 return (
                   <tr key={r.id} style={{cursor:"pointer"}} onClick={function(){setSelRep(r.id);}}>
+                    <td style={{...sTD,textAlign:"center",color:"#999",fontSize:12}}>{repPag.offset+index+1}</td>
                     <td style={Object.assign({},sTD,{fontFamily:"monospace",fontSize:12,color:TEAL,fontWeight:700})}>{r.repCode}</td>
                     <td style={Object.assign({},sTD,{fontWeight:600})}>{r.clientName}{r.clientCli&&<div style={{fontSize:10,color:"#999",fontFamily:"monospace"}}>{r.clientCli}</div>}</td>
                     <td style={sTD}><div style={{fontWeight:500}}>{r.brand} {r.model}</div>{r.imei&&<div style={{fontSize:10,color:"#999",fontFamily:"monospace"}}>{r.imei}</div>}</td>
