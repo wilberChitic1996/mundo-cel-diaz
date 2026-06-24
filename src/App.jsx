@@ -1243,6 +1243,51 @@ function usePaginator(items, perPage){
   return {paged:paged, Pager:Pager, resetPage:function(){setPage(1);}, offset:offset};
 }
 
+/* ── Tabla paginada reutilizable ────────────────────────────────────────
+   Uso:
+     var pag = usePaginator(items, 20);
+     <PagTable pag={pag} cols={[
+       { label:"Nombre", render: function(row){ return row.name; } },
+       { label:"Total",  render: function(row){ return "Q "+row.total; } },
+     ]} empty="Sin registros aún"/>
+   - Columna # incluida automáticamente con numeración continua entre páginas
+   - Pager incluido al pie
+   - Para ocultar # en una columna específica, no se puede; está fijo al inicio
+────────────────────────────────────────────────────────────────────────── */
+function PagTable(props){
+  var pag=props.pag; var cols=props.cols||[]; var empty=props.empty||"Sin registros";
+  var onRowClick=props.onRowClick||null;
+  if(!pag.paged.length) return <p style={{textAlign:"center",color:"#999",padding:40}}>{empty}</p>;
+  return (
+    <div>
+      <div style={{overflowX:"auto"}}>
+        <table style={{width:"100%",borderCollapse:"collapse"}}>
+          <thead>
+            <tr>
+              <th style={Object.assign({},sTH,{width:40,textAlign:"center"})}>#</th>
+              {cols.map(function(c,i){ return <th key={i} style={c.thStyle?Object.assign({},sTH,c.thStyle):sTH}>{c.label}</th>; })}
+            </tr>
+          </thead>
+          <tbody>
+            {pag.paged.map(function(row,i){
+              return (
+                <tr key={row.id||i} onClick={onRowClick?function(){onRowClick(row);}:undefined}
+                    style={onRowClick?{cursor:"pointer"}:undefined}>
+                  <td style={{padding:"10px 8px",textAlign:"center",color:"#bbb",fontSize:12,borderBottom:"1px solid rgba(0,0,0,0.05)"}}>{pag.offset+i+1}</td>
+                  {cols.map(function(c,ci){
+                    return <td key={ci} style={c.tdStyle?Object.assign({},sTD,c.tdStyle):sTD}>{c.render(row,i)}</td>;
+                  })}
+                </tr>
+              );
+            })}
+          </tbody>
+        </table>
+      </div>
+      <pag.Pager/>
+    </div>
+  );
+}
+
 /* ── Búsqueda global ────────────────────────────────────────────────── */
 function GlobalSearch(props){
   var onClose=props.onClose; var setView=props.setView;
