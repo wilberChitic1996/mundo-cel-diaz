@@ -3106,7 +3106,7 @@ function ProductsScreen(props) {
         {editProd&&<ProductForm product={editProd} onSave={function(p){saveProduct(p);setEditProd(null);}} onCancel={function(){setEditProd(null);}}/>}
         <div style={Object.assign({},sC,{marginBottom:14})}>
           <div style={{display:"flex",gap:10,flexWrap:"wrap",alignItems:"center"}}>
-            <input style={Object.assign({},sI,{width:240,flex:"none"})} placeholder="Buscar..." value={search} onChange={function(e){setSearch(e.target.value);prodPag.setPage(1);}}/>
+            <input style={Object.assign({},sI,{width:240,flex:"none"})} placeholder="Buscar..." value={search} onChange={function(e){setSearch(e.target.value);prodPag.resetPage();}}/>
             <select style={Object.assign({},sI,{width:150,flex:"none"})} value={cat} onChange={function(e){setCat(e.target.value);}}>
               {cats.map(function(c){return <option key={c}>{c}</option>;})}
             </select>
@@ -4252,7 +4252,7 @@ function WarrantiesScreen(props){
       )}
 
       <div style={Object.assign({},sC,{marginBottom:14})}>
-        <input style={Object.assign({},sI,{marginBottom:12})} placeholder="🔍  Buscar por cliente, descripción o referencia..." value={q} onChange={function(e){setQ(e.target.value);warPag.setPage(1);}}/>
+        <input style={Object.assign({},sI,{marginBottom:12})} placeholder="🔍  Buscar por cliente, descripción o referencia..." value={q} onChange={function(e){setQ(e.target.value);warPag.resetPage();}}/>
         <div style={{display:"flex",gap:8,flexWrap:"wrap"}}>
           {[["todas","Todas"],["vigente","Vigentes"],["vencida","Vencidas"],["reclamada","Reclamadas"]].map(function(p){
             return <button key={p[0]} style={Object.assign({},mB(filter===p[0]?"teal":"gray"),{padding:"6px 14px"})} onClick={function(){setFilter(p[0]);}}>{p[1]}</button>;
