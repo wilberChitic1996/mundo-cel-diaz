@@ -5647,24 +5647,28 @@ function App(props) {
 
   function resetPOS(){ setCart([]);setCashIn("");setClientName("");setInitialPay("");setPayType("completo");setPayMethod("Efectivo");setSelectedClientId(null);setSaleNote(""); }
 
+  var checkoutInProgress=useRef(false);
   async function checkout(){
     if(!cart.length)return;
     if(!clientName.trim()){showFlash("El nombre del cliente es obligatorio","err");return;}
+    if(checkoutInProgress.current)return;
+    checkoutInProgress.current=true;
     var client=clientName.trim();
     var items=cart.map(function(i){return {id:i.id,code:i.code,name:i.name,price:i.price,qty:i.qty,shelf:i.shelf,originalPrice:i.originalPrice||null,discountBy:i.discountBy||null,discountByRole:i.discountByRole||null,discountAt:i.discountAt||null};});
     var registradoPor={userId:session.userId,name:session.name,role:session.role};
-    var base={id:gid(),date:new Date().toISOString(),client:client,clientId:selectedClientId||null,items:items,total:cartTotal,method:payMethod,registradoPor:registradoPor,nota:saleNote.trim()||null};
+    var nota=saleNote.trim()||null;
     function deduct(){ setProducts(function(p){return p.map(function(x){var ci=cart.find(function(i){return i.id===x.id;});return ci&&x.unit!=="serv"?Object.assign({},x,{stock:x.stock-ci.qty}):x;}); }); }
     var idempotencyKey=gid()+"-"+Date.now();
     if(payType==="completo"){
       try {
-        await salesAPI.create({client:client,total:cartTotal,method:payMethod,items:cart,idempotencyKey:idempotencyKey});
+        await salesAPI.create({client:client,total:cartTotal,method:payMethod,items:cart,nota:nota,idempotencyKey:idempotencyKey});
         var freshSales = await salesAPI.getAll();
         var ns = (freshSales||[]).map(function(s){return Object.assign({},s,{items:s.sale_items||[],total:Number(s.total),date:s.created_at,registradoPor:s.registrado_por||null,payType:s.pay_type||'completo',status:s.status||'completado'});});
         setSales(ns);
       } catch(e){
         var errMsg=e&&e.error?e.error:null;
         showFlash("⛔ "+(errMsg||"Error al registrar la venta. Verifica tu conexión."),"err");
+        checkoutInProgress.current=false;
         return;
       }
       deduct();
@@ -5673,19 +5677,21 @@ function App(props) {
       var paid=payType==="parcial"?Math.min(initPaidVal,cartTotal):0;
       var balance=cartTotal-paid;
       try{
-        await salesAPI.create({client:client,total:cartTotal,method:payMethod,items:cart,payType:payType,initialPay:paid,idempotencyKey:idempotencyKey});
+        await salesAPI.create({client:client,total:cartTotal,method:payMethod,items:cart,payType:payType,initialPay:paid,nota:nota,idempotencyKey:idempotencyKey});
         var freshAccs = await accountsAPI.getAll();
         var na=(freshAccs||[]).map(function(a){return Object.assign({},a,{items:a.account_items||[],payments:(a.account_payments||[]).map(function(_pp){return Object.assign({},_pp,{date:_pp.date||_pp.created_at,amount:Number(_pp.amount),registradoPor:_pp.registrado_por||_pp.registradoPor||null});}),total:Number(a.total),paid:Number(a.paid),balance:Number(a.balance),date:a.created_at,registradoPor:a.registrado_por||null});});
         setAccounts(na);
       }catch(e){
         var errMsg2=e&&e.error?e.error:null;
         showFlash("⛔ "+(errMsg2||"Error al registrar la cuenta. Verifica tu conexión."),"err");
+        checkoutInProgress.current=false;
         return;
       }
       deduct();
       showFlash(payType==="pendiente"?"⏳ Pendiente — "+Q(cartTotal)+" por cobrar":"💰 Abono "+Q(paid)+" — Saldo: "+Q(balance),"warn");
     }
     resetPOS();
+    checkoutInProgress.current=false;
   }
 
   async function addPayment(accountId,amount,method,note){
