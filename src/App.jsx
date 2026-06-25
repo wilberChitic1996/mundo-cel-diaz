@@ -1739,7 +1739,7 @@ function CajaScreen(props) {
   var movements=[];
   sales.forEach(function(s){
     if(s.method==="Efectivo"&&new Date(s.date).toDateString()===todayStr&&s.status==='completado'){
-      movements.push({id:s.id,date:s.date,desc:"Venta",detail:s.client,amount:s.total,type:"entrada"});
+      movements.push({id:s.id,date:s.date,desc:"Venta",detail:s.client,amount:s.total,type:"entrada",note:s.nota||""});
     }
   });
   accounts.forEach(function(a){
