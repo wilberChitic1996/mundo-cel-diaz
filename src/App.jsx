@@ -7823,13 +7823,18 @@ function CuadresScreen(props){
 
   function printCuadre(){
     var _si=getStore(); var _sn=_si.store_name||STORE_FALLBACK;
-    var salesRows=periodSales.slice().sort(function(a,b){return new Date(b.date)-new Date(a.date);}).map(function(s){
+    // Todas las ventas del período (cobradas + crédito) para el detalle
+    var allPeriodSales=periodSales.concat(periodSalesCredito).slice().sort(function(a,b){return new Date(b.date)-new Date(a.date);});
+    var totalTransacciones=allPeriodSales.length;
+    var totalVentasBrutas=totalVentas+totalVentasCredito;
+    var salesRows=allPeriodSales.map(function(s){
+      var isCredito=s.status==='cuenta';
       return '<tr><td>'+new Date(s.date).toLocaleDateString("es-GT",{day:"2-digit",month:"short"})+'</td>'+
         '<td>'+new Date(s.date).toLocaleTimeString("es-GT",{hour:"2-digit",minute:"2-digit"})+'</td>'+
         '<td>'+s.client+'</td>'+
         '<td>'+(s.items||[]).length+' art.</td>'+
-        '<td><span style="background:#E1F5EE;color:#085041;padding:2px 8px;border-radius:12px;font-size:11px;">'+s.method+'</span></td>'+
-        '<td style="text-align:right;font-weight:700;color:#1D9E75;">Q '+Number(s.total).toFixed(2)+'</td></tr>';
+        '<td><span style="background:'+(isCredito?'#FFF3E0':'#E1F5EE')+';color:'+(isCredito?'#E65100':'#085041')+';padding:2px 8px;border-radius:12px;font-size:11px;">'+(isCredito?'Crédito':s.method)+'</span></td>'+
+        '<td style="text-align:right;font-weight:700;color:'+(isCredito?'#E65100':'#1D9E75')+';">Q '+Number(s.total).toFixed(2)+'</td></tr>';
     }).join("");
 
     var html='<!DOCTYPE html><html><head><meta charset="UTF-8"><title>Cuadre — '+_sn+'</title>'+
@@ -7861,11 +7866,12 @@ function CuadresScreen(props){
 
     '<div class="section"><div class="section-title">📊 Resumen de ingresos</div>'+
     '<div class="grid4">'+
-      '<div class="metric"><div class="lbl">Transacciones</div><div class="val">'+periodSales.length+'</div></div>'+
-      '<div class="metric"><div class="lbl">Ventas brutas</div><div class="val">Q '+totalVentas.toFixed(2)+'</div></div>'+
+      '<div class="metric"><div class="lbl">Transacciones</div><div class="val">'+totalTransacciones+'</div></div>'+
+      '<div class="metric"><div class="lbl">Cobrado (ef/tarjeta)</div><div class="val">Q '+totalVentas.toFixed(2)+'</div></div>'+
+      (totalVentasCredito>0?'<div class="metric" style="border-left-color:#E65100;"><div class="lbl">Crédito otorgado</div><div class="val" style="color:#E65100;">Q '+totalVentasCredito.toFixed(2)+'</div></div>':'')+
       '<div class="metric"><div class="lbl">Abonos cobrados</div><div class="val">Q '+abonosPeriod.toFixed(2)+'</div></div>'+
       '<div class="metric" style="border-left-color:#2E7D32;"><div class="lbl">Ingresos netos</div><div class="val" style="color:#2E7D32;">Q '+totalIngresosNeto.toFixed(2)+'</div></div>'+
-    '</div></div>'+
+    '</div></div>'+(totalVentasCredito>0?'<div style="background:#FFF3E0;border-left:4px solid #E65100;border-radius:8px;padding:10px 14px;margin-bottom:20px;font-size:11px;color:#7A3700;"><b>Nota:</b> Q '+totalVentasCredito.toFixed(2)+' corresponden a ventas a crédito ('+periodSalesCredito.length+' venta'+(periodSalesCredito.length!==1?'s':'')+') — aún pendientes de cobro.</div>':'')+
 
     '<div class="section"><div class="section-title">💵 Por método de pago (neto)</div>'+
     '<div class="grid3">'+
@@ -7902,11 +7908,11 @@ function CuadresScreen(props){
     top5.map(function(item,i){return '<tr><td>'+(i+1)+'</td><td>'+item[0]+'</td><td style="font-weight:700;color:#1D9E75;">'+item[1]+' uds</td></tr>';}).join("")+
     '</tbody></table></div>':'')+
 
-    (periodSales.length>0?'<div class="section"><div class="section-title">📋 Detalle de ventas</div>'+
+    (allPeriodSales.length>0?'<div class="section"><div class="section-title">📋 Detalle de ventas</div>'+
     '<table><thead><tr><th>Fecha</th><th>Hora</th><th>Cliente</th><th>Artículos</th><th>Método</th><th style="text-align:right;">Total</th></tr></thead>'+
     '<tbody>'+salesRows+'</tbody>'+
     '<tfoot><tr style="background:#1a2535;color:#fff;"><td colspan="5" style="padding:8px 10px;font-weight:700;">TOTAL DEL PERÍODO</td>'+
-    '<td style="padding:8px 10px;text-align:right;font-weight:800;font-size:14px;">Q '+totalVentas.toFixed(2)+'</td></tr></tfoot>'+
+    '<td style="padding:8px 10px;text-align:right;font-weight:800;font-size:14px;">Q '+totalVentasBrutas.toFixed(2)+'</td></tr></tfoot>'+
     '</table></div>':
     '<div class="section" style="text-align:center;color:#999;padding:40px;">Sin ventas en el período seleccionado</div>')+
 
