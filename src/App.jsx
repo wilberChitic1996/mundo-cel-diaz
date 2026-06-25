@@ -3257,29 +3257,10 @@ function InventoryScreen(props) {
         </div>
       </div>
 
-      {/* Tabs + filtros sticky */}
-      <div style={{position:"sticky",top:0,zIndex:10,background:"var(--bg-page,#f5f4f0)",paddingBottom:12,marginBottom:4}}>
-        <div style={{display:"flex",gap:8,marginBottom:invView==="lista"?10:0}}>
-          <button style={btnTab(invView==="resumen")} onClick={function(){setInvView("resumen");setInvQ("");setSecFilter("");setInvPage(0);}}>▦ Resumen por sección</button>
-          <button style={btnTab(invView==="lista")} onClick={function(){setInvView("lista");setInvPage(0);}}>☰ Lista completa</button>
-        </div>
-        {invView==="lista"&&(
-          <div style={{display:"flex",gap:8,flexWrap:"wrap"}}>
-            <input
-              type="text"
-              placeholder="Buscar por nombre, código o ubicación..."
-              value={invQ}
-              onChange={function(e){goSearch(e.target.value);}}
-              style={{flex:1,minWidth:200,padding:"9px 14px",borderRadius:8,border:"1px solid #ddd",fontSize:14,outline:"none",background:"#fff"}}
-            />
-            <select value={secFilter} onChange={function(e){setSecFilter(e.target.value);setInvPage(0);setInvQ("");}}
-              style={{padding:"9px 12px",borderRadius:8,border:"1px solid #ddd",fontSize:13,background:"#fff",color:"#333"}}>
-              <option value="">Todas las secciones</option>
-              {Object.keys(secsMap).sort().map(function(s){return <option key={s} value={s}>Sección {s}</option>;})}
-            </select>
-            {(invQ||secFilter)&&<button onClick={function(){setInvQ("");setSecFilter("");setInvPage(0);}} style={{padding:"9px 14px",borderRadius:8,border:"1px solid #ddd",background:"#f5f4f0",cursor:"pointer",fontSize:13,color:"#666"}}>✕ Limpiar</button>}
-          </div>
-        )}
+      {/* Tabs */}
+      <div style={{display:"flex",gap:8,marginBottom:16}}>
+        <button style={btnTab(invView==="resumen")} onClick={function(){setInvView("resumen");setInvQ("");setSecFilter("");setInvPage(0);}}>▦ Resumen por sección</button>
+        <button style={btnTab(invView==="lista")} onClick={function(){setInvView("lista");setInvPage(0);}}>☰ Lista completa</button>
       </div>
 
       {/* VISTA RESUMEN */}
@@ -3312,15 +3293,31 @@ function InventoryScreen(props) {
       {/* VISTA LISTA */}
       {invView==="lista"&&(
         <div>
-          <p style={{fontSize:12,color:"#888",marginBottom:8}}>{listFiltered.length} producto{listFiltered.length!==1?"s":""}{secFilter?" en Sección "+secFilter:""}{invQ?" · búsqueda: \""+invQ+"\"":""}</p>
+          {/* Filtros */}
+          <div style={{display:"flex",gap:8,marginBottom:12,flexWrap:"wrap"}}>
+            <input
+              type="text"
+              placeholder="Buscar por nombre, código o ubicación..."
+              value={invQ}
+              onChange={function(e){goSearch(e.target.value);}}
+              style={{flex:1,minWidth:200,padding:"9px 14px",borderRadius:8,border:"1px solid #ddd",fontSize:14,outline:"none"}}
+            />
+            <select value={secFilter} onChange={function(e){setSecFilter(e.target.value);setInvPage(0);setInvQ("");}}
+              style={{padding:"9px 12px",borderRadius:8,border:"1px solid #ddd",fontSize:13,background:"#fff",color:"#333"}}>
+              <option value="">Todas las secciones</option>
+              {Object.keys(secsMap).sort().map(function(s){return <option key={s} value={s}>Sección {s}</option>;})}
+            </select>
+            {(invQ||secFilter)&&<button onClick={function(){setInvQ("");setSecFilter("");setInvPage(0);}} style={{padding:"9px 14px",borderRadius:8,border:"1px solid #ddd",background:"#f5f4f0",cursor:"pointer",fontSize:13,color:"#666"}}>✕ Limpiar</button>}
+          </div>
+          <p style={{fontSize:12,color:"#888",marginBottom:10}}>{listFiltered.length} producto{listFiltered.length!==1?"s":""}{secFilter?" en Sección "+secFilter:""}{invQ?" · búsqueda: \""+invQ+"\"":""}</p>
 
-          {/* Tabla — overflow visible para que thead sticky funcione */}
-          <div style={{background:"#fff",borderRadius:12,border:"1px solid rgba(0,0,0,0.08)"}}>
-            <table style={{width:"100%",borderCollapse:"collapse",borderRadius:12,overflow:"hidden"}}>
+          {/* Tabla */}
+          <div style={{background:"#fff",borderRadius:12,border:"1px solid rgba(0,0,0,0.08)",overflow:"hidden"}}>
+            <table style={{width:"100%",borderCollapse:"collapse"}}>
               <thead>
                 <tr style={{background:NAVY}}>
-                  {["Ubicación","Código","Producto","Categoría","Stock","Precio"].map(function(h,hi,arr){
-                    return <th key={h} style={{padding:"10px 14px",textAlign:"left",color:"#fff",fontSize:12,fontWeight:700,position:"sticky",top:0,zIndex:1,background:NAVY,borderRadius:hi===0?"12px 0 0 0":hi===arr.length-1?"0 12px 0 0":0}}>{h}</th>;
+                  {["Ubicación","Código","Producto","Categoría","Stock","Precio"].map(function(h){
+                    return <th key={h} style={{padding:"10px 14px",textAlign:"left",color:"#fff",fontSize:12,fontWeight:700}}>{h}</th>;
                   })}
                 </tr>
               </thead>
