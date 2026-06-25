@@ -294,3 +294,25 @@ img, video { max-width: 100%; display: block; }
   .sidebar-mobile, .mobile-header { display: none !important; }
   body { background: white !important; color: black !important; }
 }
+
+/* ── 12. Contenedor de tabla con scroll propio y thead sticky ──
+   Usar className="tbl-wrap" en el div que envuelve cada <table>
+   principal. El thead queda fijo mientras las filas se desplazan,
+   igual que el panel izquierdo: el nombre del sistema fijo, el
+   contenido scrollea debajo.
+   ── */
+.tbl-wrap {
+  overflow-y: auto;
+  max-height: calc(100vh - 260px);
+}
+.tbl-wrap thead th {
+  position: sticky;
+  top: 0;
+  z-index: 2;
+}
+@media (max-width: 768px) {
+  .tbl-wrap {
+    max-height: calc(100vh - 200px);
+    overflow-x: auto;
+  }
+}

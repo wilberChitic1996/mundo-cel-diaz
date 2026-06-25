@@ -2909,7 +2909,7 @@ function ReturnsScreen(props) {
 
       <div style={sC}>
         {returns.length===0?<p style={{textAlign:"center",color:"#999",padding:40}}>Sin devoluciones registradas</p>:(
-          <table style={{width:"100%",borderCollapse:"collapse"}}>
+          <div className="tbl-wrap"><table style={{width:"100%",borderCollapse:"collapse"}}>
             <thead><tr>{["#","Fecha","Cliente","Motivo","Estado artículo","Reembolso","Monto reimb.","Valor artícs."].map(function(h){return <th key={h} style={h==="#"?Object.assign({},sTH,{width:40,textAlign:"center"}):sTH}>{h}</th>;})}</tr></thead>
             <tbody>
               {retPag.paged.map(function(r,index){
@@ -2928,7 +2928,7 @@ function ReturnsScreen(props) {
                 );
               })}
             </tbody>
-          </table>
+          </table></div>
         )}
         <retPag.Pager/>
       </div>
@@ -2963,7 +2963,7 @@ function DefectiveScreen(props) {
         </div>
         <div style={sC}>
           {filtered.length===0?<p style={{textAlign:"center",color:"#999",padding:40}}>Sin piezas en esta categoría</p>:(
-              <table style={{width:"100%",borderCollapse:"collapse"}}>
+              <div className="tbl-wrap"><table style={{width:"100%",borderCollapse:"collapse"}}>
                 <thead><tr>{["#","Fecha","Código","Pieza","Cant.","Precio","Motivo","Estado","Acciones"].map(function(h){return <th key={h} style={h==="#"?Object.assign({},sTH,{width:40,textAlign:"center"}):sTH}>{h}</th>;})}</tr></thead>
                 <tbody>
                 {defPag.paged.map(function(d,index){
@@ -2994,7 +2994,7 @@ function DefectiveScreen(props) {
                   );
                 })}
                 </tbody>
-              </table>
+              </table></div>
           )}
           <defPag.Pager/>
         </div>
@@ -3118,7 +3118,7 @@ function ProductsScreen(props) {
           </div>
         </div>
         <div style={sC}>
-          <table style={{width:"100%",borderCollapse:"collapse"}}>
+          <div className="tbl-wrap"><table style={{width:"100%",borderCollapse:"collapse"}}>
             <thead><tr>{["#","Código","Nombre","Categoría","Estantería","Precio","Costo","Margen","Stock",""].map(function(h){return <th key={h} style={h==="#"?Object.assign({},sTH,{width:40,textAlign:"center"}):sTH}>{h}</th>;})}</tr></thead>
             <tbody>
             {prodPag.paged.map(function(p,index){
@@ -3146,7 +3146,7 @@ function ProductsScreen(props) {
             })}
             {filtered.length===0&&<tr><td colSpan={9} style={Object.assign({},sTD,{textAlign:"center",color:"#999",padding:32})}>Sin resultados</td></tr>}
             </tbody>
-          </table>
+          </table></div>
           <prodPag.Pager/>
         </div>
         {priceHistProd&&(
@@ -3196,63 +3196,162 @@ function ProductsScreen(props) {
 }
 
 /* ── Inventario ── */
+var INV_LIST_PAGE = 20;
+
 function InventoryScreen(props) {
   var products=props.products;
-  var secs={};
-  products.filter(function(p){return p.unit!=="serv";}).forEach(function(p){
-    var s=(p.shelf||"").split("-")[0];
-    if(!secs[s])secs[s]=[];
-    secs[s].push(p);
+  var _iq=useState(""); var invQ=_iq[0]; var setInvQ=_iq[1];
+  var _vw=useState("resumen"); var invView=_vw[0]; var setInvView=_vw[1];
+  var _sec=useState(""); var secFilter=_sec[0]; var setSecFilter=_sec[1];
+  var _pg=useState(0); var invPage=_pg[0]; var setInvPage=_pg[1];
+
+  var nonServ=products.filter(function(p){return p.unit!=="serv";});
+  var total=nonServ.reduce(function(s,p){return s+p.stock;},0);
+
+  // Secciones para resumen y filtro
+  var secsMap={};
+  nonServ.forEach(function(p){
+    var s=(p.shelf||"Sin sección").split("-")[0]||"Sin sección";
+    if(!secsMap[s])secsMap[s]={count:0,stock:0,alerts:0};
+    secsMap[s].count++;
+    secsMap[s].stock+=p.stock;
+    if(p.stock<5)secsMap[s].alerts++;
   });
-  var total=products.filter(function(p){return p.unit!=="serv";}).reduce(function(s,p){return s+p.stock;},0);
+
+  // Lista filtrada para vista lista
+  var listFiltered=nonServ.filter(function(p){
+    var q=invQ.toLowerCase();
+    var matchQ=!q||(p.name||"").toLowerCase().indexOf(q)>=0||(p.code||"").toLowerCase().indexOf(q)>=0||(p.shelf||"").toLowerCase().indexOf(q)>=0;
+    var s=(p.shelf||"Sin sección").split("-")[0]||"Sin sección";
+    var matchS=!secFilter||s===secFilter;
+    return matchQ&&matchS;
+  }).slice().sort(function(a,b){return (a.shelf||"").localeCompare(b.shelf||"");});
+
+  var totalPages=Math.ceil(listFiltered.length/INV_LIST_PAGE);
+  var pageItems=listFiltered.slice(invPage*INV_LIST_PAGE,(invPage+1)*INV_LIST_PAGE);
+
+  function goSearch(q){ setInvQ(q); setInvPage(0); if(q) setInvView("lista"); }
+  function goSec(s){ setSecFilter(s===secFilter?"":s); setInvView("lista"); setInvPage(0); setInvQ(""); }
+
+  var btnTab=function(active){ return {padding:"7px 16px",borderRadius:6,border:"1px solid "+(active?TEAL:"#ddd"),background:active?TEAL:"#fff",color:active?"#fff":"#555",fontWeight:active?700:400,fontSize:13,cursor:"pointer"}; };
+
   return (
-      <div>
-        <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:20,flexWrap:"wrap",gap:10}}>
-          <p style={H1}>🗄️ Inventario<HelpTip text={"Lista completa de productos y servicios.\n\n• Stock: cantidad disponible en físico\n• Stock mínimo: si baja de este número aparece alerta en el Dashboard\n• Costo: precio de compra (para calcular ganancia)\n• Estantería: ubicación física del producto\n\nSolo el administrador puede crear, editar o desactivar productos."}/></p>
-          <div style={{display:"flex",gap:8,alignItems:"center",flexWrap:"wrap"}}>
-            <div style={{background:"#f5f4f0",borderRadius:8,padding:"8px 14px",fontSize:13,color:"#666"}}>
-              <b>{products.filter(function(p){return p.unit!=="serv";}).length}</b> productos · <b style={{color:TEAL}}>{total}</b> uds
-            </div>
-            <button style={Object.assign({},mB("teal"),{padding:"6px 12px",fontSize:12})} onClick={function(){
-              var cols=["Código","Nombre","Categoría","Ubicación","Stock","Precio","Costo"];
-              var rows=products.filter(function(p){return p.unit!=="serv";}).map(function(p){
-                return[p.code||"",p.name,p.category||"",p.shelf||"",p.stock,p.price.toFixed(2),p.cost.toFixed(2)];
-              });
-              exportExcel(rows,cols,"inventario");
-            }}>📊 Excel</button>
-            <button style={Object.assign({},mB("blue"),{padding:"6px 12px",fontSize:12})} onClick={function(){
-              var cols=["Código","Nombre","Categoría","Ubic.","Stock","Precio","Costo"];
-              var rows=products.filter(function(p){return p.unit!=="serv";}).map(function(p){
-                return[p.code||"",p.name,p.category||"",p.shelf||"",p.stock,"Q"+p.price.toFixed(2),"Q"+p.cost.toFixed(2)];
-              });
-              exportPDF("Inventario de Productos",cols,rows,"inventario");
-            }}>📄 PDF</button>
+    <div>
+      {/* Header */}
+      <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:16,flexWrap:"wrap",gap:10}}>
+        <p style={H1}>🗄️ Inventario<HelpTip text={"Lista completa de productos.\n\n• Vista Resumen: secciones con conteo y alertas\n• Vista Lista: tabla completa paginada con búsqueda y filtros"}/></p>
+        <div style={{display:"flex",gap:8,alignItems:"center",flexWrap:"wrap"}}>
+          <div style={{background:"#f5f4f0",borderRadius:8,padding:"8px 14px",fontSize:13,color:"#666"}}>
+            <b>{nonServ.length}</b> productos · <b style={{color:TEAL}}>{total}</b> uds
           </div>
-        </div>
-        <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fill,minmax(265px,1fr))",gap:16}}>
-          {Object.keys(secs).sort().map(function(sec){
-            var prods=secs[sec];
-            var tot=prods.reduce(function(s,p){return s+p.stock;},0);
-            var al=prods.filter(function(p){return p.stock<5;}).length;
-            return (
-                <div key={sec} style={sC}>
-                  <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:14}}>
-                    <div><p style={{fontWeight:700,fontSize:16,margin:0}}>Sección {sec}</p><p style={{fontSize:12,color:"#666",margin:"3px 0 0"}}>{prods.length} productos · {tot} uds</p></div>
-                    {al>0&&<span style={mBg("amber")}>{al} alerta{al!==1?"s":""}</span>}
-                  </div>
-                  {prods.slice().sort(function(a,b){return a.shelf.localeCompare(b.shelf);}).map(function(p){
-                    return (
-                        <div key={p.id} style={{display:"flex",justifyContent:"space-between",alignItems:"center",padding:"6px 0",borderBottom:"1px solid rgba(0,0,0,0.06)"}}>
-                          <div style={{fontSize:13}}><span style={{fontFamily:"monospace",fontSize:10,color:"#999",marginRight:6}}>{p.shelf}</span><span>{p.name}</span></div>
-                          <span style={mBg(p.stock===0?"red":p.stock<5?"amber":"green")}>{p.stock}</span>
-                        </div>
-                    );
-                  })}
-                </div>
-            );
-          })}
+          <button style={Object.assign({},mB("teal"),{padding:"6px 12px",fontSize:12})} onClick={function(){
+            var cols=["Código","Nombre","Categoría","Ubicación","Stock","Precio","Costo"];
+            var rows=nonServ.map(function(p){ return[p.code||"",p.name,p.category||"",p.shelf||"",p.stock,p.price.toFixed(2),p.cost.toFixed(2)]; });
+            exportExcel(rows,cols,"inventario");
+          }}>📊 Excel</button>
+          <button style={Object.assign({},mB("blue"),{padding:"6px 12px",fontSize:12})} onClick={function(){
+            var cols=["Código","Nombre","Categoría","Ubic.","Stock","Precio","Costo"];
+            var rows=nonServ.map(function(p){ return[p.code||"",p.name,p.category||"",p.shelf||"","Q"+p.price.toFixed(2),"Q"+p.cost.toFixed(2)]; });
+            exportPDF("Inventario de Productos",cols,rows,"inventario");
+          }}>📄 PDF</button>
         </div>
       </div>
+
+      {/* Tabs */}
+      <div style={{display:"flex",gap:8,marginBottom:16}}>
+        <button style={btnTab(invView==="resumen")} onClick={function(){setInvView("resumen");setInvQ("");setSecFilter("");setInvPage(0);}}>▦ Resumen por sección</button>
+        <button style={btnTab(invView==="lista")} onClick={function(){setInvView("lista");setInvPage(0);}}>☰ Lista completa</button>
+      </div>
+
+      {/* VISTA RESUMEN */}
+      {invView==="resumen"&&(
+        <div>
+          <p style={{fontSize:13,color:"#888",marginBottom:12}}>Toca una sección para ver sus productos en detalle.</p>
+          <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fill,minmax(200px,1fr))",gap:12}}>
+            {Object.keys(secsMap).sort().map(function(sec){
+              var s=secsMap[sec];
+              return (
+                <div key={sec} onClick={function(){goSec(sec);}}
+                  style={{background:"#fff",borderRadius:12,border:"1px solid "+(s.alerts>0?"#F59E0B":"rgba(0,0,0,0.08)"),padding:"16px",cursor:"pointer",transition:"box-shadow 0.15s"}}
+                  onMouseEnter={function(e){e.currentTarget.style.boxShadow="0 4px 12px rgba(0,0,0,0.1)";}}
+                  onMouseLeave={function(e){e.currentTarget.style.boxShadow="none";}}
+                >
+                  <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start",marginBottom:8}}>
+                    <p style={{fontWeight:700,fontSize:15,margin:0,color:NAVY}}>Sección {sec}</p>
+                    {s.alerts>0&&<span style={mBg("amber")}>{s.alerts}</span>}
+                  </div>
+                  <p style={{fontSize:13,color:"#666",margin:"0 0 4px"}}>{s.count} producto{s.count!==1?"s":""}</p>
+                  <p style={{fontSize:13,color:TEAL,fontWeight:700,margin:0}}>{s.stock} uds en stock</p>
+                  <p style={{fontSize:11,color:"#aaa",margin:"8px 0 0"}}>Ver productos →</p>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      )}
+
+      {/* VISTA LISTA */}
+      {invView==="lista"&&(
+        <div>
+          {/* Filtros */}
+          <div style={{display:"flex",gap:8,marginBottom:12,flexWrap:"wrap"}}>
+            <input
+              type="text"
+              placeholder="Buscar por nombre, código o ubicación..."
+              value={invQ}
+              onChange={function(e){goSearch(e.target.value);}}
+              style={{flex:1,minWidth:200,padding:"9px 14px",borderRadius:8,border:"1px solid #ddd",fontSize:14,outline:"none"}}
+            />
+            <select value={secFilter} onChange={function(e){setSecFilter(e.target.value);setInvPage(0);setInvQ("");}}
+              style={{padding:"9px 12px",borderRadius:8,border:"1px solid #ddd",fontSize:13,background:"#fff",color:"#333"}}>
+              <option value="">Todas las secciones</option>
+              {Object.keys(secsMap).sort().map(function(s){return <option key={s} value={s}>Sección {s}</option>;})}
+            </select>
+            {(invQ||secFilter)&&<button onClick={function(){setInvQ("");setSecFilter("");setInvPage(0);}} style={{padding:"9px 14px",borderRadius:8,border:"1px solid #ddd",background:"#f5f4f0",cursor:"pointer",fontSize:13,color:"#666"}}>✕ Limpiar</button>}
+          </div>
+          <p style={{fontSize:12,color:"#888",marginBottom:10}}>{listFiltered.length} producto{listFiltered.length!==1?"s":""}{secFilter?" en Sección "+secFilter:""}{invQ?" · búsqueda: \""+invQ+"\"":""}</p>
+
+          {/* Tabla */}
+          <div className="tbl-wrap" style={{background:"#fff",borderRadius:12,border:"1px solid rgba(0,0,0,0.08)",maxHeight:"calc(100vh - 320px)"}}>
+            <table style={{width:"100%",borderCollapse:"collapse"}}>
+              <thead>
+                <tr style={{background:NAVY}}>
+                  {["Ubicación","Código","Producto","Categoría","Stock","Precio"].map(function(h){
+                    return <th key={h} style={{padding:"10px 14px",textAlign:"left",color:"#fff",fontSize:12,fontWeight:700,background:NAVY}}>{h}</th>;
+                  })}
+                </tr>
+              </thead>
+              <tbody>
+                {pageItems.length===0&&(
+                  <tr><td colSpan={6} style={{padding:32,textAlign:"center",color:"#aaa",fontSize:14}}>Sin resultados</td></tr>
+                )}
+                {pageItems.map(function(p,i){
+                  return (
+                    <tr key={p.id} style={{background:i%2===0?"#fff":"#fafafa",borderBottom:"1px solid rgba(0,0,0,0.04)"}}>
+                      <td style={{padding:"9px 14px",fontFamily:"monospace",fontSize:12,color:"#888"}}>{p.shelf||"—"}</td>
+                      <td style={{padding:"9px 14px",fontFamily:"monospace",fontSize:12,color:"#555"}}>{p.code||"—"}</td>
+                      <td style={{padding:"9px 14px",fontSize:13,fontWeight:500,color:NAVY}}>{p.name}</td>
+                      <td style={{padding:"9px 14px",fontSize:12,color:"#666"}}>{p.category||"—"}</td>
+                      <td style={{padding:"9px 14px"}}><span style={mBg(p.stock===0?"red":p.stock<5?"amber":"green")}>{p.stock}</span></td>
+                      <td style={{padding:"9px 14px",fontSize:13,fontWeight:600,color:NAVY}}>Q{Number(p.price).toFixed(2)}</td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
+
+          {/* Paginación */}
+          {totalPages>1&&(
+            <div style={{display:"flex",justifyContent:"center",alignItems:"center",gap:8,marginTop:16}}>
+              <button disabled={invPage===0} onClick={function(){setInvPage(invPage-1);}} style={{padding:"6px 14px",borderRadius:6,border:"1px solid #ddd",background:invPage===0?"#f5f5f5":"#fff",cursor:invPage===0?"default":"pointer",color:invPage===0?"#ccc":"#333"}}>‹ Anterior</button>
+              <span style={{fontSize:13,color:"#666"}}>Página {invPage+1} de {totalPages}</span>
+              <button disabled={invPage>=totalPages-1} onClick={function(){setInvPage(invPage+1);}} style={{padding:"6px 14px",borderRadius:6,border:"1px solid #ddd",background:invPage>=totalPages-1?"#f5f5f5":"#fff",cursor:invPage>=totalPages-1?"default":"pointer",color:invPage>=totalPages-1?"#ccc":"#333"}}>Siguiente ›</button>
+            </div>
+          )}
+        </div>
+      )}
+    </div>
   );
 }
 
@@ -3588,7 +3687,7 @@ function HistoryScreen(props) {
         </div>
         <div style={sC}>
           {fmovs.length===0?<p style={{textAlign:"center",color:"#999",padding:48}}>Sin movimientos en esta categoria</p>:(
-              <table style={{width:"100%",borderCollapse:"collapse"}}>
+              <div className="tbl-wrap"><table style={{width:"100%",borderCollapse:"collapse"}}>
                 <thead><tr>{["#","Fecha","Hora","Tipo","Cliente","Metodo","Atendio","Monto",""].map(function(h){return <th key={h} style={h==="#"?Object.assign({},sTH,{width:40,textAlign:"center"}):sTH}>{h}</th>;})}</tr></thead>
                 <tbody>
                 {histPag.paged.map(function(m,index){
@@ -3621,7 +3720,7 @@ function HistoryScreen(props) {
                   );
                 })}
                 </tbody>
-              </table>
+              </table></div>
           )}
         </div>
         {fmovs.length>0&&React.createElement(histPag.Pager)}
@@ -4070,7 +4169,7 @@ function ClientsScreen(props) {
             {q?"Sin resultados para \""+q+"\""  :"Sin clientes registrados aún"}
           </div>
         ):(
-          <table style={{width:"100%",borderCollapse:"collapse"}}>
+          <div className="tbl-wrap"><table style={{width:"100%",borderCollapse:"collapse"}}>
             <thead><tr>{["#","Código","Nombre","DPI","Teléfono","Compras","Deuda",""].map(function(h){return <th key={h} style={h==="#"?Object.assign({},sTH,{width:40,textAlign:"center"}):sTH}>{h}</th>;})}</tr></thead>
             <tbody>
               {cliPag.paged.map(function(c,index){
@@ -4094,7 +4193,7 @@ function ClientsScreen(props) {
                 );
               })}
             </tbody>
-          </table>
+          </table></div>
         )}
         {filtered.length>0&&React.createElement(cliPag.Pager)}
       </div>
@@ -4262,7 +4361,7 @@ function WarrantiesScreen(props){
 
       <div style={sC}>
         {displayed.length===0?<p style={{textAlign:"center",color:"#999",padding:40}}>Sin garantías en esta categoría</p>:(
-          <table style={{width:"100%",borderCollapse:"collapse"}}>
+          <div className="tbl-wrap"><table style={{width:"100%",borderCollapse:"collapse"}}>
             <thead><tr>{["#","Cliente","Descripción","Referencia","Inicio","Vencimiento","Estado",""].map(function(h){return <th key={h} style={h==="#"?Object.assign({},sTH,{width:40,textAlign:"center"}):sTH}>{h}</th>;})}</tr></thead>
             <tbody>
             {warPag.paged.map(function(w,index){
@@ -4287,7 +4386,7 @@ function WarrantiesScreen(props){
               );
             })}
             </tbody>
-          </table>
+          </table></div>
         )}
         <warPag.Pager/>
       </div>
@@ -4449,7 +4548,7 @@ function SuppliersScreen(props){
               <p style={{fontSize:15,marginBottom:4}}>Sin proveedores registrados</p>
               <p style={{fontSize:13}}>Agrega tu primer proveedor para registrar compras y actualizar stock</p>
             </div>
-            :<table style={{width:"100%",borderCollapse:"collapse"}}>
+            :<div className="tbl-wrap"><table style={{width:"100%",borderCollapse:"collapse"}}>
               <thead><tr>{["#","Proveedor","Teléfono","Correo","Dirección","Notas",""].map(function(h){return <th key={h} style={h==="#"?Object.assign({},sTH,{width:40,textAlign:"center"}):sTH}>{h}</th>;})}</tr></thead>
               <tbody>
               {supPag.paged.map(function(s,index){
@@ -4471,7 +4570,7 @@ function SuppliersScreen(props){
                 );
               })}
               </tbody>
-            </table>}
+            </table></div>}
           <supPag.Pager/>
         </div>
       )}
@@ -4484,7 +4583,7 @@ function SuppliersScreen(props){
               <p style={{fontSize:32,marginBottom:8}}>📦</p>
               <p style={{fontSize:15}}>Sin compras registradas aún</p>
             </div>
-            :<table style={{width:"100%",borderCollapse:"collapse"}}>
+            :<div className="tbl-wrap"><table style={{width:"100%",borderCollapse:"collapse"}}>
               <thead><tr>{["#","Fecha","Proveedor","Artículos","Total","Registrado por"].map(function(h){return <th key={h} style={h==="#"?Object.assign({},sTH,{width:40,textAlign:"center"}):sTH}>{h}</th>;})}</tr></thead>
               <tbody>
               {purPag.paged.map(function(p,index){
@@ -4506,7 +4605,7 @@ function SuppliersScreen(props){
                 );
               })}
               </tbody>
-            </table>}
+            </table></div>}
           <purPag.Pager/>
         </div>
       )}
@@ -6532,8 +6631,8 @@ function AuditScreen(props){
 
       {err&&<div style={{background:"var(--bg-error,#FDECEA)",color:"var(--text-error,#791F1F)",padding:"10px 14px",borderRadius:8,marginBottom:12}}>{err}</div>}
 
-      <div style={Object.assign({},sC,{padding:0,overflow:"hidden"})}>
-        <div className="t-resp">
+      <div style={Object.assign({},sC,{padding:0})}>
+        <div className="t-resp tbl-wrap">
           <table style={{width:"100%",borderCollapse:"collapse"}}>
             <thead>
               <tr>
@@ -7098,7 +7197,7 @@ function RepairsScreen(props){
       {/* LISTA */}
       <div style={sC}>
         {filtered.length===0?<p style={{textAlign:"center",color:"#999",padding:40}}>Sin órdenes en esta categoría</p>:(
-          <table style={{width:"100%",borderCollapse:"collapse"}}>
+          <div className="tbl-wrap"><table style={{width:"100%",borderCollapse:"collapse"}}>
             <thead><tr>{["#","Orden","Cliente","Dispositivo","Técnico","Estado","Costo","Entrega",""].map(function(h){return <th key={h} style={h==="#"?Object.assign({},sTH,{width:40,textAlign:"center"}):sTH}>{h}</th>;})}</tr></thead>
             <tbody>
               {repPag.paged.slice().sort(function(a,b){return new Date(b.createdAt)-new Date(a.createdAt);}).map(function(r,index){
@@ -7120,7 +7219,7 @@ function RepairsScreen(props){
                 );
               })}
             </tbody>
-          </table>
+          </table></div>
         )}
         {filtered.length>0&&React.createElement(repPag.Pager)}
       </div>
