@@ -25,22 +25,27 @@ export default defineConfig({
         ],
       },
       workbox: {
+        // Cambiar cacheId fuerza nombres de caché nuevos — el SW viejo
+        // detecta las cachés como obsoletas y cede el control al nuevo.
+        cacheId: 'praxisgt-v2',
         globPatterns: ['**/*.{js,css,html,ico,png,svg,woff2}'],
-        // Forzar que el Service Worker nuevo tome control de inmediato y borre
-        // las cachés viejas (builds anteriores y datos del API cacheados).
         skipWaiting: true,
         clientsClaim: true,
         cleanupOutdatedCaches: true,
-        // IMPORTANTE: el API NUNCA se cachea. Este es un sistema 100% online —
-        // todas las llamadas a /api/ deben ir SIEMPRE al servidor en vivo.
-        // Cachear respuestas del API causaba que se sirvieran datos viejos o
-        // vacíos (respaldos incompletos, listas vacías). El Service Worker solo
-        // cachea la app (JS/CSS/imágenes), nunca los datos.
         navigateFallbackDenylist: [/^\/api\//],
         runtimeCaching: [
           {
             urlPattern: /\/api\//i,
             handler: 'NetworkOnly',
+          },
+          {
+            // HTML de navegación: NetworkFirst para siempre recibir el deploy más reciente
+            urlPattern: ({ request }) => request.mode === 'navigate',
+            handler: 'NetworkFirst',
+            options: {
+              cacheName: 'praxisgt-v2-navigate',
+              networkTimeoutSeconds: 5,
+            },
           },
         ],
       },
