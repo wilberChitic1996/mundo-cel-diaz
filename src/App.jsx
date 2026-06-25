@@ -3312,12 +3312,12 @@ function InventoryScreen(props) {
           <p style={{fontSize:12,color:"#888",marginBottom:10}}>{listFiltered.length} producto{listFiltered.length!==1?"s":""}{secFilter?" en Sección "+secFilter:""}{invQ?" · búsqueda: \""+invQ+"\"":""}</p>
 
           {/* Tabla */}
-          <div style={{background:"#fff",borderRadius:12,border:"1px solid rgba(0,0,0,0.08)",overflow:"hidden"}}>
+          <div style={{background:"#fff",borderRadius:12,border:"1px solid rgba(0,0,0,0.08)"}}>
             <table style={{width:"100%",borderCollapse:"collapse"}}>
               <thead>
                 <tr style={{background:NAVY}}>
                   {["Ubicación","Código","Producto","Categoría","Stock","Precio"].map(function(h){
-                    return <th key={h} style={{padding:"10px 14px",textAlign:"left",color:"#fff",fontSize:12,fontWeight:700}}>{h}</th>;
+                    return <th key={h} style={{padding:"10px 14px",textAlign:"left",color:"#fff",fontSize:12,fontWeight:700,position:"sticky",top:0,zIndex:2,background:NAVY}}>{h}</th>;
                   })}
                 </tr>
               </thead>
