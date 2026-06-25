@@ -3196,51 +3196,83 @@ function ProductsScreen(props) {
 }
 
 /* ── Inventario ── */
+var INV_PAGE_SIZE = 15;
+
 function InventoryScreen(props) {
   var products=props.products;
+  var _iq=useState(""); var invQ=_iq[0]; var setInvQ=_iq[1];
+  var _exp=useState({}); var expanded=_exp[0]; var setExpanded=_exp[1];
+
+  var nonServ=products.filter(function(p){return p.unit!=="serv";});
+  var total=nonServ.reduce(function(s,p){return s+p.stock;},0);
+
+  var filtered=invQ.trim()===""?nonServ:nonServ.filter(function(p){
+    var q=invQ.toLowerCase();
+    return (p.name||"").toLowerCase().indexOf(q)>=0||(p.code||"").toLowerCase().indexOf(q)>=0||(p.shelf||"").toLowerCase().indexOf(q)>=0;
+  });
+
   var secs={};
-  products.filter(function(p){return p.unit!=="serv";}).forEach(function(p){
-    var s=(p.shelf||"").split("-")[0];
+  filtered.forEach(function(p){
+    var s=(p.shelf||"Sin sección").split("-")[0]||"Sin sección";
     if(!secs[s])secs[s]=[];
     secs[s].push(p);
   });
-  var total=products.filter(function(p){return p.unit!=="serv";}).reduce(function(s,p){return s+p.stock;},0);
+
+  function toggleExpand(sec){
+    setExpanded(function(prev){ var n=Object.assign({},prev); n[sec]=!n[sec]; return n; });
+  }
+
   return (
       <div>
-        <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:20,flexWrap:"wrap",gap:10}}>
+        <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:16,flexWrap:"wrap",gap:10}}>
           <p style={H1}>🗄️ Inventario<HelpTip text={"Lista completa de productos y servicios.\n\n• Stock: cantidad disponible en físico\n• Stock mínimo: si baja de este número aparece alerta en el Dashboard\n• Costo: precio de compra (para calcular ganancia)\n• Estantería: ubicación física del producto\n\nSolo el administrador puede crear, editar o desactivar productos."}/></p>
           <div style={{display:"flex",gap:8,alignItems:"center",flexWrap:"wrap"}}>
             <div style={{background:"#f5f4f0",borderRadius:8,padding:"8px 14px",fontSize:13,color:"#666"}}>
-              <b>{products.filter(function(p){return p.unit!=="serv";}).length}</b> productos · <b style={{color:TEAL}}>{total}</b> uds
+              <b>{nonServ.length}</b> productos · <b style={{color:TEAL}}>{total}</b> uds
             </div>
             <button style={Object.assign({},mB("teal"),{padding:"6px 12px",fontSize:12})} onClick={function(){
               var cols=["Código","Nombre","Categoría","Ubicación","Stock","Precio","Costo"];
-              var rows=products.filter(function(p){return p.unit!=="serv";}).map(function(p){
+              var rows=nonServ.map(function(p){
                 return[p.code||"",p.name,p.category||"",p.shelf||"",p.stock,p.price.toFixed(2),p.cost.toFixed(2)];
               });
               exportExcel(rows,cols,"inventario");
             }}>📊 Excel</button>
             <button style={Object.assign({},mB("blue"),{padding:"6px 12px",fontSize:12})} onClick={function(){
               var cols=["Código","Nombre","Categoría","Ubic.","Stock","Precio","Costo"];
-              var rows=products.filter(function(p){return p.unit!=="serv";}).map(function(p){
+              var rows=nonServ.map(function(p){
                 return[p.code||"",p.name,p.category||"",p.shelf||"",p.stock,"Q"+p.price.toFixed(2),"Q"+p.cost.toFixed(2)];
               });
               exportPDF("Inventario de Productos",cols,rows,"inventario");
             }}>📄 PDF</button>
           </div>
         </div>
+
+        <div style={{marginBottom:16}}>
+          <input
+            type="text"
+            placeholder="Buscar por nombre, código o ubicación..."
+            value={invQ}
+            onChange={function(e){setInvQ(e.target.value);}}
+            style={{width:"100%",padding:"10px 14px",borderRadius:8,border:"1px solid #ddd",fontSize:14,outline:"none",boxSizing:"border-box"}}
+          />
+          {invQ&&<p style={{fontSize:12,color:"#888",margin:"6px 0 0"}}>{filtered.length} resultado{filtered.length!==1?"s":""} para "{invQ}"</p>}
+        </div>
+
         <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fill,minmax(265px,1fr))",gap:16}}>
           {Object.keys(secs).sort().map(function(sec){
-            var prods=secs[sec];
+            var prods=secs[sec].slice().sort(function(a,b){return (a.shelf||"").localeCompare(b.shelf||"");});
             var tot=prods.reduce(function(s,p){return s+p.stock;},0);
             var al=prods.filter(function(p){return p.stock<5;}).length;
+            var isExp=expanded[sec]||invQ.trim()!=="";
+            var visible=isExp?prods:prods.slice(0,INV_PAGE_SIZE);
+            var hidden=prods.length-INV_PAGE_SIZE;
             return (
                 <div key={sec} style={sC}>
                   <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:14}}>
                     <div><p style={{fontWeight:700,fontSize:16,margin:0}}>Sección {sec}</p><p style={{fontSize:12,color:"#666",margin:"3px 0 0"}}>{prods.length} productos · {tot} uds</p></div>
                     {al>0&&<span style={mBg("amber")}>{al} alerta{al!==1?"s":""}</span>}
                   </div>
-                  {prods.slice().sort(function(a,b){return a.shelf.localeCompare(b.shelf);}).map(function(p){
+                  {visible.map(function(p){
                     return (
                         <div key={p.id} style={{display:"flex",justifyContent:"space-between",alignItems:"center",padding:"6px 0",borderBottom:"1px solid rgba(0,0,0,0.06)"}}>
                           <div style={{fontSize:13}}><span style={{fontFamily:"monospace",fontSize:10,color:"#999",marginRight:6}}>{p.shelf}</span><span>{p.name}</span></div>
@@ -3248,10 +3280,19 @@ function InventoryScreen(props) {
                         </div>
                     );
                   })}
+                  {prods.length>INV_PAGE_SIZE&&(
+                    <button
+                      onClick={function(){toggleExpand(sec);}}
+                      style={{marginTop:10,width:"100%",padding:"7px",borderRadius:6,border:"1px solid #ddd",background:"#f9f9f9",cursor:"pointer",fontSize:13,color:TEAL,fontWeight:600}}
+                    >
+                      {isExp?"▲ Ver menos":"▼ Ver "+hidden+" más"}
+                    </button>
+                  )}
                 </div>
             );
           })}
         </div>
+        {filtered.length===0&&<p style={{textAlign:"center",color:"#aaa",marginTop:40,fontSize:14}}>Sin resultados para "{invQ}"</p>}
       </div>
   );
 }
