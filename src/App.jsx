@@ -1113,39 +1113,132 @@ function HelpTip(props) {
 }
 
 /* ── ProductForm ── */
-var FORM_FIELDS = [
-  {k:"name",     l:"Nombre",              ph:"Ej: Pantalla...", tp:"text"  },
-  {k:"category", l:"Categoría",           ph:"Pantallas",       tp:"text"  },
-  {k:"shelf",    l:"Estantería",          ph:"A-01",            tp:"text"  },
-  {k:"price",    l:"Precio venta (Q)",    ph:"0.00",            tp:"number"},
-  {k:"cost",     l:"Costo (Q)",           ph:"0.00",            tp:"number"},
-  {k:"stock",    l:"Stock actual",        ph:"0",               tp:"number"},
-  {k:"minStock", l:"Stock mínimo (alerta)",ph:"5",              tp:"number"},
-  {k:"unit",     l:"Unidad",              ph:"uni / serv",      tp:"text"  },
+var UNIT_OPTIONS = [
+  {v:"uni",  l:"Unidad (uni)"},
+  {v:"pza",  l:"Pieza (pza)"},
+  {v:"serv", l:"Servicio (serv)"},
 ];
+function normalizeProductField(k, v) {
+  if(typeof v !== "string") return v;
+  v = v.trim();
+  if(k === "name")     return v.charAt(0).toUpperCase() + v.slice(1);
+  if(k === "category") return v.charAt(0).toUpperCase() + v.slice(1).toLowerCase().replace(/^\w/, function(c){ return v.charAt(0).toUpperCase(); });
+  if(k === "shelf")    return v.toUpperCase();
+  if(k === "code")     return v.toUpperCase();
+  return v;
+}
+function titleCase(str){
+  str = str.trim();
+  return str.charAt(0).toUpperCase() + str.slice(1);
+}
 function ProductForm(props) {
   var product=props.product; var onSave=props.onSave; var onCancel=props.onCancel;
+  var products=props.products||[];
   var _s=useState(Object.assign({},product)); var form=_s[0]; var setForm=_s[1];
   var _e=useState(""); var err=_e[0]; var setErr=_e[1];
-  function set(k,v){ setForm(function(f){ var n=Object.assign({},f); n[k]=v; return n; }); }
+  var _w=useState(""); var warn=_w[0]; var setWarn=_w[1];
+
+  // Lista de categorías únicas existentes normalizadas
+  var existingCats = [];
+  var seen = {};
+  products.forEach(function(p){
+    var c = (p.category||"").trim();
+    if(c && !seen[c.toLowerCase()]){ seen[c.toLowerCase()]=true; existingCats.push(c); }
+  });
+  existingCats.sort();
+
+  function set(k,v){
+    setErr(""); setWarn("");
+    // Advertencia si categoria es similar a una existente pero no igual
+    if(k==="category" && v.trim()){
+      var lower = v.trim().toLowerCase();
+      var similar = existingCats.find(function(c){ return c.toLowerCase()!==lower && (c.toLowerCase().startsWith(lower)||lower.startsWith(c.toLowerCase())||c.toLowerCase().replace(/s$/,"")===lower.replace(/s$/,"")); });
+      if(similar) setWarn('¿Quisiste decir "'+similar+'"?');
+    }
+    setForm(function(f){ var n=Object.assign({},f); n[k]=v; return n; });
+  }
   function doSave(){
     if(!form.name||!form.name.trim()){setErr("El nombre es obligatorio");return;}
-    onSave(Object.assign({},form,{price:parseFloat(form.price)||0,cost:parseFloat(form.cost)||0,stock:parseInt(form.stock)||0,minStock:parseInt(form.minStock)||0}));
+    if(!form.category||!form.category.trim()){setErr("La categoría es obligatoria");return;}
+    if(!form.price||isNaN(parseFloat(form.price))){setErr("El precio es obligatorio");return;}
+    // Normalizar todos los campos de texto antes de guardar
+    onSave(Object.assign({},form,{
+      name:     titleCase(form.name||""),
+      category: titleCase(form.category||""),
+      shelf:    (form.shelf||"").trim().toUpperCase(),
+      code:     (form.code||"").trim().toUpperCase(),
+      unit:     form.unit||"uni",
+      price:    parseFloat(form.price)||0,
+      cost:     parseFloat(form.cost)||0,
+      stock:    parseInt(form.stock)||0,
+      minStock: parseInt(form.minStock)||0,
+    }));
   }
   return (
       <div style={Object.assign({},sC,{marginBottom:16,borderColor:TEAL,borderWidth:"1.5px"})}>
         <p style={{fontWeight:600,margin:"0 0 14px",fontSize:15}}>{product.id?"✏️ Editar":"➕ Nuevo Producto"}</p>
         {err&&<p style={{color:"#E24B4A",fontSize:13,margin:"0 0 10px"}}>⚠ {err}</p>}
         <div className="rg-4" style={{display:"grid",gridTemplateColumns:"repeat(4,1fr)",gap:12,marginBottom:14}}>
-          {FORM_FIELDS.map(function(f){
-            return (
-                <div key={f.k}>
-                  <label style={sL}>{f.l}</label>
-                  <input type={f.tp} style={sI} value={form[f.k]||""} placeholder={f.ph}
-                         onChange={function(e){setErr("");set(f.k,e.target.value);}}/>
-                </div>
-            );
-          })}
+          {/* Nombre */}
+          <div>
+            <label style={sL}>Nombre *</label>
+            <input type="text" style={sI} value={form.name||""} placeholder="Ej: Pantalla Samsung A24"
+              onChange={function(e){set("name",e.target.value);}}/>
+          </div>
+          {/* Categoría — combobox con lista de existentes */}
+          <div>
+            <label style={sL}>Categoría *</label>
+            <input type="text" list="cat-list" style={sI} value={form.category||""} placeholder="Ej: Pantallas"
+              onChange={function(e){set("category",e.target.value);}}
+              onBlur={function(e){
+                var v=e.target.value.trim();
+                if(v) set("category", titleCase(v));
+              }}/>
+            <datalist id="cat-list">
+              {existingCats.map(function(c){return <option key={c} value={c}/>;}) }
+            </datalist>
+            {warn&&<p style={{fontSize:11,color:"#E65100",margin:"3px 0 0"}}>⚠ {warn}</p>}
+          </div>
+          {/* Estantería */}
+          <div>
+            <label style={sL}>Estantería</label>
+            <input type="text" style={sI} value={form.shelf||""} placeholder="Ej: A-01"
+              onChange={function(e){set("shelf",e.target.value);}}
+              onBlur={function(e){set("shelf",(e.target.value||"").trim().toUpperCase());}}/>
+          </div>
+          {/* Código */}
+          <div>
+            <label style={sL}>Código</label>
+            <input type="text" style={sI} value={form.code||""} placeholder="Ej: MCD-001"
+              onChange={function(e){set("code",e.target.value);}}
+              onBlur={function(e){set("code",(e.target.value||"").trim().toUpperCase());}}/>
+          </div>
+          {/* Precio */}
+          <div>
+            <label style={sL}>Precio venta (Q) *</label>
+            <input type="number" style={sI} value={form.price||""} placeholder="0.00"
+              onChange={function(e){set("price",e.target.value);}}/>
+          </div>
+          {/* Costo */}
+          <div>
+            <label style={sL}>Costo (Q)</label>
+            <input type="number" style={sI} value={form.cost||""} placeholder="0.00"
+              onChange={function(e){set("cost",e.target.value);}}/>
+          </div>
+          {/* Stock */}
+          <div>
+            <label style={sL}>Stock actual</label>
+            <input type="number" style={sI} value={form.stock||""} placeholder="0"
+              onChange={function(e){set("stock",e.target.value);}}/>
+          </div>
+          {/* Unidad — dropdown fijo */}
+          <div>
+            <label style={sL}>Unidad</label>
+            <select style={Object.assign({},sI,{background:"#fff"})} value={form.unit||"uni"}
+              onChange={function(e){set("unit",e.target.value);}}>
+              {UNIT_OPTIONS.map(function(o){return <option key={o.v} value={o.v}>{o.l}</option>;})}
+            </select>
+          </div>
         </div>
         <div style={{display:"flex",gap:10}}>
           <button style={mB("teal")} onClick={doSave}>{product.id?"Guardar cambios":"Agregar"}</button>
@@ -3103,7 +3196,7 @@ function ProductsScreen(props) {
           </div>
         </div>
         {importMsg&&<div style={{background:importMsg.startsWith("✅")?"#EAF3DE":"#FCEBEB",border:"1px solid "+(importMsg.startsWith("✅")?"#97C459":"#F09595"),borderRadius:8,padding:"10px 16px",marginBottom:12,color:importMsg.startsWith("✅")?"#27500A":"#791F1F",fontSize:14,fontWeight:500}}>{importMsg}</div>}
-        {editProd&&<ProductForm product={editProd} onSave={function(p){saveProduct(p);setEditProd(null);}} onCancel={function(){setEditProd(null);}}/>}
+        {editProd&&<ProductForm product={editProd} products={products} onSave={function(p){saveProduct(p);setEditProd(null);}} onCancel={function(){setEditProd(null);}}/>}
         <div style={Object.assign({},sC,{marginBottom:14})}>
           <div style={{display:"flex",gap:10,flexWrap:"wrap",alignItems:"center"}}>
             <input style={Object.assign({},sI,{width:240,flex:"none"})} placeholder="Buscar..." value={search} onChange={function(e){setSearch(e.target.value);prodPag.setPage(1);}}/>
@@ -3983,18 +4076,20 @@ function ClientsScreen(props) {
   var _eu=useState(null); var editCli=_eu[0]; var setEditCli=_eu[1];
   var _fn=useState(""); var fName=_fn[0]; var setFName=_fn[1];
   var _fd=useState(""); var fDpi=_fd[0]; var setFDpi=_fd[1];
+  var _fn2=useState(""); var fNit=_fn2[0]; var setFNit=_fn2[1];
   var _ft=useState(""); var fTel=_ft[0]; var setFTel=_ft[1];
   var _fa=useState(""); var fAddr=_fa[0]; var setFAddr=_fa[1];
+  var _fem=useState(""); var fEmail=_fem[0]; var setFEmail=_fem[1];
   var _fe=useState(""); var fErr=_fe[0]; var setFErr=_fe[1];
 
   var filtered=clients.filter(function(c){
     if(!q.trim()) return true;
     var ql=q.toLowerCase();
-    return (c.name||"").toLowerCase().includes(ql)||(c.dpi||"").includes(q.trim())||(c.cliCode||"").toLowerCase().includes(ql)||(c.phone||"").includes(q.trim());
+    return (c.name||"").toLowerCase().includes(ql)||(c.dpi||"").includes(q.trim())||(c.nit||"").toLowerCase().includes(ql)||(c.cliCode||"").toLowerCase().includes(ql)||(c.phone||"").includes(q.trim())||(c.email||"").toLowerCase().includes(ql);
   });
   var cliPag=usePaginator(filtered,20);
 
-  function resetForm(){setFName("");setFDpi("");setFTel("");setFAddr("");setFErr("");setEditCli(null);setShowForm(false);}
+  function resetForm(){setFName("");setFDpi("");setFNit("");setFTel("");setFAddr("");setFEmail("");setFErr("");setEditCli(null);setShowForm(false);}
 
   function doSave(){
     if(!fName.trim()){setFErr("El nombre es obligatorio");return;}
@@ -4009,8 +4104,10 @@ function ClientsScreen(props) {
       cliCode:cliCode,
       name:fName.trim(),
       dpi:fDpi.trim()||"",
+      nit:(fNit.trim().toUpperCase())||"CF",
       phone:fTel.trim()||"",
       address:fAddr.trim()||"",
+      email:fEmail.trim()||"",
       active:true,
       createdAt:editCli?editCli.createdAt:new Date().toISOString(),
       createdBy:editCli?editCli.createdBy:{userId:session.userId,name:session.name,role:session.role},
@@ -4020,7 +4117,7 @@ function ClientsScreen(props) {
     resetForm();
   }
 
-  function startEdit(c){setEditCli(c);setFName(c.name);setFDpi(c.dpi||"");setFTel(c.phone||"");setFAddr(c.address||"");setFErr("");setShowForm(true);}
+  function startEdit(c){setEditCli(c);setFName(c.name);setFDpi(c.dpi||"");setFNit(c.nit&&c.nit!=="CF"?c.nit:"");setFTel(c.phone||"");setFAddr(c.address||"");setFEmail(c.email||"");setFErr("");setShowForm(true);}
 
   // Vista perfil 360°
   if(selCli){
@@ -4047,8 +4144,10 @@ function ClientsScreen(props) {
               </div>
               <div style={{display:"flex",gap:16,fontSize:13,color:"#666",flexWrap:"wrap"}}>
                 <span style={{fontFamily:"monospace",background:"#f5f4f0",padding:"2px 8px",borderRadius:6,fontWeight:600,color:TEAL}}>{cli.cliCode}</span>
+                <span>🧾 NIT: <b>{cli.nit||"CF"}</b></span>
                 {cli.dpi&&<span>🪪 DPI: {cli.dpi}</span>}
                 {cli.phone&&<span>📱 {cli.phone}</span>}
+                {cli.email&&<span>✉️ {cli.email}</span>}
                 {cli.address&&<span>📍 {cli.address}</span>}
               </div>
             </div>
@@ -4135,13 +4234,19 @@ function ClientsScreen(props) {
           <div className="form-grid-2" style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:12,marginBottom:14}}>
             <div><label style={sL}>Nombre completo *</label><input style={sI} value={fName} placeholder="Nombre del cliente" onChange={function(e){setFErr("");setFName(e.target.value);}}/></div>
             <div>
+              <label style={sL}>NIT (para factura) <span style={{color:"#888",fontWeight:400}}>— sin NIT escribe CF</span></label>
+              <input style={sI} value={fNit} placeholder="CF o ej: 1234567-8" onChange={function(e){setFNit(e.target.value.toUpperCase());}}/>
+              {fNit&&fNit!=="CF"&&<p style={{fontSize:11,color:"#666",margin:"3px 0 0"}}>Se guardará como: {fNit.trim().toUpperCase()||"CF"}</p>}
+            </div>
+            <div>
               <label style={sL}>DPI (13 dígitos, opcional)</label>
-              <input style={sI} value={fDpi} placeholder="Sin DPI → se asigna ID automático" maxLength={13} onChange={function(e){setFErr("");setFDpi(e.target.value.replace(/\D/g,""));}}/>
+              <input style={sI} value={fDpi} placeholder="Solo si lo tiene" maxLength={13} onChange={function(e){setFErr("");setFDpi(e.target.value.replace(/\D/g,""));}}/>
               {fDpi&&!validarDPI(fDpi)&&<p style={{fontSize:11,color:"#E24B4A",margin:"3px 0 0"}}>⚠ Debe tener 13 dígitos ({fDpi.length}/13)</p>}
               {fDpi&&validarDPI(fDpi)&&fDpi.length===13&&<p style={{fontSize:11,color:TEAL,margin:"3px 0 0"}}>✓ DPI válido</p>}
             </div>
             <div><label style={sL}>Teléfono</label><input style={sI} value={fTel} placeholder="Ej: 55551234" onChange={function(e){setFTel(e.target.value);}}/></div>
             <div><label style={sL}>Dirección</label><input style={sI} value={fAddr} placeholder="Opcional" onChange={function(e){setFAddr(e.target.value);}}/></div>
+            <div><label style={sL}>Correo electrónico</label><input type="email" style={sI} value={fEmail} placeholder="Para enviar facturas (opcional)" onChange={function(e){setFEmail(e.target.value);}}/></div>
           </div>
           {!editCli&&<div style={{background:"#f5f4f0",borderRadius:8,padding:"8px 14px",marginBottom:14,fontSize:12,color:"#666"}}>
             💡 Si el cliente no tiene DPI, se le asignará un código único automático (CLI-000001, CLI-000002…)
@@ -4160,7 +4265,7 @@ function ClientsScreen(props) {
       </div>
 
       <div style={Object.assign({},sC,{marginBottom:14})}>
-        <input style={sI} value={q} placeholder="🔍 Buscar por nombre, DPI, código CLI o teléfono..." onChange={function(e){setQ(e.target.value);}}/>
+        <input style={sI} value={q} placeholder="🔍 Buscar por nombre, NIT, DPI, código CLI o teléfono..." onChange={function(e){setQ(e.target.value);}}/>
       </div>
 
       <div style={sC}>
@@ -4170,7 +4275,7 @@ function ClientsScreen(props) {
           </div>
         ):(
           <div className="tbl-wrap"><table style={{width:"100%",borderCollapse:"collapse"}}>
-            <thead><tr>{["#","Código","Nombre","DPI","Teléfono","Compras","Deuda",""].map(function(h){return <th key={h} style={h==="#"?Object.assign({},sTH,{width:40,textAlign:"center"}):sTH}>{h}</th>;})}</tr></thead>
+            <thead><tr>{["#","Código","Nombre","NIT","Teléfono","Compras","Deuda",""].map(function(h){return <th key={h} style={h==="#"?Object.assign({},sTH,{width:40,textAlign:"center"}):sTH}>{h}</th>;})}</tr></thead>
             <tbody>
               {cliPag.paged.map(function(c,index){
                 var cliSalesCount=sales.filter(function(s){return s.clientId===c.id||(s.client===c.name&&!s.clientId);}).length;
@@ -4184,7 +4289,7 @@ function ClientsScreen(props) {
                       {c.name}
                       {esFrecuente&&<span style={Object.assign({},mBg("amber"),{marginLeft:6})}>⭐</span>}
                     </td>
-                    <td style={Object.assign({},sTD,{fontFamily:"monospace",fontSize:12})}>{c.dpi||<span style={{color:"#bbb"}}>Sin DPI</span>}</td>
+                    <td style={Object.assign({},sTD,{fontFamily:"monospace",fontSize:12})}>{c.nit||<span style={{color:"#bbb"}}>CF</span>}</td>
                     <td style={Object.assign({},sTD,{color:"#666"})}>{c.phone||"—"}</td>
                     <td style={sTD}>{cliSalesCount} compras</td>
                     <td style={sTD}>{cliDeuda>0?<span style={mBg("red")}>{Q(cliDeuda)}</span>:<span style={mBg("green")}>✓ Al día</span>}</td>
@@ -4409,6 +4514,7 @@ function SuppliersScreen(props){
   var _ms=useState(false); var showSupModal=_ms[0]; var setShowSupModal=_ms[1];
   var _editSup=useState(null); var editSup=_editSup[0]; var setEditSup=_editSup[1];
   var _sName=useState(""); var sName=_sName[0]; var setSName=_sName[1];
+  var _sNit=useState(""); var sNit=_sNit[0]; var setSnit=_sNit[1];
   var _sPhone=useState(""); var sPhone=_sPhone[0]; var setSPhone=_sPhone[1];
   var _sEmail=useState(""); var sEmail=_sEmail[0]; var setSEmail=_sEmail[1];
   var _sAddr=useState(""); var sAddr=_sAddr[0]; var setSAddr=_sAddr[1];
@@ -4446,18 +4552,18 @@ function SuppliersScreen(props){
   },[prodQ,products]);
 
   function openNewSup(){
-    setEditSup(null); setSName(""); setSPhone(""); setSEmail(""); setSAddr(""); setSNotes("");
+    setEditSup(null); setSName(""); setSnit(""); setSPhone(""); setSEmail(""); setSAddr(""); setSNotes("");
     setShowSupModal(true);
   }
   function openEditSup(s){
-    setEditSup(s); setSName(s.name||""); setSPhone(s.phone||""); setSEmail(s.email||"");
+    setEditSup(s); setSName(s.name||""); setSnit(s.nit||""); setSPhone(s.phone||""); setSEmail(s.email||"");
     setSAddr(s.address||""); setSNotes(s.notes||"");
     setShowSupModal(true);
   }
   function saveSup(){
     if(!sName.trim()) return alert("Nombre requerido");
     setSaving(true);
-    var data={name:sName.trim(),phone:sPhone.trim(),email:sEmail.trim(),address:sAddr.trim(),notes:sNotes.trim()};
+    var data={name:sName.trim(),nit:sNit.trim()||null,phone:sPhone.trim(),email:sEmail.trim(),address:sAddr.trim(),notes:sNotes.trim()};
     var prom=editSup?suppliersAPI.update(editSup.id,data):suppliersAPI.create(data);
     prom.then(function(s){
       if(editSup){
@@ -4615,7 +4721,7 @@ function SuppliersScreen(props){
         <div style={{position:"fixed",inset:0,background:"rgba(0,0,0,0.5)",display:"flex",alignItems:"center",justifyContent:"center",zIndex:1000,padding:16}}>
           <div style={{background:"#fff",borderRadius:14,padding:28,width:"100%",maxWidth:460}}>
             <p style={{fontWeight:700,fontSize:18,margin:"0 0 18px",color:NAVY}}>{editSup?"Editar proveedor":"Nuevo proveedor"}</p>
-            {[["Nombre *",sName,setSName,"Ej: Distribuidora XYZ"],["Teléfono",sPhone,setSPhone,"Ej: 5555-0000"],["Correo",sEmail,setSEmail,"Ej: ventas@proveedor.com"],["Dirección",sAddr,setSAddr,"Ej: Zona 4, Guatemala"],["Notas",sNotes,setSNotes,"Observaciones…"]].map(function(f){
+            {[["Nombre *",sName,setSName,"Ej: Distribuidora XYZ"],["NIT (tributario)",sNit,setSnit,"Ej: 1234567-8 (opcional)"],["Teléfono",sPhone,setSPhone,"Ej: 5555-0000"],["Correo",sEmail,setSEmail,"Ej: ventas@proveedor.com"],["Dirección",sAddr,setSAddr,"Ej: Zona 4, Guatemala"],["Notas",sNotes,setSNotes,"Observaciones…"]].map(function(f){
               return (
                 <div key={f[0]} style={{marginBottom:12}}>
                   <label style={{display:"block",fontWeight:600,fontSize:13,marginBottom:4}}>{f[0]}</label>
@@ -5862,13 +5968,25 @@ function App(props) {
   }
   async function saveProduct(prod){
     var isNew=!prod.id;
+    // Normalización de segunda capa — por si llega desde otro flujo (importación, etc.)
+    function tc(s){ s=(s||"").trim(); return s.charAt(0).toUpperCase()+s.slice(1); }
+    var clean={
+      code:     (prod.code||"").trim().toUpperCase(),
+      name:     tc(prod.name||""),
+      category: tc(prod.category||""),
+      shelf:    (prod.shelf||"").trim().toUpperCase(),
+      price:    prod.price||0,
+      cost:     prod.cost||0,
+      stock:    prod.stock||0,
+      unit:     prod.unit||"uni",
+    };
     try{
       if(!isNew){
-        await productsAPI.update(prod.id,{code:prod.code,name:prod.name,category:prod.category||'',shelf:prod.shelf||'',price:prod.price,cost:prod.cost||0,stock:prod.stock||0,unit:prod.unit||'uni'});
-        setProducts(function(p){return p.map(function(x){return x.id===prod.id?prod:x;});});
+        await productsAPI.update(prod.id,clean);
+        setProducts(function(p){return p.map(function(x){return x.id===prod.id?Object.assign({},prod,clean):x;});});
       } else {
-        var saved=await productsAPI.create({code:prod.code,name:prod.name,category:prod.category||'',shelf:prod.shelf||'',price:prod.price,cost:prod.cost||0,stock:prod.stock||0,unit:prod.unit||'uni'});
-        setProducts(function(p){return p.concat([Object.assign({},prod,{id:saved.id})]);});
+        var saved=await productsAPI.create(clean);
+        setProducts(function(p){return p.concat([Object.assign({},prod,clean,{id:saved.id})]);});
       }
     }catch(e){
       var emP=e&&e.error?e.error:null;
@@ -5972,8 +6090,9 @@ function App(props) {
 
   async function saveClient(obj, isEdit){
     try{
-      if(isEdit){ await clientsAPI.update(obj.id,{cliCode:obj.cliCode,name:obj.name,dpi:obj.dpi||null,phone:obj.phone||null,address:obj.address||null,active:obj.active!==false}); }
-      else { await clientsAPI.create({id:obj.id,cliCode:obj.cliCode,name:obj.name,dpi:obj.dpi||null,phone:obj.phone||null,address:obj.address||null,active:true,createdAt:obj.createdAt}); }
+      var cliData={cliCode:obj.cliCode,name:obj.name,dpi:obj.dpi||null,nit:obj.nit||"CF",phone:obj.phone||null,address:obj.address||null,email:obj.email||null,active:obj.active!==false};
+      if(isEdit){ await clientsAPI.update(obj.id,cliData); }
+      else { await clientsAPI.create(Object.assign({},cliData,{id:obj.id,active:true,createdAt:obj.createdAt})); }
       var fc=await clientsAPI.getAll();
       setClients((fc||[]).map(function(c){return Object.assign({},c,{cliCode:c.cli_code,createdAt:c.created_at});}));
     }catch(e){
