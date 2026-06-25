@@ -7916,9 +7916,10 @@ function CuadresScreen(props){
     '</div>'+
     '</body></html>';
 
+    var htmlWithPrint=html.replace('</body>','<script>window.onload=function(){window.print();};<\/script></body>');
     var w=window.open("","_blank","width=900,height=700");
-    w.document.write(html); w.document.close();
-    w.onload=function(){w.print();};
+    if(!w){showFlash("⚠️ El navegador bloqueó la ventana emergente. Permití los popups para este sitio e intentá de nuevo.","err");return;}
+    w.document.write(htmlWithPrint); w.document.close();
   }
 
   var rangos=[["hoy","Hoy"],["semana","Esta semana"],["quincenal","Últimos 15 días"],["mes","Este mes"],["mes_ant","Mes anterior"],["custom","Personalizado"]];
