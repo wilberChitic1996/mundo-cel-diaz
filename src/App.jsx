@@ -2909,7 +2909,7 @@ function ReturnsScreen(props) {
 
       <div style={sC}>
         {returns.length===0?<p style={{textAlign:"center",color:"#999",padding:40}}>Sin devoluciones registradas</p>:(
-          <table style={{width:"100%",borderCollapse:"collapse"}}>
+          <div className="tbl-wrap"><table style={{width:"100%",borderCollapse:"collapse"}}>
             <thead><tr>{["#","Fecha","Cliente","Motivo","Estado artículo","Reembolso","Monto reimb.","Valor artícs."].map(function(h){return <th key={h} style={h==="#"?Object.assign({},sTH,{width:40,textAlign:"center"}):sTH}>{h}</th>;})}</tr></thead>
             <tbody>
               {retPag.paged.map(function(r,index){
@@ -2928,7 +2928,7 @@ function ReturnsScreen(props) {
                 );
               })}
             </tbody>
-          </table>
+          </table></div>
         )}
         <retPag.Pager/>
       </div>
@@ -2963,7 +2963,7 @@ function DefectiveScreen(props) {
         </div>
         <div style={sC}>
           {filtered.length===0?<p style={{textAlign:"center",color:"#999",padding:40}}>Sin piezas en esta categoría</p>:(
-              <table style={{width:"100%",borderCollapse:"collapse"}}>
+              <div className="tbl-wrap"><table style={{width:"100%",borderCollapse:"collapse"}}>
                 <thead><tr>{["#","Fecha","Código","Pieza","Cant.","Precio","Motivo","Estado","Acciones"].map(function(h){return <th key={h} style={h==="#"?Object.assign({},sTH,{width:40,textAlign:"center"}):sTH}>{h}</th>;})}</tr></thead>
                 <tbody>
                 {defPag.paged.map(function(d,index){
@@ -2994,7 +2994,7 @@ function DefectiveScreen(props) {
                   );
                 })}
                 </tbody>
-              </table>
+              </table></div>
           )}
           <defPag.Pager/>
         </div>
@@ -3118,7 +3118,7 @@ function ProductsScreen(props) {
           </div>
         </div>
         <div style={sC}>
-          <table style={{width:"100%",borderCollapse:"collapse"}}>
+          <div className="tbl-wrap"><table style={{width:"100%",borderCollapse:"collapse"}}>
             <thead><tr>{["#","Código","Nombre","Categoría","Estantería","Precio","Costo","Margen","Stock",""].map(function(h){return <th key={h} style={h==="#"?Object.assign({},sTH,{width:40,textAlign:"center"}):sTH}>{h}</th>;})}</tr></thead>
             <tbody>
             {prodPag.paged.map(function(p,index){
@@ -3146,7 +3146,7 @@ function ProductsScreen(props) {
             })}
             {filtered.length===0&&<tr><td colSpan={9} style={Object.assign({},sTD,{textAlign:"center",color:"#999",padding:32})}>Sin resultados</td></tr>}
             </tbody>
-          </table>
+          </table></div>
           <prodPag.Pager/>
         </div>
         {priceHistProd&&(
@@ -3312,12 +3312,12 @@ function InventoryScreen(props) {
           <p style={{fontSize:12,color:"#888",marginBottom:10}}>{listFiltered.length} producto{listFiltered.length!==1?"s":""}{secFilter?" en Sección "+secFilter:""}{invQ?" · búsqueda: \""+invQ+"\"":""}</p>
 
           {/* Tabla */}
-          <div style={{background:"#fff",borderRadius:12,border:"1px solid rgba(0,0,0,0.08)",overflow:"hidden"}}>
+          <div className="tbl-wrap" style={{background:"#fff",borderRadius:12,border:"1px solid rgba(0,0,0,0.08)",maxHeight:"calc(100vh - 320px)"}}>
             <table style={{width:"100%",borderCollapse:"collapse"}}>
               <thead>
                 <tr style={{background:NAVY}}>
                   {["Ubicación","Código","Producto","Categoría","Stock","Precio"].map(function(h){
-                    return <th key={h} style={{padding:"10px 14px",textAlign:"left",color:"#fff",fontSize:12,fontWeight:700}}>{h}</th>;
+                    return <th key={h} style={{padding:"10px 14px",textAlign:"left",color:"#fff",fontSize:12,fontWeight:700,background:NAVY}}>{h}</th>;
                   })}
                 </tr>
               </thead>
@@ -3687,7 +3687,7 @@ function HistoryScreen(props) {
         </div>
         <div style={sC}>
           {fmovs.length===0?<p style={{textAlign:"center",color:"#999",padding:48}}>Sin movimientos en esta categoria</p>:(
-              <table style={{width:"100%",borderCollapse:"collapse"}}>
+              <div className="tbl-wrap"><table style={{width:"100%",borderCollapse:"collapse"}}>
                 <thead><tr>{["#","Fecha","Hora","Tipo","Cliente","Metodo","Atendio","Monto",""].map(function(h){return <th key={h} style={h==="#"?Object.assign({},sTH,{width:40,textAlign:"center"}):sTH}>{h}</th>;})}</tr></thead>
                 <tbody>
                 {histPag.paged.map(function(m,index){
@@ -3720,7 +3720,7 @@ function HistoryScreen(props) {
                   );
                 })}
                 </tbody>
-              </table>
+              </table></div>
           )}
         </div>
         {fmovs.length>0&&React.createElement(histPag.Pager)}
@@ -4169,7 +4169,7 @@ function ClientsScreen(props) {
             {q?"Sin resultados para \""+q+"\""  :"Sin clientes registrados aún"}
           </div>
         ):(
-          <table style={{width:"100%",borderCollapse:"collapse"}}>
+          <div className="tbl-wrap"><table style={{width:"100%",borderCollapse:"collapse"}}>
             <thead><tr>{["#","Código","Nombre","DPI","Teléfono","Compras","Deuda",""].map(function(h){return <th key={h} style={h==="#"?Object.assign({},sTH,{width:40,textAlign:"center"}):sTH}>{h}</th>;})}</tr></thead>
             <tbody>
               {cliPag.paged.map(function(c,index){
@@ -4193,7 +4193,7 @@ function ClientsScreen(props) {
                 );
               })}
             </tbody>
-          </table>
+          </table></div>
         )}
         {filtered.length>0&&React.createElement(cliPag.Pager)}
       </div>
@@ -4361,7 +4361,7 @@ function WarrantiesScreen(props){
 
       <div style={sC}>
         {displayed.length===0?<p style={{textAlign:"center",color:"#999",padding:40}}>Sin garantías en esta categoría</p>:(
-          <table style={{width:"100%",borderCollapse:"collapse"}}>
+          <div className="tbl-wrap"><table style={{width:"100%",borderCollapse:"collapse"}}>
             <thead><tr>{["#","Cliente","Descripción","Referencia","Inicio","Vencimiento","Estado",""].map(function(h){return <th key={h} style={h==="#"?Object.assign({},sTH,{width:40,textAlign:"center"}):sTH}>{h}</th>;})}</tr></thead>
             <tbody>
             {warPag.paged.map(function(w,index){
@@ -4386,7 +4386,7 @@ function WarrantiesScreen(props){
               );
             })}
             </tbody>
-          </table>
+          </table></div>
         )}
         <warPag.Pager/>
       </div>
@@ -4548,7 +4548,7 @@ function SuppliersScreen(props){
               <p style={{fontSize:15,marginBottom:4}}>Sin proveedores registrados</p>
               <p style={{fontSize:13}}>Agrega tu primer proveedor para registrar compras y actualizar stock</p>
             </div>
-            :<table style={{width:"100%",borderCollapse:"collapse"}}>
+            :<div className="tbl-wrap"><table style={{width:"100%",borderCollapse:"collapse"}}>
               <thead><tr>{["#","Proveedor","Teléfono","Correo","Dirección","Notas",""].map(function(h){return <th key={h} style={h==="#"?Object.assign({},sTH,{width:40,textAlign:"center"}):sTH}>{h}</th>;})}</tr></thead>
               <tbody>
               {supPag.paged.map(function(s,index){
@@ -4570,7 +4570,7 @@ function SuppliersScreen(props){
                 );
               })}
               </tbody>
-            </table>}
+            </table></div>}
           <supPag.Pager/>
         </div>
       )}
@@ -4583,7 +4583,7 @@ function SuppliersScreen(props){
               <p style={{fontSize:32,marginBottom:8}}>📦</p>
               <p style={{fontSize:15}}>Sin compras registradas aún</p>
             </div>
-            :<table style={{width:"100%",borderCollapse:"collapse"}}>
+            :<div className="tbl-wrap"><table style={{width:"100%",borderCollapse:"collapse"}}>
               <thead><tr>{["#","Fecha","Proveedor","Artículos","Total","Registrado por"].map(function(h){return <th key={h} style={h==="#"?Object.assign({},sTH,{width:40,textAlign:"center"}):sTH}>{h}</th>;})}</tr></thead>
               <tbody>
               {purPag.paged.map(function(p,index){
@@ -4605,7 +4605,7 @@ function SuppliersScreen(props){
                 );
               })}
               </tbody>
-            </table>}
+            </table></div>}
           <purPag.Pager/>
         </div>
       )}
@@ -6631,8 +6631,8 @@ function AuditScreen(props){
 
       {err&&<div style={{background:"var(--bg-error,#FDECEA)",color:"var(--text-error,#791F1F)",padding:"10px 14px",borderRadius:8,marginBottom:12}}>{err}</div>}
 
-      <div style={Object.assign({},sC,{padding:0,overflow:"hidden"})}>
-        <div className="t-resp">
+      <div style={Object.assign({},sC,{padding:0})}>
+        <div className="t-resp tbl-wrap">
           <table style={{width:"100%",borderCollapse:"collapse"}}>
             <thead>
               <tr>
@@ -7197,7 +7197,7 @@ function RepairsScreen(props){
       {/* LISTA */}
       <div style={sC}>
         {filtered.length===0?<p style={{textAlign:"center",color:"#999",padding:40}}>Sin órdenes en esta categoría</p>:(
-          <table style={{width:"100%",borderCollapse:"collapse"}}>
+          <div className="tbl-wrap"><table style={{width:"100%",borderCollapse:"collapse"}}>
             <thead><tr>{["#","Orden","Cliente","Dispositivo","Técnico","Estado","Costo","Entrega",""].map(function(h){return <th key={h} style={h==="#"?Object.assign({},sTH,{width:40,textAlign:"center"}):sTH}>{h}</th>;})}</tr></thead>
             <tbody>
               {repPag.paged.slice().sort(function(a,b){return new Date(b.createdAt)-new Date(a.createdAt);}).map(function(r,index){
@@ -7219,7 +7219,7 @@ function RepairsScreen(props){
                 );
               })}
             </tbody>
-          </table>
+          </table></div>
         )}
         {filtered.length>0&&React.createElement(repPag.Pager)}
       </div>
