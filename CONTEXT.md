@@ -1,6 +1,16 @@
 # CONTEXT — MUNDO CEL DIAZ
 > Este archivo lo actualiza Claude al final de cada sesión. Úsalo como prompt inicial.
 
+## ⚠️ REGLAS OPERATIVAS CRÍTICAS (Claude DEBE cumplirlas SIEMPRE)
+
+1. **Mantener este archivo SIEMPRE actualizado.** Actualizar CONTEXT.md y subirlo a `main` cada vez que:
+   - Se mergea un PR o se hace cualquier cambio en código/infra/DB.
+   - El usuario diga "agregar esto a pendientes" o algo similar → registrarlo de inmediato en la sección 🔴 PENDIENTE.
+   - Se complete un pendiente → marcarlo como ✅ y moverlo a "Ya resuelto".
+2. **No depender de la memoria entre sesiones.** Verificar SIEMPRE contra el código real (git log, GitHub, lectura de archivos) antes de afirmar que algo está hecho o pendiente.
+3. **Commitear el MD directo a `main`** (es documentación, no requiere PR). Si el usuario prefiere PR para el MD, preguntar. Mensaje de commit claro describiendo qué cambió de estado.
+4. **Al cerrar cada sesión:** agregar entrada al Historial de sesiones con fecha y lo trabajado.
+
 ## Prompt de inicio (copia y pega esto en cada nueva sesión)
 
 ```
@@ -17,8 +27,10 @@ y dime en qué quedamos. Luego pregúntame qué trabajamos hoy.
 
 | # | Tarea | Estado | Cómo se confirma |
 |---|-------|--------|------------------|
+| 0 | **🚨 Superadmin sin acceso** — perdió contraseña / trabado en 2FA | 🔴 EN PROGRESO | Reset de password vía SQL en Supabase. Hash de `MundoCel2026!` listo. Ojo: 2FA envía código a email del superadmin vía Resend — como dominio NO está verificado, solo llega a wchitic75@gmail.com. Verificar que el email del superadmin sea ese. |
 | 1 | **Resend** — verificar dominio `mundoceldiaz.com` para 2FA | ⏳ "Pending" (esperando propagación DNS de Namecheap) | Entrar a resend.com/domains → debe decir "Verified" en verde |
 | 2 | **Vercel staging** — cambiar rama productiva de `main` → `staging` | ❌ Pendiente | Proyecto `mundo-cel-diaz-staging` → Settings → Git → Production Branch |
+| 3 | **Ambiente piloto** — terminar configuración staging (frontend+API+DB de prueba) | ❌ Pendiente | Retomar: definir si staging usa BD separada o la misma con tenant de prueba |
 
 **Ya resuelto y cerrado (no rehacer):**
 - ✅ Railway: proyecto accidental `protective-upliftment` ELIMINADO
