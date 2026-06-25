@@ -536,7 +536,7 @@ function LoginScreen(props) {
       var em=(e&&e.error)?e.error:"";
       if(em&&em!=="Error de conexion"){setRecErr(em);return;}
       var users=await db.load(UK,[]);
-      var user=(users||[]).find(function(u){return u.email.toLowerCase()===recEmail.trim().toLowerCase()&&u.active;});
+      var user=(users||[]).find(function(u){return String(u.email||"").toLowerCase()===recEmail.trim().toLowerCase()&&u.active;});
       if(!user){setRecErr("No se encontró una cuenta activa con ese email.");return;}
       if(!user.secQuestion){setRecErr("Esta cuenta no tiene pregunta de seguridad configurada. Contactá al administrador del sistema.");return;}
       setRecUser(Object.assign({},user,{source:"local"}));
@@ -763,7 +763,8 @@ function UsersScreen(props) {
         var apiUsers=await usersAPI.getAll();
         if(apiUsers&&apiUsers.length>0){
           var merged=apiUsers.map(function(au){
-            var local=(u||[]).find(function(lu){return lu.email.toLowerCase()===au.email.toLowerCase();});
+            var auEmail=String(au.email||"").toLowerCase();
+            var local=(u||[]).find(function(lu){return String(lu.email||"").toLowerCase()===auEmail;});
             return {id:au.id,name:au.name,email:au.email,role:au.role,active:au.active,
               passwordHash:local?local.passwordHash:"",secQuestion:au.sec_question||(local?local.secQuestion:""),
               secAnswerHash:local?local.secAnswerHash:"",lastLogin:au.last_login||null,
@@ -783,7 +784,7 @@ function UsersScreen(props) {
 
   async function saveUser(){
     if(!fName.trim()||!fEmail.trim()){setFErr("Nombre y email son obligatorios");return;}
-    var dup=users.find(function(u){return u.email.toLowerCase()===fEmail.trim().toLowerCase()&&(!editUser||u.id!==editUser.id);});
+    var dup=users.find(function(u){return String(u.email||"").toLowerCase()===fEmail.trim().toLowerCase()&&(!editUser||u.id!==editUser.id);});
     if(dup){setFErr("Ya existe un usuario con ese email");return;}
     if(!editUser&&!fPass.trim()){setFErr("La contraseña es obligatoria para usuarios nuevos");return;}
     if(fPass&&fPass.length<8){setFErr("Contraseña: mínimo 8 caracteres");return;}
