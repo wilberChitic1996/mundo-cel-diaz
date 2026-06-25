@@ -11,6 +11,26 @@ y dime en qué quedamos. Luego pregúntame qué trabajamos hoy.
 
 ---
 
+## 🔴 PENDIENTE AHORA MISMO (actualizado 25 junio 2026)
+
+> Verificar SIEMPRE contra el código/PRs reales antes de afirmar. No confiar solo en memoria.
+
+| # | Tarea | Estado | Cómo se confirma |
+|---|-------|--------|------------------|
+| 1 | **Resend** — verificar dominio `mundoceldiaz.com` para 2FA | ⏳ "Pending" (esperando propagación DNS de Namecheap) | Entrar a resend.com/domains → debe decir "Verified" en verde |
+| 2 | **Vercel staging** — cambiar rama productiva de `main` → `staging` | ❌ Pendiente | Proyecto `mundo-cel-diaz-staging` → Settings → Git → Production Branch |
+
+**Ya resuelto y cerrado (no rehacer):**
+- ✅ Railway: proyecto accidental `protective-upliftment` ELIMINADO
+- ✅ BUG #9 validación itemCondition (PR #32 API, mergeado)
+- ✅ DNS en Namecheap: DKIM verificado, SPF (host `send`) y MX configurados; Resend "Restart" ejecutado
+
+**Notas Resend:** plan free solo envía al correo registrado (wchitic75@gmail.com) HASTA que el dominio esté verificado. El MX no se pudo crear en Namecheap (no expone MX en Advanced DNS) pero NO es necesario para *enviar* — solo para recibir, que no usamos. Con DKIM + SPF basta.
+
+**Infra staging:** API staging = Railway proyecto `observant-possibility`. API prod = Railway `remarkable-warmth`. Frontend staging = Vercel `mundo-cel-diaz-staging.vercel.app`. Ambos staging usan rama `staging`.
+
+---
+
 ## Infraestructura
 
 | Parte | Tecnología | URL |
@@ -51,15 +71,22 @@ y dime en qué quedamos. Luego pregúntame qué trabajamos hoy.
 - Contraseñas con bcrypt (auto-migra SHA-256 al primer login)
 - CORS restringido a www.mundoceldiaz.com via FRONTEND_URL en Railway
 - Rate limiting en login y recuperación
-- JWT con expiración de 8h
+- JWT con expiración de 8h (payload usa `userId`, NO `id`)
 - Errores internos de Supabase ocultos al cliente
+- Helmet en todos los endpoints
+- **2FA por correo para superadmin** (código 6 dígitos, 10 min, vía Resend) — backend auth.js + pantalla frontend
+- Logs de seguridad en login fallido/exitoso/token inválido
+- **Aislamiento multi-tenant**: todas las tablas con `tenant_id` filtradas vía `withTenant()`. RLS activo en todas las tablas. API usa service_role (seguridad vive en capa Express). Tablas hijo (sale_items, account_items, etc.) heredan tenant del padre — correcto.
+- **9 bugs corregidos en revisión defensiva (25 jun)**: req.user.userId en admin.js, tenant-leak en pagos de cuentas, sale_items huérfanos con rollback, 2FA bypass de usuario desactivado, errores en delete tenant, settings fallback inseguro, validación itemCondition, + null-safety frontend
+- **Stock atómico**: función RPC Postgres `decrement_stock()` con SELECT FOR UPDATE (evita race condition en ventas concurrentes)
+- **Constraint** `UNIQUE(tenant_id, key)` en `store_settings` (se eliminó el `UNIQUE(key)` suelto que era inseguro)
 
 ---
 
 ## Pendiente por implementar (roadmap)
 
 ### Prioridad ALTA — Integridad de datos
-- [ ] Atomicidad en venta + descuento de stock (todo o nada)
+- [x] Atomicidad en descuento de stock (RPC Postgres `decrement_stock` con SELECT FOR UPDATE)
 - [x] Verificar stock disponible justo antes de confirmar venta (evitar stock negativo)
 - [x] Límite de descuentos por rol (cajero max 20%, admin sin límite) — error claro si se excede
 - [x] Idempotency key en ventas (evitar ventas duplicadas si falla la red)
@@ -72,7 +99,7 @@ y dime en qué quedamos. Luego pregúntame qué trabajamos hoy.
 ### Prioridad ALTA — Funcionalidad de negocio
 - [ ] IVA configurable en boletas (esperar hasta implementar facturación)
 - [ ] Cuentas por cobrar con fecha de vencimiento + reporte de aging (30/60/90 días) — pendiente consultar con cliente
-- [ ] Garantías en ventas y reparaciones — pendiente consultar con cliente
+- [x] Garantías en ventas y reparaciones (módulo /api/warranties + pantalla)
 - [x] Rastro de auditoría (tabla audit_logs: quién cambió qué y cuándo)
 
 ### Prioridad MEDIA — Crecimiento
@@ -151,3 +178,29 @@ Vender el sistema como POS especializado para tiendas de celulares y reparacione
   - Móvil (Chrome/Safari sobre HTTPS): Web Share API adjunta la imagen PNG directamente al mensaje
   - Escritorio/Electron: imagen se descarga como `boleta-mundoceldiaz.png` + WhatsApp se abre con texto + aviso al usuario para adjuntarla manualmente
 - **Pendiente (roadmap)**: integración con API de pago (UltraMsg/Twilio) para envío automático con imagen en escritorio
+
+### Sesiones 5-7 — 23-24 junio 2026
+**Lo que se hizo:**
+- **Módulo Proveedores y Compras**: tabla suppliers + purchases, pantalla SuppliersScreen, registro de compras que suma stock
+- **Cierre de caja formal**: sesiones de caja, fondo inicial, gastos, arqueo con diferencia
+- **Garantías**: módulo completo /api/warranties
+- **2FA superadmin**: código por correo vía Resend en cada login de superadmin
+- **Email 2FA**: cambiado de onboarding@resend.dev a noreply@mundoceldiaz.com (PR #30 API)
+- **Fix crash Proveedores**: Rules of Hooks — usePaginator se llamaba después de `if(loading) return` (PR #76 frontend)
+- **Ambiente staging/piloto**: Railway `observant-possibility` (API) + Vercel `mundo-cel-diaz-staging` (frontend), rama `staging`
+
+### Sesión 8 — 24-25 junio 2026
+**Lo que se hizo:**
+- **Verificación dominio Resend**: DNS en Namecheap (DKIM ✅, SPF host `send`, MX no soportado pero no necesario). Estado "Pending" esperando propagación
+- **Null-safety frontend (PRs #77, #78)**: protección `(p.code||"")`, `(p.name||"")`, `(p.shelf||"")`, `(m.desc||"")` en búsquedas/filtros de Products, POS, Suppliers, Inventory, Caja. Fix `setPage`→`resetPage` (crash al buscar)
+- **Revisión defensiva exhaustiva (PR #31 API)**: 9 bugs encontrados, corregidos los reales:
+  - CRÍTICO: `req.user.id`→`req.user.userId` en admin.js (superadmin no podía cambiar credenciales)
+  - ALTO: tenant-leak en POST /accounts/:id/payments (verificación de tenant agregada)
+  - ALTO: sale_items huérfanos (rollback agregado si falla insert)
+  - ALTO: 2FA bypass de usuario desactivado (`.eq('active',true)` en verify-2fa)
+  - MEDIO: errores silenciosos en delete tenant (captura + log por tabla)
+- **BUG #2 stock atómico**: RPC `decrement_stock()` creada en Supabase, sales.js la usa
+- **BUG #5 settings**: eliminado fallback inseguro + constraint `UNIQUE(key)` suelto borrado de DB
+- **BUG #9 (PR #32)**: validación itemCondition en devoluciones
+- **Railway**: proyecto accidental `protective-upliftment` eliminado
+- **Verificación honesta**: el usuario pidió verificar contra código real (no memoria). Confirmado vía git log y GitHub que todo lo afirmado está mergeado a main.
