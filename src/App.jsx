@@ -1113,39 +1113,132 @@ function HelpTip(props) {
 }
 
 /* ── ProductForm ── */
-var FORM_FIELDS = [
-  {k:"name",     l:"Nombre",              ph:"Ej: Pantalla...", tp:"text"  },
-  {k:"category", l:"Categoría",           ph:"Pantallas",       tp:"text"  },
-  {k:"shelf",    l:"Estantería",          ph:"A-01",            tp:"text"  },
-  {k:"price",    l:"Precio venta (Q)",    ph:"0.00",            tp:"number"},
-  {k:"cost",     l:"Costo (Q)",           ph:"0.00",            tp:"number"},
-  {k:"stock",    l:"Stock actual",        ph:"0",               tp:"number"},
-  {k:"minStock", l:"Stock mínimo (alerta)",ph:"5",              tp:"number"},
-  {k:"unit",     l:"Unidad",              ph:"uni / serv",      tp:"text"  },
+var UNIT_OPTIONS = [
+  {v:"uni",  l:"Unidad (uni)"},
+  {v:"pza",  l:"Pieza (pza)"},
+  {v:"serv", l:"Servicio (serv)"},
 ];
+function normalizeProductField(k, v) {
+  if(typeof v !== "string") return v;
+  v = v.trim();
+  if(k === "name")     return v.charAt(0).toUpperCase() + v.slice(1);
+  if(k === "category") return v.charAt(0).toUpperCase() + v.slice(1).toLowerCase().replace(/^\w/, function(c){ return v.charAt(0).toUpperCase(); });
+  if(k === "shelf")    return v.toUpperCase();
+  if(k === "code")     return v.toUpperCase();
+  return v;
+}
+function titleCase(str){
+  str = str.trim();
+  return str.charAt(0).toUpperCase() + str.slice(1);
+}
 function ProductForm(props) {
   var product=props.product; var onSave=props.onSave; var onCancel=props.onCancel;
+  var products=props.products||[];
   var _s=useState(Object.assign({},product)); var form=_s[0]; var setForm=_s[1];
   var _e=useState(""); var err=_e[0]; var setErr=_e[1];
-  function set(k,v){ setForm(function(f){ var n=Object.assign({},f); n[k]=v; return n; }); }
+  var _w=useState(""); var warn=_w[0]; var setWarn=_w[1];
+
+  // Lista de categorías únicas existentes normalizadas
+  var existingCats = [];
+  var seen = {};
+  products.forEach(function(p){
+    var c = (p.category||"").trim();
+    if(c && !seen[c.toLowerCase()]){ seen[c.toLowerCase()]=true; existingCats.push(c); }
+  });
+  existingCats.sort();
+
+  function set(k,v){
+    setErr(""); setWarn("");
+    // Advertencia si categoria es similar a una existente pero no igual
+    if(k==="category" && v.trim()){
+      var lower = v.trim().toLowerCase();
+      var similar = existingCats.find(function(c){ return c.toLowerCase()!==lower && (c.toLowerCase().startsWith(lower)||lower.startsWith(c.toLowerCase())||c.toLowerCase().replace(/s$/,"")===lower.replace(/s$/,"")); });
+      if(similar) setWarn('¿Quisiste decir "'+similar+'"?');
+    }
+    setForm(function(f){ var n=Object.assign({},f); n[k]=v; return n; });
+  }
   function doSave(){
     if(!form.name||!form.name.trim()){setErr("El nombre es obligatorio");return;}
-    onSave(Object.assign({},form,{price:parseFloat(form.price)||0,cost:parseFloat(form.cost)||0,stock:parseInt(form.stock)||0,minStock:parseInt(form.minStock)||0}));
+    if(!form.category||!form.category.trim()){setErr("La categoría es obligatoria");return;}
+    if(!form.price||isNaN(parseFloat(form.price))){setErr("El precio es obligatorio");return;}
+    // Normalizar todos los campos de texto antes de guardar
+    onSave(Object.assign({},form,{
+      name:     titleCase(form.name||""),
+      category: titleCase(form.category||""),
+      shelf:    (form.shelf||"").trim().toUpperCase(),
+      code:     (form.code||"").trim().toUpperCase(),
+      unit:     form.unit||"uni",
+      price:    parseFloat(form.price)||0,
+      cost:     parseFloat(form.cost)||0,
+      stock:    parseInt(form.stock)||0,
+      minStock: parseInt(form.minStock)||0,
+    }));
   }
   return (
       <div style={Object.assign({},sC,{marginBottom:16,borderColor:TEAL,borderWidth:"1.5px"})}>
         <p style={{fontWeight:600,margin:"0 0 14px",fontSize:15}}>{product.id?"✏️ Editar":"➕ Nuevo Producto"}</p>
         {err&&<p style={{color:"#E24B4A",fontSize:13,margin:"0 0 10px"}}>⚠ {err}</p>}
         <div className="rg-4" style={{display:"grid",gridTemplateColumns:"repeat(4,1fr)",gap:12,marginBottom:14}}>
-          {FORM_FIELDS.map(function(f){
-            return (
-                <div key={f.k}>
-                  <label style={sL}>{f.l}</label>
-                  <input type={f.tp} style={sI} value={form[f.k]||""} placeholder={f.ph}
-                         onChange={function(e){setErr("");set(f.k,e.target.value);}}/>
-                </div>
-            );
-          })}
+          {/* Nombre */}
+          <div>
+            <label style={sL}>Nombre *</label>
+            <input type="text" style={sI} value={form.name||""} placeholder="Ej: Pantalla Samsung A24"
+              onChange={function(e){set("name",e.target.value);}}/>
+          </div>
+          {/* Categoría — combobox con lista de existentes */}
+          <div>
+            <label style={sL}>Categoría *</label>
+            <input type="text" list="cat-list" style={sI} value={form.category||""} placeholder="Ej: Pantallas"
+              onChange={function(e){set("category",e.target.value);}}
+              onBlur={function(e){
+                var v=e.target.value.trim();
+                if(v) set("category", titleCase(v));
+              }}/>
+            <datalist id="cat-list">
+              {existingCats.map(function(c){return <option key={c} value={c}/>;}) }
+            </datalist>
+            {warn&&<p style={{fontSize:11,color:"#E65100",margin:"3px 0 0"}}>⚠ {warn}</p>}
+          </div>
+          {/* Estantería */}
+          <div>
+            <label style={sL}>Estantería</label>
+            <input type="text" style={sI} value={form.shelf||""} placeholder="Ej: A-01"
+              onChange={function(e){set("shelf",e.target.value);}}
+              onBlur={function(e){set("shelf",(e.target.value||"").trim().toUpperCase());}}/>
+          </div>
+          {/* Código */}
+          <div>
+            <label style={sL}>Código</label>
+            <input type="text" style={sI} value={form.code||""} placeholder="Ej: MCD-001"
+              onChange={function(e){set("code",e.target.value);}}
+              onBlur={function(e){set("code",(e.target.value||"").trim().toUpperCase());}}/>
+          </div>
+          {/* Precio */}
+          <div>
+            <label style={sL}>Precio venta (Q) *</label>
+            <input type="number" style={sI} value={form.price||""} placeholder="0.00"
+              onChange={function(e){set("price",e.target.value);}}/>
+          </div>
+          {/* Costo */}
+          <div>
+            <label style={sL}>Costo (Q)</label>
+            <input type="number" style={sI} value={form.cost||""} placeholder="0.00"
+              onChange={function(e){set("cost",e.target.value);}}/>
+          </div>
+          {/* Stock */}
+          <div>
+            <label style={sL}>Stock actual</label>
+            <input type="number" style={sI} value={form.stock||""} placeholder="0"
+              onChange={function(e){set("stock",e.target.value);}}/>
+          </div>
+          {/* Unidad — dropdown fijo */}
+          <div>
+            <label style={sL}>Unidad</label>
+            <select style={Object.assign({},sI,{background:"#fff"})} value={form.unit||"uni"}
+              onChange={function(e){set("unit",e.target.value);}}>
+              {UNIT_OPTIONS.map(function(o){return <option key={o.v} value={o.v}>{o.l}</option>;})}
+            </select>
+          </div>
         </div>
         <div style={{display:"flex",gap:10}}>
           <button style={mB("teal")} onClick={doSave}>{product.id?"Guardar cambios":"Agregar"}</button>
@@ -3103,7 +3196,7 @@ function ProductsScreen(props) {
           </div>
         </div>
         {importMsg&&<div style={{background:importMsg.startsWith("✅")?"#EAF3DE":"#FCEBEB",border:"1px solid "+(importMsg.startsWith("✅")?"#97C459":"#F09595"),borderRadius:8,padding:"10px 16px",marginBottom:12,color:importMsg.startsWith("✅")?"#27500A":"#791F1F",fontSize:14,fontWeight:500}}>{importMsg}</div>}
-        {editProd&&<ProductForm product={editProd} onSave={function(p){saveProduct(p);setEditProd(null);}} onCancel={function(){setEditProd(null);}}/>}
+        {editProd&&<ProductForm product={editProd} products={products} onSave={function(p){saveProduct(p);setEditProd(null);}} onCancel={function(){setEditProd(null);}}/>}
         <div style={Object.assign({},sC,{marginBottom:14})}>
           <div style={{display:"flex",gap:10,flexWrap:"wrap",alignItems:"center"}}>
             <input style={Object.assign({},sI,{width:240,flex:"none"})} placeholder="Buscar..." value={search} onChange={function(e){setSearch(e.target.value);prodPag.setPage(1);}}/>
@@ -5862,13 +5955,25 @@ function App(props) {
   }
   async function saveProduct(prod){
     var isNew=!prod.id;
+    // Normalización de segunda capa — por si llega desde otro flujo (importación, etc.)
+    function tc(s){ s=(s||"").trim(); return s.charAt(0).toUpperCase()+s.slice(1); }
+    var clean={
+      code:     (prod.code||"").trim().toUpperCase(),
+      name:     tc(prod.name||""),
+      category: tc(prod.category||""),
+      shelf:    (prod.shelf||"").trim().toUpperCase(),
+      price:    prod.price||0,
+      cost:     prod.cost||0,
+      stock:    prod.stock||0,
+      unit:     prod.unit||"uni",
+    };
     try{
       if(!isNew){
-        await productsAPI.update(prod.id,{code:prod.code,name:prod.name,category:prod.category||'',shelf:prod.shelf||'',price:prod.price,cost:prod.cost||0,stock:prod.stock||0,unit:prod.unit||'uni'});
-        setProducts(function(p){return p.map(function(x){return x.id===prod.id?prod:x;});});
+        await productsAPI.update(prod.id,clean);
+        setProducts(function(p){return p.map(function(x){return x.id===prod.id?Object.assign({},prod,clean):x;});});
       } else {
-        var saved=await productsAPI.create({code:prod.code,name:prod.name,category:prod.category||'',shelf:prod.shelf||'',price:prod.price,cost:prod.cost||0,stock:prod.stock||0,unit:prod.unit||'uni'});
-        setProducts(function(p){return p.concat([Object.assign({},prod,{id:saved.id})]);});
+        var saved=await productsAPI.create(clean);
+        setProducts(function(p){return p.concat([Object.assign({},prod,clean,{id:saved.id})]);});
       }
     }catch(e){
       var emP=e&&e.error?e.error:null;
