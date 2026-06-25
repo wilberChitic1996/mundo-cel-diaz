@@ -3196,7 +3196,7 @@ function ProductsScreen(props) {
 }
 
 /* ── Inventario ── */
-var INV_LIST_PAGE = 30;
+var INV_LIST_PAGE = 20;
 
 function InventoryScreen(props) {
   var products=props.products;
@@ -3302,7 +3302,7 @@ function InventoryScreen(props) {
               onChange={function(e){goSearch(e.target.value);}}
               style={{flex:1,minWidth:200,padding:"9px 14px",borderRadius:8,border:"1px solid #ddd",fontSize:14,outline:"none"}}
             />
-            <select value={secFilter} onChange={function(e){setSecFilter(e.target.value);setInvPage(0);}}
+            <select value={secFilter} onChange={function(e){setSecFilter(e.target.value);setInvPage(0);setInvQ("");}}
               style={{padding:"9px 12px",borderRadius:8,border:"1px solid #ddd",fontSize:13,background:"#fff",color:"#333"}}>
               <option value="">Todas las secciones</option>
               {Object.keys(secsMap).sort().map(function(s){return <option key={s} value={s}>Sección {s}</option>;})}
