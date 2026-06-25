@@ -2,8 +2,8 @@
 import axios from 'axios';
 
 // ── URL del API — auto-detección por dominio ──────────────────────
-// NO se usa VITE_API_URL. El código detecta la API correcta
-// según el hostname del navegador.
+// NO se usa VITE_API_URL (era frágil y causaba errores en producción).
+// El código detecta la API correcta según el hostname del navegador.
 const API_PROD    = 'https://mundo-cel-diaz-api-production.up.railway.app/api';
 const API_STAGING = 'https://mundo-cel-diaz-api-production-e546.up.railway.app/api';
 
@@ -138,6 +138,24 @@ export const suppliersAPI = {
   createPurchase:  function(data)  { return api.post('/suppliers/purchases', data); },
 };
 
+// ── Categorías ────────────────────────────────────────
+export const categoriesAPI = {
+  getAll: function(cfg)   { return api.get('/categories', cfg); },
+  create: function(data)  { return api.post('/categories', data); },
+  update: function(id, d) { return api.put('/categories/' + id, d); },
+  remove: function(id)    { return api.delete('/categories/' + id); },
+};
+
+// ── Ubicaciones / Estanterías ─────────────────────────
+export const locationsAPI = {
+  getAll:      function(cfg)        { return api.get('/locations', cfg); },
+  create:      function(data)       { return api.post('/locations', data); },
+  update:      function(id, d)      { return api.put('/locations/' + id, d); },
+  remove:      function(id)         { return api.delete('/locations/' + id); },
+  moveProduct: function(pid, data)  { return api.put('/locations/move-product/' + pid, data); },
+};
+
+// ── Configuración de tienda ───────────────────────────
 export const settingsAPI = {
   getAll: function()     { return api.get('/settings'); },
   update: function(data) { return api.put('/settings', data); },

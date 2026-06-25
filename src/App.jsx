@@ -3,7 +3,7 @@ import * as XLSX from 'xlsx';
 import html2canvas from 'html2canvas';
 import { AreaChart, Area, BarChart, Bar, PieChart, Pie, Cell, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend } from 'recharts';
 import { db } from './utils/db.js';
-import { authAPI, productsAPI, salesAPI, accountsAPI, returnsAPI, defectivesAPI, usersAPI, checkAPI, clientsAPI, repairsAPI, auditAPI, warrantiesAPI, cajaAPI, settingsAPI, suppliersAPI, adminAPI } from './utils/api.js';
+import { authAPI, productsAPI, salesAPI, accountsAPI, returnsAPI, defectivesAPI, usersAPI, checkAPI, clientsAPI, repairsAPI, auditAPI, warrantiesAPI, cajaAPI, settingsAPI, suppliersAPI, adminAPI, categoriesAPI, locationsAPI } from './utils/api.js';
 
 const TEAL    = "#1D9E75";
 const NAVY    = "#1a2535";
@@ -231,7 +231,7 @@ var SESS_KEY = "mnpos-session-v1";
 
 var PERMS = {
   superadmin: ["superadmin"],
-  admin:      ["dashboard","pos","caja","accounts","returns","defective","products","inventory","history","backup","users","clients","repairs","cuadres","audit","warranties","storeconfig","suppliers","ayuda"],
+  admin:      ["dashboard","pos","caja","accounts","returns","defective","products","catalogos","inventory","history","backup","users","clients","repairs","cuadres","audit","warranties","storeconfig","suppliers","ayuda"],
   cajero:     ["dashboard","pos","caja","accounts","returns","history","clients","repairs","warranties","ayuda"],
   auditor:    ["dashboard","caja","history","inventory","cuadres","ayuda"],
 };
@@ -497,8 +497,10 @@ function LoginScreen(props) {
       setErr("Error inesperado. Intenta de nuevo.");
     } catch(e){
       setLoading(false);
-      var msg=(e&&e.error)?e.error:(e&&e.message)?e.message:"";
-      var isNetwork=!msg||msg.toLowerCase().includes("network")||msg.toLowerCase().includes("conexion")||msg.toLowerCase().includes("fetch")||msg.toLowerCase().includes("failed");
+      var rawMsg=(e&&e.error)?e.error:(e&&e.message)?e.message:"";
+      var msg=(typeof rawMsg==="string")?rawMsg:"";  // blindaje: msg siempre texto (e.error puede venir como objeto)
+      var ml=msg.toLowerCase();
+      var isNetwork=!msg||ml.includes("network")||ml.includes("conexion")||ml.includes("fetch")||ml.includes("failed")||ml.includes("not found")||ml.includes("404");
       if(isNetwork){
         setErr("Sin conexión al servidor. Verifica tu internet e intenta de nuevo.");
       } else {
@@ -534,7 +536,7 @@ function LoginScreen(props) {
       var em=(e&&e.error)?e.error:"";
       if(em&&em!=="Error de conexion"){setRecErr(em);return;}
       var users=await db.load(UK,[]);
-      var user=(users||[]).find(function(u){return u.email.toLowerCase()===recEmail.trim().toLowerCase()&&u.active;});
+      var user=(users||[]).find(function(u){return String(u.email||"").toLowerCase()===recEmail.trim().toLowerCase()&&u.active;});
       if(!user){setRecErr("No se encontró una cuenta activa con ese email.");return;}
       if(!user.secQuestion){setRecErr("Esta cuenta no tiene pregunta de seguridad configurada. Contactá al administrador del sistema.");return;}
       setRecUser(Object.assign({},user,{source:"local"}));
@@ -761,7 +763,8 @@ function UsersScreen(props) {
         var apiUsers=await usersAPI.getAll();
         if(apiUsers&&apiUsers.length>0){
           var merged=apiUsers.map(function(au){
-            var local=(u||[]).find(function(lu){return lu.email.toLowerCase()===au.email.toLowerCase();});
+            var auEmail=String(au.email||"").toLowerCase();
+            var local=(u||[]).find(function(lu){return String(lu.email||"").toLowerCase()===auEmail;});
             return {id:au.id,name:au.name,email:au.email,role:au.role,active:au.active,
               passwordHash:local?local.passwordHash:"",secQuestion:au.sec_question||(local?local.secQuestion:""),
               secAnswerHash:local?local.secAnswerHash:"",lastLogin:au.last_login||null,
@@ -781,7 +784,7 @@ function UsersScreen(props) {
 
   async function saveUser(){
     if(!fName.trim()||!fEmail.trim()){setFErr("Nombre y email son obligatorios");return;}
-    var dup=users.find(function(u){return u.email.toLowerCase()===fEmail.trim().toLowerCase()&&(!editUser||u.id!==editUser.id);});
+    var dup=users.find(function(u){return String(u.email||"").toLowerCase()===fEmail.trim().toLowerCase()&&(!editUser||u.id!==editUser.id);});
     if(dup){setFErr("Ya existe un usuario con ese email");return;}
     if(!editUser&&!fPass.trim()){setFErr("La contraseña es obligatoria para usuarios nuevos");return;}
     if(fPass&&fPass.length<8){setFErr("Contraseña: mínimo 8 caracteres");return;}
@@ -1133,45 +1136,38 @@ function titleCase(str){
 }
 function ProductForm(props) {
   var product=props.product; var onSave=props.onSave; var onCancel=props.onCancel;
-  var products=props.products||[];
+  var categories=props.categories||[];
+  var locations=props.locations||[];
   var _s=useState(Object.assign({},product)); var form=_s[0]; var setForm=_s[1];
   var _e=useState(""); var err=_e[0]; var setErr=_e[1];
-  var _w=useState(""); var warn=_w[0]; var setWarn=_w[1];
-
-  // Lista de categorías únicas existentes normalizadas
-  var existingCats = [];
-  var seen = {};
-  products.forEach(function(p){
-    var c = (p.category||"").trim();
-    if(c && !seen[c.toLowerCase()]){ seen[c.toLowerCase()]=true; existingCats.push(c); }
-  });
-  existingCats.sort();
 
   function set(k,v){
-    setErr(""); setWarn("");
-    // Advertencia si categoria es similar a una existente pero no igual
-    if(k==="category" && v.trim()){
-      var lower = v.trim().toLowerCase();
-      var similar = existingCats.find(function(c){ return c.toLowerCase()!==lower && (c.toLowerCase().startsWith(lower)||lower.startsWith(c.toLowerCase())||c.toLowerCase().replace(/s$/,"")===lower.replace(/s$/,"")); });
-      if(similar) setWarn('¿Quisiste decir "'+similar+'"?');
-    }
+    setErr("");
     setForm(function(f){ var n=Object.assign({},f); n[k]=v; return n; });
   }
   function doSave(){
     if(!form.name||!form.name.trim()){setErr("El nombre es obligatorio");return;}
-    if(!form.category||!form.category.trim()){setErr("La categoría es obligatoria");return;}
+    if(!form.category_id){setErr("La categoría es obligatoria — elígela de la lista");return;}
     if(!form.price||isNaN(parseFloat(form.price))){setErr("El precio es obligatorio");return;}
-    // Normalizar todos los campos de texto antes de guardar
+    // Resolver nombres seleccionados para guardar también los campos legacy
+    // (category / shelf) y que las tablas existentes sigan funcionando.
+    var selCat = categories.find(function(c){return String(c.id)===String(form.category_id);});
+    var selLoc = locations.find(function(l){return String(l.id)===String(form.location_id);});
+    var pos = (form.position||"").trim();
+    var shelfTxt = selLoc ? (selLoc.name + (pos ? " · " + pos : "")) : pos;
     onSave(Object.assign({},form,{
-      name:     titleCase(form.name||""),
-      category: titleCase(form.category||""),
-      shelf:    (form.shelf||"").trim().toUpperCase(),
-      code:     (form.code||"").trim().toUpperCase(),
-      unit:     form.unit||"uni",
-      price:    parseFloat(form.price)||0,
-      cost:     parseFloat(form.cost)||0,
-      stock:    parseInt(form.stock)||0,
-      minStock: parseInt(form.minStock)||0,
+      name:        titleCase(form.name||""),
+      category_id: form.category_id,
+      category:    selCat ? selCat.name : "",
+      location_id: form.location_id || null,
+      position:    pos || null,
+      shelf:       shelfTxt,
+      code:        (form.code||"").trim().toUpperCase(),
+      unit:        form.unit||"uni",
+      price:       parseFloat(form.price)||0,
+      cost:        parseFloat(form.cost)||0,
+      stock:       parseInt(form.stock)||0,
+      minStock:    parseInt(form.minStock)||0,
     }));
   }
   return (
@@ -1185,26 +1181,31 @@ function ProductForm(props) {
             <input type="text" style={sI} value={form.name||""} placeholder="Ej: Pantalla Samsung A24"
               onChange={function(e){set("name",e.target.value);}}/>
           </div>
-          {/* Categoría — combobox con lista de existentes */}
+          {/* Categoría — lista cerrada (administrable en Catálogos) */}
           <div>
             <label style={sL}>Categoría *</label>
-            <input type="text" list="cat-list" style={sI} value={form.category||""} placeholder="Ej: Pantallas"
-              onChange={function(e){set("category",e.target.value);}}
-              onBlur={function(e){
-                var v=e.target.value.trim();
-                if(v) set("category", titleCase(v));
-              }}/>
-            <datalist id="cat-list">
-              {existingCats.map(function(c){return <option key={c} value={c}/>;}) }
-            </datalist>
-            {warn&&<p style={{fontSize:11,color:"#E65100",margin:"3px 0 0"}}>⚠ {warn}</p>}
+            <select style={Object.assign({},sI,{background:"#fff"})} value={form.category_id||""}
+              onChange={function(e){set("category_id",e.target.value);}}>
+              <option value="">— Elegir categoría —</option>
+              {categories.map(function(c){return <option key={c.id} value={c.id}>{(c.icon?c.icon+" ":"")+c.name}</option>;})}
+            </select>
+            {categories.length===0&&<p style={{fontSize:11,color:"#E65100",margin:"3px 0 0"}}>No hay categorías. Créalas en "Catálogos".</p>}
           </div>
-          {/* Estantería */}
+          {/* Ubicación (estante) — lista cerrada */}
           <div>
-            <label style={sL}>Estantería</label>
-            <input type="text" style={sI} value={form.shelf||""} placeholder="Ej: A-01"
-              onChange={function(e){set("shelf",e.target.value);}}
-              onBlur={function(e){set("shelf",(e.target.value||"").trim().toUpperCase());}}/>
+            <label style={sL}>Estante / Ubicación</label>
+            <select style={Object.assign({},sI,{background:"#fff"})} value={form.location_id||""}
+              onChange={function(e){set("location_id",e.target.value);}}>
+              <option value="">— Sin ubicación —</option>
+              {locations.map(function(l){return <option key={l.id} value={l.id}>{l.name}</option>;})}
+            </select>
+          </div>
+          {/* Posición dentro del estante (bandeja/gaveta) */}
+          <div>
+            <label style={sL}>Posición</label>
+            <input type="text" style={sI} value={form.position||""} placeholder="Ej: B3, A2-2"
+              onChange={function(e){set("position",e.target.value);}}
+              onBlur={function(e){set("position",(e.target.value||"").trim());}}/>
           </div>
           {/* Código */}
           <div>
@@ -1268,6 +1269,7 @@ function Sidebar(props) {
     {id:"returns",   ic:"🔄", lb:"Devoluciones"},
     {id:"defective", ic:"🔩", lb:"Piezas Defect."},
     {id:"products",  ic:"📦", lb:"Productos"},
+    {id:"catalogos", ic:"🏷️", lb:"Catálogos"},
     {id:"inventory", ic:"🗄️", lb:"Inventario"},
     {id:"history",   ic:"📋", lb:"Historial"},
     {id:"warranties", ic:"🛡️", lb:"Garantías"},
@@ -3105,9 +3107,128 @@ function DefectiveScreen(props) {
 }
 
 /* ── Productos ── */
+function CatalogosScreen(props){
+  var categories=props.categories||[]; var locations=props.locations||[];
+  var products=props.products||[]; var reloadCatalogos=props.reloadCatalogos||function(){};
+  var showFlash=props.showFlash||function(){};
+  var _t=useState("categorias"); var tab=_t[0]; var setTab=_t[1];
+  var _nc=useState(""); var newCat=_nc[0]; var setNewCat=_nc[1];
+  var _nl=useState(""); var newLoc=_nl[0]; var setNewLoc=_nl[1];
+  var _busy=useState(false); var busy=_busy[0]; var setBusy=_busy[1];
+
+  // Conteo de productos por categoría / ubicación (para mostrar uso y bloquear borrado)
+  function countByCat(id){ return products.filter(function(p){return String(p.category_id)===String(id);}).length; }
+  function countByLoc(id){ return products.filter(function(p){return String(p.location_id)===String(id);}).length; }
+
+  async function addCat(){
+    var name=(newCat||"").trim(); if(!name) return;
+    if(categories.find(function(c){return c.name.toLowerCase()===name.toLowerCase();})){ showFlash("⚠️ Ya existe la categoría \""+name+"\"","err"); return; }
+    setBusy(true);
+    try{ await categoriesAPI.create({name:name}); setNewCat(""); reloadCatalogos(); showFlash("✅ Categoría creada","ok"); }
+    catch(e){ showFlash("⛔ "+((e&&e.error)||"Error al crear categoría"),"err"); }
+    setBusy(false);
+  }
+  async function delCat(c){
+    if(countByCat(c.id)>0){ showFlash("⚠️ No se puede eliminar: hay productos en \""+c.name+"\"","err"); return; }
+    if(!window.confirm('¿Eliminar la categoría "'+c.name+'"?')) return;
+    try{ await categoriesAPI.remove(c.id); reloadCatalogos(); showFlash("Categoría eliminada","ok"); }
+    catch(e){ showFlash("⛔ "+((e&&e.error)||"Error al eliminar"),"err"); }
+  }
+  async function renameCat(c){
+    var nn=window.prompt("Nuevo nombre para la categoría:",c.name); if(nn===null) return;
+    nn=nn.trim(); if(!nn||nn===c.name) return;
+    try{ await categoriesAPI.update(c.id,{name:nn}); reloadCatalogos(); showFlash("✅ Categoría actualizada","ok"); }
+    catch(e){ showFlash("⛔ "+((e&&e.error)||"Error al actualizar"),"err"); }
+  }
+
+  async function addLoc(){
+    var name=(newLoc||"").trim(); if(!name) return;
+    if(locations.find(function(l){return l.name.toLowerCase()===name.toLowerCase();})){ showFlash("⚠️ Ya existe la ubicación \""+name+"\"","err"); return; }
+    setBusy(true);
+    try{ await locationsAPI.create({name:name}); setNewLoc(""); reloadCatalogos(); showFlash("✅ Ubicación creada","ok"); }
+    catch(e){ showFlash("⛔ "+((e&&e.error)||"Error al crear ubicación"),"err"); }
+    setBusy(false);
+  }
+  async function delLoc(l){
+    if(countByLoc(l.id)>0){ showFlash("⚠️ No se puede eliminar: hay productos en \""+l.name+"\"","err"); return; }
+    if(!window.confirm('¿Eliminar la ubicación "'+l.name+'"?')) return;
+    try{ await locationsAPI.remove(l.id); reloadCatalogos(); showFlash("Ubicación eliminada","ok"); }
+    catch(e){ showFlash("⛔ "+((e&&e.error)||"Error al eliminar"),"err"); }
+  }
+  async function renameLoc(l){
+    var nn=window.prompt("Nuevo nombre para la ubicación:",l.name); if(nn===null) return;
+    nn=nn.trim(); if(!nn||nn===l.name) return;
+    try{ await locationsAPI.update(l.id,{name:nn}); reloadCatalogos(); showFlash("✅ Ubicación actualizada","ok"); }
+    catch(e){ showFlash("⛔ "+((e&&e.error)||"Error al actualizar"),"err"); }
+  }
+
+  var tabBtn=function(active){return {padding:"8px 18px",borderRadius:8,border:"none",cursor:"pointer",fontSize:14,fontWeight:600,background:active?TEAL:"#eef1f4",color:active?"#fff":"#555"};};
+
+  return (
+    <div>
+      <p style={H1}>🏷️ Catálogos</p>
+      <p style={{color:"#777",fontSize:13,margin:"0 0 16px"}}>Administra las categorías y ubicaciones (estanterías). Los productos solo pueden usar valores de estas listas.</p>
+      <div style={{display:"flex",gap:10,marginBottom:16}}>
+        <button style={tabBtn(tab==="categorias")} onClick={function(){setTab("categorias");}}>Categorías ({categories.length})</button>
+        <button style={tabBtn(tab==="ubicaciones")} onClick={function(){setTab("ubicaciones");}}>Ubicaciones ({locations.length})</button>
+      </div>
+
+      {tab==="categorias"&&(
+        <div style={sC}>
+          <div style={{display:"flex",gap:10,marginBottom:16}}>
+            <input style={Object.assign({},sI,{maxWidth:320})} placeholder="Nueva categoría (ej: Baterías)" value={newCat}
+              onChange={function(e){setNewCat(e.target.value);}} onKeyDown={function(e){if(e.key==="Enter")addCat();}}/>
+            <button style={mB("teal")} disabled={busy} onClick={addCat}>+ Agregar</button>
+          </div>
+          {categories.length===0?<p style={{color:"#999",fontSize:13}}>Aún no hay categorías. Crea la primera arriba.</p>:
+          <table style={{width:"100%",borderCollapse:"collapse"}}>
+            <thead><tr>{["Categoría","Productos",""].map(function(h){return <th key={h} style={sTH}>{h}</th>;})}</tr></thead>
+            <tbody>{categories.map(function(c){return (
+              <tr key={c.id}>
+                <td style={Object.assign({},sTD,{fontWeight:600})}>{(c.icon?c.icon+" ":"")+c.name}</td>
+                <td style={sTD}>{countByCat(c.id)}</td>
+                <td style={Object.assign({},sTD,{textAlign:"right"})}>
+                  <button style={Object.assign({},mB("blue"),{padding:"4px 10px",fontSize:12,marginRight:6})} onClick={function(){renameCat(c);}}>✏</button>
+                  <button style={Object.assign({},mB("red"),{padding:"4px 10px",fontSize:12})} onClick={function(){delCat(c);}}>🗑</button>
+                </td>
+              </tr>
+            );})}</tbody>
+          </table>}
+        </div>
+      )}
+
+      {tab==="ubicaciones"&&(
+        <div style={sC}>
+          <p style={{fontSize:12,color:"#888",margin:"0 0 12px"}}>El estante es el mueble (vitrina, rack, bodega). La posición exacta (bandeja/gaveta) se asigna en cada producto.</p>
+          <div style={{display:"flex",gap:10,marginBottom:16}}>
+            <input style={Object.assign({},sI,{maxWidth:320})} placeholder="Nuevo estante (ej: Vitrina 1, Bodega)" value={newLoc}
+              onChange={function(e){setNewLoc(e.target.value);}} onKeyDown={function(e){if(e.key==="Enter")addLoc();}}/>
+            <button style={mB("teal")} disabled={busy} onClick={addLoc}>+ Agregar</button>
+          </div>
+          {locations.length===0?<p style={{color:"#999",fontSize:13}}>Aún no hay ubicaciones. Crea la primera arriba.</p>:
+          <table style={{width:"100%",borderCollapse:"collapse"}}>
+            <thead><tr>{["Estante / Ubicación","Productos",""].map(function(h){return <th key={h} style={sTH}>{h}</th>;})}</tr></thead>
+            <tbody>{locations.map(function(l){return (
+              <tr key={l.id}>
+                <td style={Object.assign({},sTD,{fontWeight:600})}>{l.name}</td>
+                <td style={sTD}>{countByLoc(l.id)}</td>
+                <td style={Object.assign({},sTD,{textAlign:"right"})}>
+                  <button style={Object.assign({},mB("blue"),{padding:"4px 10px",fontSize:12,marginRight:6})} onClick={function(){renameLoc(l);}}>✏</button>
+                  <button style={Object.assign({},mB("red"),{padding:"4px 10px",fontSize:12})} onClick={function(){delLoc(l);}}>🗑</button>
+                </td>
+              </tr>
+            );})}</tbody>
+          </table>}
+        </div>
+      )}
+    </div>
+  );
+}
+
 function ProductsScreen(props) {
   var products=props.products; var saveProduct=props.saveProduct; var deleteProduct=props.deleteProduct;
   var importProducts=props.importProducts||function(){};
+  var categories=props.categories||[]; var locations=props.locations||[];
   var _s=useState(""); var search=_s[0]; var setSearch=_s[1];
   var _c=useState("Todas"); var cat=_c[0]; var setCat=_c[1];
   var _o=useState("name"); var sort=_o[0]; var setSort=_o[1];
@@ -3192,11 +3313,11 @@ function ProductsScreen(props) {
               <input type="file" accept=".xlsx,.xls" style={{display:"none"}} disabled={importing}
                 onChange={function(e){handleImportExcel(e.target.files[0]);e.target.value="";}}/>
             </label>
-            <button style={mB("teal")} onClick={function(){setEditProd({name:"",category:"",price:"",cost:"",stock:"",shelf:"",unit:"uni"});}}>+ Agregar</button>
+            <button style={mB("teal")} onClick={function(){setEditProd({name:"",category_id:"",location_id:"",position:"",price:"",cost:"",stock:"",unit:"uni"});}}>+ Agregar</button>
           </div>
         </div>
         {importMsg&&<div style={{background:importMsg.startsWith("✅")?"#EAF3DE":"#FCEBEB",border:"1px solid "+(importMsg.startsWith("✅")?"#97C459":"#F09595"),borderRadius:8,padding:"10px 16px",marginBottom:12,color:importMsg.startsWith("✅")?"#27500A":"#791F1F",fontSize:14,fontWeight:500}}>{importMsg}</div>}
-        {editProd&&<ProductForm product={editProd} products={products} onSave={function(p){saveProduct(p);setEditProd(null);}} onCancel={function(){setEditProd(null);}}/>}
+        {editProd&&<ProductForm product={editProd} categories={categories} locations={locations} onSave={function(p){saveProduct(p);setEditProd(null);}} onCancel={function(){setEditProd(null);}}/>}
         <div style={Object.assign({},sC,{marginBottom:14})}>
           <div style={{display:"flex",gap:10,flexWrap:"wrap",alignItems:"center"}}>
             <input style={Object.assign({},sI,{width:240,flex:"none"})} placeholder="Buscar..." value={search} onChange={function(e){setSearch(e.target.value);prodPag.setPage(1);}}/>
@@ -3229,7 +3350,13 @@ function ProductsScreen(props) {
                     <td style={sTD}><span style={mBg(p.unit==="serv"?"blue":p.stock===0?"red":p.stock<5?"amber":"green")}>{p.unit==="serv"?"Serv.":p.stock}</span></td>
                     <td style={sTD}>
                       <div style={{display:"flex",gap:6}}>
-                        <button style={Object.assign({},mB("blue"),{padding:"4px 10px",fontSize:12})} onClick={function(){setEditProd(Object.assign({},p));}}>✏</button>
+                        <button style={Object.assign({},mB("blue"),{padding:"4px 10px",fontSize:12})} onClick={function(){
+                          var e=Object.assign({},p);
+                          // Si el producto aún no tiene category_id (no migrado), intentar resolverlo por el texto legacy
+                          if(!e.category_id&&e.category){var mc=categories.find(function(c){return c.name.toLowerCase()===String(e.category).toLowerCase();});if(mc)e.category_id=mc.id;}
+                          if(!e.location_id&&e.shelf){var ls=String(e.shelf).split(" · ");var ml=locations.find(function(l){return l.name.toLowerCase()===ls[0].toLowerCase();});if(ml){e.location_id=ml.id;if(ls[1]&&!e.position)e.position=ls[1];}}
+                          setEditProd(e);
+                        }}>✏</button>
                         <button style={Object.assign({},mB("purple"),{padding:"4px 10px",fontSize:12})} onClick={function(){openPriceHist(p);}}>📈</button>
                         <button style={Object.assign({},mB("red"),{padding:"4px 10px",fontSize:12})} onClick={function(){if(window.confirm('¿Eliminar "'+p.name+'"? Esta acción no se puede deshacer.')){deleteProduct(p.id);}}}>🗑</button>
                       </div>
@@ -5667,6 +5794,8 @@ function App(props) {
   var theme=props.theme||"light"; var toggleTheme=props.toggleTheme||function(){};
   var sidebarOpen=props.sidebarOpen||false; var setSidebarOpen=props.setSidebarOpen||function(){};
   var _p=useState([]); var products=_p[0]; var setProducts=_p[1];
+  var _cats=useState([]); var categories=_cats[0]; var setCategories=_cats[1];
+  var _locs=useState([]); var locations=_locs[0]; var setLocations=_locs[1];
   var _s=useState([]); var sales=_s[0]; var setSales=_s[1];
   var _a=useState([]); var accounts=_a[0]; var setAccounts=_a[1];
   var _r=useState([]); var returns=_r[0]; var setReturns=_r[1];
@@ -5705,6 +5834,8 @@ function App(props) {
         ]);
         var wars = await warrantiesAPI.getAll().catch(function(){return [];});
         var cfg  = await settingsAPI.getAll().catch(function(){return {};});
+        categoriesAPI.getAll().then(function(c){setCategories(c||[]);}).catch(function(){});
+        locationsAPI.getAll().then(function(l){setLocations(l||[]);}).catch(function(){});
         if(cfg&&cfg.store_name){ setStoreInfo(function(prev){return Object.assign({},prev,cfg);}); setStore(cfg); }
         if(session.role==="admin"&&(!cfg||cfg.onboarding_done!=="true")){
           if((prods||[]).length>0){
@@ -5971,14 +6102,17 @@ function App(props) {
     // Normalización de segunda capa — por si llega desde otro flujo (importación, etc.)
     function tc(s){ s=(s||"").trim(); return s.charAt(0).toUpperCase()+s.slice(1); }
     var clean={
-      code:     (prod.code||"").trim().toUpperCase(),
-      name:     tc(prod.name||""),
-      category: tc(prod.category||""),
-      shelf:    (prod.shelf||"").trim().toUpperCase(),
-      price:    prod.price||0,
-      cost:     prod.cost||0,
-      stock:    prod.stock||0,
-      unit:     prod.unit||"uni",
+      code:        (prod.code||"").trim().toUpperCase(),
+      name:        tc(prod.name||""),
+      category:    tc(prod.category||""),
+      category_id: prod.category_id||null,
+      location_id: prod.location_id||null,
+      position:    (prod.position||"").trim()||null,
+      shelf:       (prod.shelf||"").trim(),
+      price:       prod.price||0,
+      cost:        prod.cost||0,
+      stock:       prod.stock||0,
+      unit:        prod.unit||"uni",
     };
     try{
       if(!isNew){
@@ -6002,6 +6136,11 @@ function App(props) {
       var emDel=e&&e.error?e.error:null;
       showFlash("⛔ "+(emDel||"Error al eliminar. Verifica tu conexión."),"err");
     }
+  }
+
+  function reloadCatalogos(){
+    categoriesAPI.getAll().then(function(c){setCategories(c||[]);}).catch(function(){});
+    locationsAPI.getAll().then(function(l){setLocations(l||[]);}).catch(function(){});
   }
 
   async function importProducts(prods, callback){
@@ -6598,7 +6737,8 @@ function App(props) {
           {view==="accounts" &&canAccess(session.role,"accounts")&&<AccountsScreen accounts={accounts} pendingAccs={pendingAccs} totalPend={totalPend} addPayment={addPayment} showFlash={showFlash} products={products} session={session} clients={clients}/>}
           {view==="returns"  &&canAccess(session.role,"returns")&&<ReturnsScreen returns={returns} products={products} onProcess={processReturn} showFlash={showFlash} clients={clients} sales={sales}/>}
           {view==="defective"&&canAccess(session.role,"defective")&&<DefectiveScreen defectives={defectives} onUpdateStatus={updateDefectiveStatus} onReingress={reingresarDefective}/>}
-          {view==="products" &&canAccess(session.role,"products")&&<ProductsScreen products={products} saveProduct={saveProduct} deleteProduct={deleteProduct} importProducts={importProducts}/>}
+          {view==="products" &&canAccess(session.role,"products")&&<ProductsScreen products={products} categories={categories} locations={locations} saveProduct={saveProduct} deleteProduct={deleteProduct} importProducts={importProducts}/>}
+          {view==="catalogos"&&canAccess(session.role,"catalogos")&&<CatalogosScreen categories={categories} locations={locations} products={products} reloadCatalogos={reloadCatalogos} showFlash={showFlash}/>}
           {view==="inventory"&&canAccess(session.role,"inventory")&&<InventoryScreen products={products}/>}
           {view==="history"  &&canAccess(session.role,"history")&&<HistoryScreen sales={sales} selectedSale={selSale} setSelectedSale={setSelSale} accounts={accounts} returns={returns} products={products} session={session} clients={clients}/>}
           {view==="cuadres"  &&canAccess(session.role,"cuadres")&&<CuadresScreen sales={sales} accounts={accounts} returns={returns} products={products} repairs={repairs} session={session}/>}
