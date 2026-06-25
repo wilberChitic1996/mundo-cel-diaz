@@ -1,7 +1,38 @@
 // src/utils/api.js
 import axios from 'axios';
 
-const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:4000/api';
+// ── Resolución robusta de la URL del API ──────────────────────────
+// No dependemos solo de VITE_API_URL en Vercel (es frágil: build-time,
+// oculta y fácil de dejar incompleta). El código detecta el API correcto
+// según el dominio donde está corriendo el frontend. Si VITE_API_URL
+// está bien configurada, tiene prioridad; si está vacía o trae el
+// placeholder de ejemplo, se ignora y se auto-detecta.
+//
+// IMPORTANTE: la URL del API SIEMPRE debe terminar en /api porque todas
+// las rutas del backend están montadas bajo /api (ver app.js).
+const API_PROD    = 'https://mundo-cel-diaz-api-production.up.railway.app/api';
+const API_STAGING = 'https://mundo-cel-diaz-api-production-e546.up.railway.app/api';
+
+function resolveApiUrl() {
+  // 1. Si VITE_API_URL está configurada y es válida, mandar esa.
+  var envUrl = import.meta.env.VITE_API_URL;
+  if (envUrl && envUrl.indexOf('example.com') === -1) {
+    // Asegurar que termine en /api (tolera que la dejen sin el sufijo).
+    var clean = envUrl.replace(/\/+$/, '');
+    return /\/api$/.test(clean) ? clean : clean + '/api';
+  }
+  // 2. Auto-detección por el dominio del navegador.
+  if (typeof window !== 'undefined' && window.location) {
+    var host = window.location.hostname;
+    if (host === 'localhost' || host === '127.0.0.1') return 'http://localhost:4000/api';
+    if (host.indexOf('staging') !== -1) return API_STAGING; // piloto
+    return API_PROD; // producción (vercel.app o dominio propio)
+  }
+  // 3. Fallback para entorno sin window (build/SSR).
+  return 'http://localhost:4000/api';
+}
+
+const API_URL = resolveApiUrl();
 
 const api = axios.create({
   baseURL: API_URL,
