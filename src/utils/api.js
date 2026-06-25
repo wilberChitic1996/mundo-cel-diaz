@@ -154,6 +154,23 @@ export const suppliersAPI = {
   createPurchase:  function(data)  { return api.post('/suppliers/purchases', data); },
 };
 
+// ── Categorías ────────────────────────────────────────
+export const categoriesAPI = {
+  getAll: function(cfg)   { return api.get('/categories', cfg); },
+  create: function(data)  { return api.post('/categories', data); },
+  update: function(id, d) { return api.put('/categories/' + id, d); },
+  remove: function(id)    { return api.delete('/categories/' + id); },
+};
+
+// ── Ubicaciones / Estanterías ─────────────────────────
+export const locationsAPI = {
+  getAll:      function(cfg)        { return api.get('/locations', cfg); },
+  create:      function(data)       { return api.post('/locations', data); },
+  update:      function(id, d)      { return api.put('/locations/' + id, d); },
+  remove:      function(id)         { return api.delete('/locations/' + id); },
+  moveProduct: function(pid, data)  { return api.put('/locations/move-product/' + pid, data); },
+};
+
 // ── Configuración de tienda ───────────────────────────
 export const settingsAPI = {
   getAll: function()     { return api.get('/settings'); },
