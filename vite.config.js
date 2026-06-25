@@ -25,8 +25,6 @@ export default defineConfig({
         ],
       },
       workbox: {
-        // Cambiar cacheId fuerza nombres de caché nuevos — el SW viejo
-        // detecta las cachés como obsoletas y cede el control al nuevo.
         cacheId: 'praxisgt-v2',
         globPatterns: ['**/*.{js,css,html,ico,png,svg,woff2}'],
         skipWaiting: true,
@@ -39,7 +37,6 @@ export default defineConfig({
             handler: 'NetworkOnly',
           },
           {
-            // HTML de navegación: NetworkFirst para siempre recibir el deploy más reciente
             urlPattern: ({ request }) => request.mode === 'navigate',
             handler: 'NetworkFirst',
             options: {
