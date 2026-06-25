@@ -3304,21 +3304,41 @@ function ProductsScreen(props) {
         }
         function _col(){for(var a=0;a<arguments.length;a++){for(var h=0;h<headers.length;h++){if(headers[h]&&headers[h].indexOf(arguments[a])>=0)return h;}}return -1;}
         function _g(row,idx){return (idx>=0&&row)?row[idx]:"";}
+        var VALID_UNITS=["uni","pza","serv"];
+        var rowErrs=[];
         var prods=[];
+        var existingNames=new Set(products.map(function(p){return (p.name||"").trim().toLowerCase();}));
         if(hRow>=0){
-          var _ci={name:_col("nombre","name","producto","descripcion"),category:_col("categoria","category","rubro"),shelf:_col("estanteria","shelf","ubicacion"),price:_col("precio venta","precio de venta","precio","price"),cost:_col("costo","cost","coste"),stock:_col("stock","existencia","cantidad"),unit:_col("unidad","unit","medida")};
+          var _ci={name:_col("nombre","name","producto","descripcion"),category:_col("categoria","category","rubro"),shelf:_col("estanteria","shelf","ubicacion","posicion"),price:_col("precio venta","precio de venta","precio","price"),cost:_col("costo","cost","coste"),stock:_col("stock","existencia","cantidad"),unit:_col("unidad","unit","medida")};
+          var seenInFile=new Set();
           for(var _d=hRow+1;_d<aoa.length;_d++){
             var _row=aoa[_d]||[];
             var _nm=String(_g(_row,_ci.name)||"").trim();
             if(!_nm)continue;
-            prods.push({name:_nm,category:String(_g(_row,_ci.category)||"").trim(),shelf:String(_g(_row,_ci.shelf)||"").trim(),price:parseFloat(_g(_row,_ci.price))||0,cost:parseFloat(_g(_row,_ci.cost))||0,stock:parseInt(_g(_row,_ci.stock))||0,minStock:5,unit:String(_g(_row,_ci.unit)||"uni").trim().toLowerCase()==="serv"?"serv":"uni"});
+            if(prods.length>=500){rowErrs.push("Fila "+(_d+1)+": lí­mite de 500 filas alcanzado — las filas restantes se ignoraron.");break;}
+            var rowNum="Fila "+(_d+1)+" ("+_nm+")";
+            var rowOk=true;
+            if(existingNames.has(_nm.toLowerCase())){rowErrs.push(rowNum+": ya existe un producto con ese nombre — omitido.");rowOk=false;}
+            if(rowOk&&seenInFile.has(_nm.toLowerCase())){rowErrs.push(rowNum+": nombre repetido en el archivo — omitido.");rowOk=false;}
+            var _price=parseFloat(_g(_row,_ci.price))||0;
+            if(rowOk&&_price<=0){rowErrs.push(rowNum+": Precio venta debe ser mayor a 0 — omitido.");rowOk=false;}
+            var _rawUnit=String(_g(_row,_ci.unit)||"uni").trim().toLowerCase();
+            var _unit=VALID_UNITS.includes(_rawUnit)?_rawUnit:"uni";
+            if(_rawUnit&&!VALID_UNITS.includes(_rawUnit)){rowErrs.push(rowNum+": unidad \'"+_rawUnit+"\' no reconocida — se usó \'uni\'. Válidos: uni, pza, serv.");}
+            if(!rowOk)continue;
+            seenInFile.add(_nm.toLowerCase());
+            prods.push({name:_nm,category:String(_g(_row,_ci.category)||"").trim(),shelf:String(_g(_row,_ci.shelf)||"").trim(),price:_price,cost:parseFloat(_g(_row,_ci.cost))||0,stock:parseInt(_g(_row,_ci.stock))||0,minStock:5,unit:_unit});
           }
         }
-        if(prods.length===0){setImportMsg("\u274c No se encontraron productos v\u00e1lidos. Verific\u00e1 que us\u00e1s la plantilla correcta.");setImporting(false);return;}
-        importProducts(prods,function(ok,count){
+        if(prods.length===0&&rowErrs.length===0){setImportMsg("❌ No se encontraron productos válidos. Verificá que usás la plantilla correcta.");setImporting(false);return;}
+        if(prods.length===0){setImportMsg("❌ Ningún producto pasó la validación:\n"+rowErrs.slice(0,5).join("\n")+(rowErrs.length>5?" (y "+(rowErrs.length-5)+" más)":""));setImporting(false);return;}
+        importProducts(prods,rowErrs,function(count,catsCreated,importErrors){
           setImporting(false);
-          setImportMsg(ok?"✅ "+count+" productos importados correctamente":"❌ Error al importar. Intentá de nuevo.");
-          setTimeout(function(){setImportMsg("");},5000);
+          var allErrs=rowErrs.concat(importErrors||[]);
+          var msg=count>0?"✅ "+count+" producto"+(count!==1?"s importados":" importado")+(catsCreated>0?" ("+catsCreated+" categoría"+(catsCreated!==1?"s nuevas)":" nueva)"):""):"⚠️ No se importó ningún producto.";
+          if(allErrs.length>0)msg+="\n\n⚠️ "+allErrs.length+" aviso(s):\n"+allErrs.slice(0,10).join("\n")+(allErrs.length>10?"\n… y "+(allErrs.length-10)+" más.":"");
+          setImportMsg(msg.trim());
+          setTimeout(function(){setImportMsg("");},20000);
         });
       } catch(err){
         setImportMsg("❌ Archivo inválido: "+err.message);
@@ -3345,11 +3365,16 @@ function ProductsScreen(props) {
           <div style={{display:"flex",gap:8}}>
             <button style={mB("gray")} title="Descargar plantilla Excel con categorías válidas" onClick={function(){
               var catNames=categories.map(function(c){return c.name;});
+              var catNote="Categorías disponibles: "+(catNames.length>0?catNames.join(", "):"(ninguna aún)")+" — Podés escribir una categoría nueva y se creará automáticamente.";
               var wsPlantilla=XLSX.utils.aoa_to_sheet([
-                ["Nombre *","Categoría *","Precio venta *","Costo","Stock","Unidad","Posición"],
-                ["Ejemplo: Pantalla Samsung A32",catNames[0]||"","350","200","5","uni","B3"],
+                ["NOTA: "+catNote],
+                ["NOTA: Unidad válida: uni (unidad), pza (pieza), serv (servicio). Precio venta debe ser > 0. Máximo 500 filas. No se importarán productos con nombre repetido."],
+                [],
+                ["Nombre *","Categoría *","Precio venta *","Costo","Stock inicial","Unidad (uni/pza/serv)","Posición en estantería"],
+                ["Ejemplo: Pantalla Samsung A32",catNames[0]||"Accesorios","350","200","5","uni","B3-2"],
+                ["Ejemplo: Funda iPhone 15 Pro","Fundas","85","40","10","pza","A1-1"],
               ]);
-              var wsCats=XLSX.utils.aoa_to_sheet([["Categorías válidas"]].concat(catNames.map(function(c){return [c];})));
+              var wsCats=XLSX.utils.aoa_to_sheet([["Categorías configuradas (podés agregar nuevas en la columna Categoría del archivo Productos)"]].concat(catNames.length>0?catNames.map(function(c){return [c];}):[["(sin categorías aún — creá una desde Catálogos o escríbela directamente en el Excel)"]]));
               var wb=XLSX.utils.book_new();
               XLSX.utils.book_append_sheet(wb,wsPlantilla,"Productos");
               XLSX.utils.book_append_sheet(wb,wsCats,"Categorías");
@@ -6265,9 +6290,8 @@ function App(props) {
     locationsAPI.getAll().then(function(l){setLocations(l||[]);}).catch(function(){});
   }
 
-  async function importProducts(prods, callback){
-    var count=0; var errors=0; var catsCreated=0;
-    // Caché local de categorías para no llamar la API en cada fila
+  async function importProducts(prods, rowErrs, callback){
+    var count=0; var catsCreated=0; var importErrors=[];
     var catCache={};
     categories.forEach(function(c){ catCache[c.name.toLowerCase()]=c.id; });
 
@@ -6281,7 +6305,6 @@ function App(props) {
           if(catCache[catKey]){
             catId=catCache[catKey];
           } else {
-            // Categoría no existe → crearla automáticamente
             try{
               var newCat=await categoriesAPI.create({name:catName});
               catCache[catKey]=newCat.id;
@@ -6289,7 +6312,6 @@ function App(props) {
               catsCreated++;
               setCategories(function(c){return c.concat([newCat]);});
             }catch(ce){
-              // Si ya existía por concurrencia, buscarla
               var freshCats=await categoriesAPI.getAll();
               var found=(freshCats||[]).find(function(c){return c.name.toLowerCase()===catKey;});
               if(found){ catCache[catKey]=found.id; catId=found.id; setCategories(freshCats); }
@@ -6299,20 +6321,25 @@ function App(props) {
         var savedImp=await productsAPI.create({
           name:prod.name, category:catName, category_id:catId,
           shelf:prod.shelf||"", price:prod.price,
-          cost:prod.cost||0, stock:prod.stock||0, unit:prod.unit||"uni",
+          cost:prod.cost||0, stock:0, unit:prod.unit||"uni",
         });
+        // Llevar el stock al valor real y registrar el movimiento inicial
+        if((prod.stock||0)>0){
+          try{ await productsAPI.adjustStock(savedImp.id,{new_stock:prod.stock,reason:"Carga inicial por importación Excel"}); }catch(se){ /* no crítico */ }
+        }
         setProducts(function(p){return p.concat([Object.assign({},prod,{id:savedImp.id,code:savedImp.code,category_id:catId})]);});
         count++;
       }catch(e){
         console.warn("Error importando:",prod.name,e);
-        errors++;
+        importErrors.push("("+prod.name+"): "+((e&&e.message)||"error al guardar"));
       }
     }
-    if(callback) callback(errors===0,count);
+    if(callback) callback(count,catsCreated,importErrors);
     var msg="✅ "+count+" productos importados";
-    if(catsCreated>0) msg+=" ("+catsCreated+" categorías nuevas creadas)";
-    if(errors>0) msg+=" — ⚠️ "+errors+" con error";
-    showFlash(msg,"ok");
+    if(catsCreated>0) msg+=" ("+catsCreated+" categorías nuevas)";
+    var allW=(rowErrs||[]).length+importErrors.length;
+    if(allW>0) msg+=" — ⚠️ "+allW+" aviso(s)";
+    showFlash(msg,count>0?"ok":"warn");
   }
 
   async function saveWarranty(data){
