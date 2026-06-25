@@ -1,34 +1,20 @@
 // src/utils/api.js
 import axios from 'axios';
 
-// ── Resolución robusta de la URL del API ──────────────────────────
-// No dependemos solo de VITE_API_URL en Vercel (es frágil: build-time,
-// oculta y fácil de dejar incompleta). El código detecta el API correcto
-// según el dominio donde está corriendo el frontend. Si VITE_API_URL
-// está bien configurada, tiene prioridad; si está vacía o trae el
-// placeholder de ejemplo, se ignora y se auto-detecta.
-//
-// IMPORTANTE: la URL del API SIEMPRE debe terminar en /api porque todas
-// las rutas del backend están montadas bajo /api (ver app.js).
+// ── URL del API — auto-detección por dominio ──────────────────────
+// NO se usa VITE_API_URL. El código detecta la API correcta
+// según el hostname del navegador.
 const API_PROD    = 'https://mundo-cel-diaz-api-production.up.railway.app/api';
 const API_STAGING = 'https://mundo-cel-diaz-api-production-e546.up.railway.app/api';
 
 function resolveApiUrl() {
-  // 1. Si VITE_API_URL está configurada y es válida, mandar esa.
-  var envUrl = import.meta.env.VITE_API_URL;
-  if (envUrl && envUrl.indexOf('example.com') === -1) {
-    // Asegurar que termine en /api (tolera que la dejen sin el sufijo).
-    var clean = envUrl.replace(/\/+$/, '');
-    return /\/api$/.test(clean) ? clean : clean + '/api';
-  }
-  // 2. Auto-detección por el dominio del navegador.
   if (typeof window !== 'undefined' && window.location) {
     var host = window.location.hostname;
     if (host === 'localhost' || host === '127.0.0.1') return 'http://localhost:4000/api';
-    if (host.indexOf('staging') !== -1) return API_STAGING; // piloto
-    return API_PROD; // producción (vercel.app o dominio propio)
+    if (host.indexOf('staging') !== -1) return API_STAGING;
+    if (host === 'mundoceldiaz.com' || host === 'www.mundoceldiaz.com') return API_PROD;
+    return API_PROD;
   }
-  // 3. Fallback para entorno sin window (build/SSR).
   return 'http://localhost:4000/api';
 }
 
@@ -40,7 +26,6 @@ const api = axios.create({
   headers: { 'Content-Type': 'application/json' }
 });
 
-// Token JWT en cada request
 api.interceptors.request.use(function(config) {
   var session = getLocalSession();
   if (session && session.token) {
@@ -49,7 +34,6 @@ api.interceptors.request.use(function(config) {
   return config;
 });
 
-// Manejar respuestas
 api.interceptors.response.use(
   function(response) { return response.data; },
   function(error) {
@@ -69,7 +53,6 @@ function clearLocalSession() {
   sessionStorage.removeItem('mnpos-api-session');
 }
 
-// ── Auth ──────────────────────────────────────────────
 export const authAPI = {
   login: async function(email, password) {
     var data = await api.post('/auth/login', { email, password });
@@ -78,15 +61,12 @@ export const authAPI = {
   },
   logout: function() { clearLocalSession(); },
   getSession: getLocalSession,
-
-  // ── Recuperación de contraseña (endpoints públicos, sin JWT) ──
   verify2fa:     function(email, code)                { return api.post('/auth/verify-2fa', { email, code }); },
   findUser:      function(email)                      { return api.post('/auth/find-user', { email }); },
   verifyAnswer:  function(email, answer)              { return api.post('/auth/verify-answer', { email, answer }); },
   resetPassword: function(email, answer, newPassword) { return api.post('/auth/reset-password', { email, answer, newPassword }); },
 };
 
-// ── Productos ─────────────────────────────────────────
 export const productsAPI = {
   getAll:       function(cfg)   { return api.get('/products', cfg); },
   create:       function(data)  { return api.post('/products', data); },
@@ -95,39 +75,33 @@ export const productsAPI = {
   priceHistory: function(id)    { return api.get('/products/' + id + '/price-history'); },
 };
 
-// ── Ventas ────────────────────────────────────────────
 export const salesAPI = {
   getAll:  function(cfg)  { return api.get('/sales', cfg); },
   create:  function(data) { return api.post('/sales', data); },
 };
 
-// ── Cuentas ───────────────────────────────────────────
 export const accountsAPI = {
   getAll:     function(cfg)      { return api.get('/accounts', cfg); },
   create:     function(data)     { return api.post('/accounts', data); },
   addPayment: function(id, data) { return api.post('/accounts/' + id + '/payments', data); },
 };
 
-// ── Devoluciones ──────────────────────────────────────
 export const returnsAPI = {
   getAll: function(cfg)  { return api.get('/returns', cfg); },
   create: function(data) { return api.post('/returns', data); },
 };
 
-// ── Piezas Defectuosas ────────────────────────────────
 export const defectivesAPI = {
   getAll:  function(cfg)        { return api.get('/defectives', cfg); },
   update:  function(id, status) { return api.put('/defectives/' + id, { status }); },
 };
 
-// ── Usuarios ──────────────────────────────────────────
 export const usersAPI = {
   getAll:  function(cfg)   { return api.get('/users', cfg); },
   create:  function(data)  { return api.post('/users', data); },
   update:  function(id, d) { return api.put('/users/' + id, d); },
 };
 
-// ── Clientes ──────────────────────────────────────────
 export const clientsAPI = {
   getAll:  function(cfg)   { return api.get('/clients', cfg); },
   create:  function(data)  { return api.post('/clients', data); },
@@ -135,7 +109,6 @@ export const clientsAPI = {
   remove:  function(id)    { return api.delete('/clients/' + id); },
 };
 
-// ── Reparaciones ──────────────────────────────────────
 export const repairsAPI = {
   getAll:       function(cfg)         { return api.get('/repairs', cfg); },
   create:       function(data)        { return api.post('/repairs', data); },
@@ -144,14 +117,12 @@ export const repairsAPI = {
   remove:       function(id)          { return api.delete('/repairs/' + id); },
 };
 
-// ── Garantías ─────────────────────────────────────────
 export const warrantiesAPI = {
   getAll:  function(cfg)   { return api.get('/warranties', cfg); },
   create:  function(data)  { return api.post('/warranties', data); },
   update:  function(id, d) { return api.put('/warranties/' + id, d); },
 };
 
-// ── Auditoría ─────────────────────────────────────────
 export const auditAPI = {
   getAll: function(params) {
     var qs = params ? ('?' + Object.keys(params).filter(function(k){ return params[k]; }).map(function(k){ return k + '=' + encodeURIComponent(params[k]); }).join('&')) : '';
@@ -159,7 +130,6 @@ export const auditAPI = {
   },
 };
 
-// ── Proveedores y Compras ─────────────────────────────
 export const suppliersAPI = {
   getAll:          function(cfg)   { return api.get('/suppliers', cfg); },
   create:          function(data)  { return api.post('/suppliers', data); },
@@ -168,13 +138,11 @@ export const suppliersAPI = {
   createPurchase:  function(data)  { return api.post('/suppliers/purchases', data); },
 };
 
-// ── Configuración de tienda ───────────────────────────
 export const settingsAPI = {
   getAll: function()     { return api.get('/settings'); },
   update: function(data) { return api.put('/settings', data); },
 };
 
-// ── Caja ──────────────────────────────────────────────
 export const cajaAPI = {
   getSesiones:   function()          { return api.get('/caja/sesiones'); },
   getSesionActiva: function()        { return api.get('/caja/sesiones/activa'); },
@@ -185,7 +153,6 @@ export const cajaAPI = {
   eliminarGasto: function(id)        { return api.delete('/caja/gastos/' + id); },
 };
 
-// ── Panel Super Admin ─────────────────────────────────
 export const adminAPI = {
   getTenants:          function()          { return api.get('/admin/tenants'); },
   createTenant:        function(data)      { return api.post('/admin/tenants', data); },
@@ -202,7 +169,6 @@ export const adminAPI = {
   deleteUser:          function(id)        { return api.delete('/admin/users/' + id); },
 };
 
-// ── Health check ──────────────────────────────────────
 export const checkAPI = async function() {
   try {
     var baseUrl = API_URL.replace('/api', '');
