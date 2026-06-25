@@ -3238,6 +3238,41 @@ function ProductsScreen(props) {
   var _ph=useState(null); var priceHistProd=_ph[0]; var setPriceHistProd=_ph[1];
   var _phd=useState([]); var priceHistData=_phd[0]; var setPriceHistData=_phd[1];
   var _phl=useState(false); var priceHistLoading=_phl[0]; var setPriceHistLoading=_phl[1];
+  // Modal ajuste de stock
+  var _adjP=useState(null); var adjProd=_adjP[0]; var setAdjProd=_adjP[1];
+  var _adjQ=useState(""); var adjQty=_adjQ[0]; var setAdjQty=_adjQ[1];
+  var _adjR=useState(""); var adjReason=_adjR[0]; var setAdjReason=_adjR[1];
+  var _adjBusy=useState(false); var adjBusy=_adjBusy[0]; var setAdjBusy=_adjBusy[1];
+  var _adjErr=useState(""); var adjErr=_adjErr[0]; var setAdjErr=_adjErr[1];
+  // Historial de stock
+  var _shP=useState(null); var stockHistProd=_shP[0]; var setStockHistProd=_shP[1];
+  var _shD=useState([]); var stockHistData=_shD[0]; var setStockHistData=_shD[1];
+  var _shL=useState(false); var stockHistLoading=_shL[0]; var setStockHistLoading=_shL[1];
+
+  var MOTIVOS_AJUSTE = ["Corrección de inventario","Daño / producto defectuoso","Robo / pérdida","Inventario físico","Otro"];
+
+  function openAdjStock(p){
+    setAdjProd(p); setAdjQty(String(p.stock)); setAdjReason(""); setAdjErr("");
+  }
+  async function doAdjStock(){
+    var qty=parseInt(adjQty);
+    if(isNaN(qty)||qty<0){setAdjErr("Cantidad inválida");return;}
+    if(!adjReason.trim()){setAdjErr("El motivo es obligatorio");return;}
+    setAdjBusy(true);
+    try{
+      var updated=await productsAPI.adjustStock(adjProd.id,{new_stock:qty,reason:adjReason});
+      setProducts(function(p){return p.map(function(x){return x.id===adjProd.id?Object.assign({},x,{stock:qty}):x;});});
+      setAdjProd(null); setAdjQty(""); setAdjReason("");
+      if(props.showFlash) props.showFlash("✅ Stock actualizado a "+qty,"ok");
+    }catch(e){
+      setAdjErr((e&&e.error)||"Error al ajustar stock");
+    }
+    setAdjBusy(false);
+  }
+  function openStockHist(p){
+    setStockHistProd(p); setStockHistData([]); setStockHistLoading(true);
+    productsAPI.stockHistory(p.id).then(function(d){setStockHistData(d||[]);setStockHistLoading(false);}).catch(function(){setStockHistLoading(false);});
+  }
 
   function openPriceHist(p){
     setPriceHistProd(p);
@@ -3358,6 +3393,8 @@ function ProductsScreen(props) {
                           setEditProd(e);
                         }}>✏</button>
                         <button style={Object.assign({},mB("purple"),{padding:"4px 10px",fontSize:12})} onClick={function(){openPriceHist(p);}}>📈</button>
+                        <button style={Object.assign({},mB("amber"),{padding:"4px 10px",fontSize:12})} title="Ajustar stock" onClick={function(){openAdjStock(p);}}>📦</button>
+                        <button style={Object.assign({},mB("purple"),{padding:"4px 10px",fontSize:12})} title="Historial de stock" onClick={function(){openStockHist(p);}}>📋</button>
                         <button style={Object.assign({},mB("red"),{padding:"4px 10px",fontSize:12})} onClick={function(){if(window.confirm('¿Eliminar "'+p.name+'"? Esta acción no se puede deshacer.')){deleteProduct(p.id);}}}>🗑</button>
                       </div>
                     </td>
@@ -3408,6 +3445,79 @@ function ProductsScreen(props) {
                   </tbody>
                 </table>
               )}
+            </div>
+          </div>
+        )}
+
+        {/* Modal — Ajustar Stock */}
+        {adjProd&&(
+          <div style={{position:"fixed",top:0,left:0,width:"100%",height:"100%",background:"rgba(0,0,0,0.5)",zIndex:1000,display:"flex",alignItems:"center",justifyContent:"center",padding:16,boxSizing:"border-box"}}>
+            <div style={{background:"#fff",borderRadius:16,padding:"28px 24px",maxWidth:440,width:"100%",boxShadow:"0 20px 60px rgba(0,0,0,0.3)"}}>
+              <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start",marginBottom:20}}>
+                <div>
+                  <p style={{fontWeight:700,fontSize:16,margin:"0 0 4px"}}>📦 Ajustar Stock</p>
+                  <p style={{fontSize:13,color:"#666",margin:0}}>{adjProd.name} <span style={{fontFamily:"monospace",fontSize:11,color:"#999"}}>({adjProd.code})</span></p>
+                  <p style={{fontSize:12,color:"#999",margin:"4px 0 0"}}>Stock actual: <strong>{adjProd.stock}</strong></p>
+                </div>
+                <button style={mB("gray")} onClick={function(){setAdjProd(null);}}>✕</button>
+              </div>
+              {adjErr&&<p style={{color:"#E24B4A",fontSize:13,margin:"0 0 10px"}}>⚠ {adjErr}</p>}
+              <div style={{marginBottom:12}}>
+                <label style={sL}>Nueva cantidad *</label>
+                <input type="number" min="0" style={sI} value={adjQty}
+                  onChange={function(e){setAdjQty(e.target.value);setAdjErr("");}}/>
+                {adjQty!==""&&!isNaN(parseInt(adjQty))&&(
+                  <p style={{fontSize:12,margin:"4px 0 0",color:parseInt(adjQty)>adjProd.stock?"#27ae60":parseInt(adjQty)<adjProd.stock?"#E24B4A":"#999"}}>
+                    {parseInt(adjQty)>adjProd.stock?"▲ Entrada de +"+(parseInt(adjQty)-adjProd.stock):parseInt(adjQty)<adjProd.stock?"▼ Salida de "+(adjProd.stock-parseInt(adjQty)):"Sin cambio"}
+                  </p>
+                )}
+              </div>
+              <div style={{marginBottom:16}}>
+                <label style={sL}>Motivo *</label>
+                <select style={Object.assign({},sI,{background:"#fff"})} value={adjReason}
+                  onChange={function(e){setAdjReason(e.target.value);setAdjErr("");}}>
+                  <option value="">— Seleccionar motivo —</option>
+                  {MOTIVOS_AJUSTE.map(function(m){return <option key={m} value={m}>{m}</option>;})}
+                </select>
+              </div>
+              <div style={{display:"flex",gap:10}}>
+                <button style={mB("teal")} disabled={adjBusy} onClick={doAdjStock}>{adjBusy?"Guardando...":"Guardar ajuste"}</button>
+                <button style={mB("gray")} onClick={function(){setAdjProd(null);}}>Cancelar</button>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Modal — Historial de Stock */}
+        {stockHistProd&&(
+          <div style={{position:"fixed",top:0,left:0,width:"100%",height:"100%",background:"rgba(0,0,0,0.5)",zIndex:1000,display:"flex",alignItems:"center",justifyContent:"center",padding:16,boxSizing:"border-box"}}>
+            <div style={{background:"#fff",borderRadius:16,padding:"28px 24px",maxWidth:620,width:"100%",maxHeight:"85vh",overflowY:"auto",boxShadow:"0 20px 60px rgba(0,0,0,0.3)"}}>
+              <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start",marginBottom:20}}>
+                <div>
+                  <p style={{fontWeight:700,fontSize:16,margin:"0 0 4px"}}>📋 Historial de Stock</p>
+                  <p style={{fontSize:13,color:"#666",margin:0}}>{stockHistProd.name}</p>
+                </div>
+                <button style={mB("gray")} onClick={function(){setStockHistProd(null);}}>✕ Cerrar</button>
+              </div>
+              {stockHistLoading?<p style={{color:"#999",textAlign:"center"}}>Cargando...</p>:
+              stockHistData.length===0?<p style={{color:"#999",fontSize:13,textAlign:"center"}}>Sin movimientos registrados aún. Los ajustes manuales y movimientos futuros aparecerán aquí.</p>:
+              <table style={{width:"100%",borderCollapse:"collapse"}}>
+                <thead><tr>{["Fecha","Tipo","Antes","Cambio","Después","Motivo","Usuario"].map(function(h){return <th key={h} style={sTH}>{h}</th>;})}</tr></thead>
+                <tbody>{stockHistData.map(function(m){
+                  var up=m.qty_change>0;
+                  return (
+                    <tr key={m.id}>
+                      <td style={Object.assign({},sTD,{fontSize:11,color:"#888"})}>{new Date(m.created_at).toLocaleDateString('es-GT')}<br/>{new Date(m.created_at).toLocaleTimeString('es-GT',{hour:"2-digit",minute:"2-digit"})}</td>
+                      <td style={sTD}><span style={mBg(m.type==="venta"?"red":m.type==="compra"?"green":m.type==="devolucion"?"blue":"amber")}>{m.type}</span></td>
+                      <td style={Object.assign({},sTD,{textAlign:"center",fontFamily:"monospace"})}>{m.qty_before}</td>
+                      <td style={Object.assign({},sTD,{textAlign:"center",fontWeight:700,color:up?"#27ae60":"#E24B4A",fontFamily:"monospace"})}>{up?"+":""}{m.qty_change}</td>
+                      <td style={Object.assign({},sTD,{textAlign:"center",fontFamily:"monospace",fontWeight:700})}>{m.qty_after}</td>
+                      <td style={Object.assign({},sTD,{fontSize:12,color:"#666"})}>{m.reason||"—"}</td>
+                      <td style={Object.assign({},sTD,{fontSize:12})}>{m.user_name||"—"}<br/><span style={Object.assign({},mBg(m.user_role==="admin"?"teal":"blue"),{fontSize:10})}>{ROLE_LABEL[m.user_role]||m.user_role||""}</span></td>
+                    </tr>
+                  );
+                })}</tbody>
+              </table>}
             </div>
           </div>
         )}
@@ -6737,7 +6847,7 @@ function App(props) {
           {view==="accounts" &&canAccess(session.role,"accounts")&&<AccountsScreen accounts={accounts} pendingAccs={pendingAccs} totalPend={totalPend} addPayment={addPayment} showFlash={showFlash} products={products} session={session} clients={clients}/>}
           {view==="returns"  &&canAccess(session.role,"returns")&&<ReturnsScreen returns={returns} products={products} onProcess={processReturn} showFlash={showFlash} clients={clients} sales={sales}/>}
           {view==="defective"&&canAccess(session.role,"defective")&&<DefectiveScreen defectives={defectives} onUpdateStatus={updateDefectiveStatus} onReingress={reingresarDefective}/>}
-          {view==="products" &&canAccess(session.role,"products")&&<ProductsScreen products={products} categories={categories} locations={locations} saveProduct={saveProduct} deleteProduct={deleteProduct} importProducts={importProducts}/>}
+          {view==="products" &&canAccess(session.role,"products")&&<ProductsScreen products={products} categories={categories} locations={locations} saveProduct={saveProduct} deleteProduct={deleteProduct} importProducts={importProducts} showFlash={showFlash} setProducts={setProducts}/>}
           {view==="catalogos"&&canAccess(session.role,"catalogos")&&<CatalogosScreen categories={categories} locations={locations} products={products} reloadCatalogos={reloadCatalogos} showFlash={showFlash}/>}
           {view==="inventory"&&canAccess(session.role,"inventory")&&<InventoryScreen products={products}/>}
           {view==="history"  &&canAccess(session.role,"history")&&<HistoryScreen sales={sales} selectedSale={selSale} setSelectedSale={setSelSale} accounts={accounts} returns={returns} products={products} session={session} clients={clients}/>}

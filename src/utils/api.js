@@ -72,7 +72,9 @@ export const productsAPI = {
   create:       function(data)  { return api.post('/products', data); },
   update:       function(id, d) { return api.put('/products/' + id, d); },
   remove:       function(id)    { return api.delete('/products/' + id); },
-  priceHistory: function(id)    { return api.get('/products/' + id + '/price-history'); },
+  priceHistory:  function(id)         { return api.get('/products/' + id + '/price-history'); },
+  adjustStock:   function(id, data)   { return api.post('/products/' + id + '/adjust-stock', data); },
+  stockHistory:  function(id)         { return api.get('/products/' + id + '/stock-history'); },
 };
 
 export const salesAPI = {
