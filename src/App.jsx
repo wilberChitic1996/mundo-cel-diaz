@@ -3343,6 +3343,18 @@ function ProductsScreen(props) {
         <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:20}}>
           <p style={H1}>📦 Productos y Servicios</p>
           <div style={{display:"flex",gap:8}}>
+            <button style={mB("gray")} title="Descargar plantilla Excel con categorías válidas" onClick={function(){
+              var catNames=categories.map(function(c){return c.name;});
+              var wsPlantilla=XLSX.utils.aoa_to_sheet([
+                ["Nombre *","Categoría *","Precio venta *","Costo","Stock","Unidad","Posición"],
+                ["Ejemplo: Pantalla Samsung A32",catNames[0]||"","350","200","5","uni","B3"],
+              ]);
+              var wsCats=XLSX.utils.aoa_to_sheet([["Categorías válidas"]].concat(catNames.map(function(c){return [c];})));
+              var wb=XLSX.utils.book_new();
+              XLSX.utils.book_append_sheet(wb,wsPlantilla,"Productos");
+              XLSX.utils.book_append_sheet(wb,wsCats,"Categorías");
+              XLSX.writeFile(wb,"plantilla_productos.xlsx");
+            }}>📄 Plantilla</button>
             <label style={Object.assign({},mB("blue"),{cursor:importing?"not-allowed":"pointer",opacity:importing?0.6:1,display:"flex",alignItems:"center",gap:6})}>
               {importing?"⏳ Importando...":"📥 Importar Excel"}
               <input type="file" accept=".xlsx,.xls" style={{display:"none"}} disabled={importing}
@@ -6254,24 +6266,53 @@ function App(props) {
   }
 
   async function importProducts(prods, callback){
-    var count=0; var errors=0;
+    var count=0; var errors=0; var catsCreated=0;
+    // Caché local de categorías para no llamar la API en cada fila
+    var catCache={};
+    categories.forEach(function(c){ catCache[c.name.toLowerCase()]=c.id; });
+
     for(var i=0;i<prods.length;i++){
       var prod=prods[i];
       try{
+        var catId=null;
+        var catName=(prod.category||"").trim();
+        if(catName){
+          var catKey=catName.toLowerCase();
+          if(catCache[catKey]){
+            catId=catCache[catKey];
+          } else {
+            // Categoría no existe → crearla automáticamente
+            try{
+              var newCat=await categoriesAPI.create({name:catName});
+              catCache[catKey]=newCat.id;
+              catId=newCat.id;
+              catsCreated++;
+              setCategories(function(c){return c.concat([newCat]);});
+            }catch(ce){
+              // Si ya existía por concurrencia, buscarla
+              var freshCats=await categoriesAPI.getAll();
+              var found=(freshCats||[]).find(function(c){return c.name.toLowerCase()===catKey;});
+              if(found){ catCache[catKey]=found.id; catId=found.id; setCategories(freshCats); }
+            }
+          }
+        }
         var savedImp=await productsAPI.create({
-          name:prod.name,category:prod.category||"",shelf:prod.shelf||"",
-          price:prod.price,cost:prod.cost||0,stock:prod.stock||0,
-          unit:prod.unit||"uni"
+          name:prod.name, category:catName, category_id:catId,
+          shelf:prod.shelf||"", price:prod.price,
+          cost:prod.cost||0, stock:prod.stock||0, unit:prod.unit||"uni",
         });
-        setProducts(function(p){return p.concat([Object.assign({},prod,{id:savedImp.id,code:savedImp.code})]);});
+        setProducts(function(p){return p.concat([Object.assign({},prod,{id:savedImp.id,code:savedImp.code,category_id:catId})]);});
         count++;
-      } catch(e){
+      }catch(e){
         console.warn("Error importando:",prod.name,e);
         errors++;
       }
     }
     if(callback) callback(errors===0,count);
-    showFlash("✅ "+count+" productos importados"+(errors>0?" ("+errors+" con error)":""),"ok");
+    var msg="✅ "+count+" productos importados";
+    if(catsCreated>0) msg+=" ("+catsCreated+" categorías nuevas creadas)";
+    if(errors>0) msg+=" — ⚠️ "+errors+" con error";
+    showFlash(msg,"ok");
   }
 
   async function saveWarranty(data){
