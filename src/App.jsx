@@ -497,8 +497,10 @@ function LoginScreen(props) {
       setErr("Error inesperado. Intenta de nuevo.");
     } catch(e){
       setLoading(false);
-      var msg=(e&&e.error)?e.error:(e&&e.message)?e.message:"";
-      var isNetwork=!msg||msg.toLowerCase().includes("network")||msg.toLowerCase().includes("conexion")||msg.toLowerCase().includes("fetch")||msg.toLowerCase().includes("failed");
+      var rawMsg=(e&&e.error)?e.error:(e&&e.message)?e.message:"";
+      var msg=(typeof rawMsg==="string")?rawMsg:"";  // blindaje: msg siempre texto (e.error puede venir como objeto)
+      var ml=msg.toLowerCase();
+      var isNetwork=!msg||ml.includes("network")||ml.includes("conexion")||ml.includes("fetch")||ml.includes("failed")||ml.includes("not found")||ml.includes("404");
       if(isNetwork){
         setErr("Sin conexión al servidor. Verifica tu internet e intenta de nuevo.");
       } else {
