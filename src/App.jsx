@@ -3196,104 +3196,162 @@ function ProductsScreen(props) {
 }
 
 /* ── Inventario ── */
-var INV_PAGE_SIZE = 15;
+var INV_LIST_PAGE = 30;
 
 function InventoryScreen(props) {
   var products=props.products;
   var _iq=useState(""); var invQ=_iq[0]; var setInvQ=_iq[1];
-  var _exp=useState({}); var expanded=_exp[0]; var setExpanded=_exp[1];
+  var _vw=useState("resumen"); var invView=_vw[0]; var setInvView=_vw[1];
+  var _sec=useState(""); var secFilter=_sec[0]; var setSecFilter=_sec[1];
+  var _pg=useState(0); var invPage=_pg[0]; var setInvPage=_pg[1];
 
   var nonServ=products.filter(function(p){return p.unit!=="serv";});
   var total=nonServ.reduce(function(s,p){return s+p.stock;},0);
 
-  var filtered=invQ.trim()===""?nonServ:nonServ.filter(function(p){
-    var q=invQ.toLowerCase();
-    return (p.name||"").toLowerCase().indexOf(q)>=0||(p.code||"").toLowerCase().indexOf(q)>=0||(p.shelf||"").toLowerCase().indexOf(q)>=0;
-  });
-
-  var secs={};
-  filtered.forEach(function(p){
+  // Secciones para resumen y filtro
+  var secsMap={};
+  nonServ.forEach(function(p){
     var s=(p.shelf||"Sin sección").split("-")[0]||"Sin sección";
-    if(!secs[s])secs[s]=[];
-    secs[s].push(p);
+    if(!secsMap[s])secsMap[s]={count:0,stock:0,alerts:0};
+    secsMap[s].count++;
+    secsMap[s].stock+=p.stock;
+    if(p.stock<5)secsMap[s].alerts++;
   });
 
-  function toggleExpand(sec){
-    setExpanded(function(prev){ var n=Object.assign({},prev); n[sec]=!n[sec]; return n; });
-  }
+  // Lista filtrada para vista lista
+  var listFiltered=nonServ.filter(function(p){
+    var q=invQ.toLowerCase();
+    var matchQ=!q||(p.name||"").toLowerCase().indexOf(q)>=0||(p.code||"").toLowerCase().indexOf(q)>=0||(p.shelf||"").toLowerCase().indexOf(q)>=0;
+    var s=(p.shelf||"Sin sección").split("-")[0]||"Sin sección";
+    var matchS=!secFilter||s===secFilter;
+    return matchQ&&matchS;
+  }).slice().sort(function(a,b){return (a.shelf||"").localeCompare(b.shelf||"");});
+
+  var totalPages=Math.ceil(listFiltered.length/INV_LIST_PAGE);
+  var pageItems=listFiltered.slice(invPage*INV_LIST_PAGE,(invPage+1)*INV_LIST_PAGE);
+
+  function goSearch(q){ setInvQ(q); setInvPage(0); if(q) setInvView("lista"); }
+  function goSec(s){ setSecFilter(s===secFilter?"":s); setInvView("lista"); setInvPage(0); setInvQ(""); }
+
+  var btnTab=function(active){ return {padding:"7px 16px",borderRadius:6,border:"1px solid "+(active?TEAL:"#ddd"),background:active?TEAL:"#fff",color:active?"#fff":"#555",fontWeight:active?700:400,fontSize:13,cursor:"pointer"}; };
 
   return (
-      <div>
-        <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:16,flexWrap:"wrap",gap:10}}>
-          <p style={H1}>🗄️ Inventario<HelpTip text={"Lista completa de productos y servicios.\n\n• Stock: cantidad disponible en físico\n• Stock mínimo: si baja de este número aparece alerta en el Dashboard\n• Costo: precio de compra (para calcular ganancia)\n• Estantería: ubicación física del producto\n\nSolo el administrador puede crear, editar o desactivar productos."}/></p>
-          <div style={{display:"flex",gap:8,alignItems:"center",flexWrap:"wrap"}}>
-            <div style={{background:"#f5f4f0",borderRadius:8,padding:"8px 14px",fontSize:13,color:"#666"}}>
-              <b>{nonServ.length}</b> productos · <b style={{color:TEAL}}>{total}</b> uds
-            </div>
-            <button style={Object.assign({},mB("teal"),{padding:"6px 12px",fontSize:12})} onClick={function(){
-              var cols=["Código","Nombre","Categoría","Ubicación","Stock","Precio","Costo"];
-              var rows=nonServ.map(function(p){
-                return[p.code||"",p.name,p.category||"",p.shelf||"",p.stock,p.price.toFixed(2),p.cost.toFixed(2)];
-              });
-              exportExcel(rows,cols,"inventario");
-            }}>📊 Excel</button>
-            <button style={Object.assign({},mB("blue"),{padding:"6px 12px",fontSize:12})} onClick={function(){
-              var cols=["Código","Nombre","Categoría","Ubic.","Stock","Precio","Costo"];
-              var rows=nonServ.map(function(p){
-                return[p.code||"",p.name,p.category||"",p.shelf||"",p.stock,"Q"+p.price.toFixed(2),"Q"+p.cost.toFixed(2)];
-              });
-              exportPDF("Inventario de Productos",cols,rows,"inventario");
-            }}>📄 PDF</button>
+    <div>
+      {/* Header */}
+      <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:16,flexWrap:"wrap",gap:10}}>
+        <p style={H1}>🗄️ Inventario<HelpTip text={"Lista completa de productos.\n\n• Vista Resumen: secciones con conteo y alertas\n• Vista Lista: tabla completa paginada con búsqueda y filtros"}/></p>
+        <div style={{display:"flex",gap:8,alignItems:"center",flexWrap:"wrap"}}>
+          <div style={{background:"#f5f4f0",borderRadius:8,padding:"8px 14px",fontSize:13,color:"#666"}}>
+            <b>{nonServ.length}</b> productos · <b style={{color:TEAL}}>{total}</b> uds
+          </div>
+          <button style={Object.assign({},mB("teal"),{padding:"6px 12px",fontSize:12})} onClick={function(){
+            var cols=["Código","Nombre","Categoría","Ubicación","Stock","Precio","Costo"];
+            var rows=nonServ.map(function(p){ return[p.code||"",p.name,p.category||"",p.shelf||"",p.stock,p.price.toFixed(2),p.cost.toFixed(2)]; });
+            exportExcel(rows,cols,"inventario");
+          }}>📊 Excel</button>
+          <button style={Object.assign({},mB("blue"),{padding:"6px 12px",fontSize:12})} onClick={function(){
+            var cols=["Código","Nombre","Categoría","Ubic.","Stock","Precio","Costo"];
+            var rows=nonServ.map(function(p){ return[p.code||"",p.name,p.category||"",p.shelf||"","Q"+p.price.toFixed(2),"Q"+p.cost.toFixed(2)]; });
+            exportPDF("Inventario de Productos",cols,rows,"inventario");
+          }}>📄 PDF</button>
+        </div>
+      </div>
+
+      {/* Tabs */}
+      <div style={{display:"flex",gap:8,marginBottom:16}}>
+        <button style={btnTab(invView==="resumen")} onClick={function(){setInvView("resumen");setInvQ("");setSecFilter("");setInvPage(0);}}>▦ Resumen por sección</button>
+        <button style={btnTab(invView==="lista")} onClick={function(){setInvView("lista");setInvPage(0);}}>☰ Lista completa</button>
+      </div>
+
+      {/* VISTA RESUMEN */}
+      {invView==="resumen"&&(
+        <div>
+          <p style={{fontSize:13,color:"#888",marginBottom:12}}>Toca una sección para ver sus productos en detalle.</p>
+          <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fill,minmax(200px,1fr))",gap:12}}>
+            {Object.keys(secsMap).sort().map(function(sec){
+              var s=secsMap[sec];
+              return (
+                <div key={sec} onClick={function(){goSec(sec);}}
+                  style={{background:"#fff",borderRadius:12,border:"1px solid "+(s.alerts>0?"#F59E0B":"rgba(0,0,0,0.08)"),padding:"16px",cursor:"pointer",transition:"box-shadow 0.15s"}}
+                  onMouseEnter={function(e){e.currentTarget.style.boxShadow="0 4px 12px rgba(0,0,0,0.1)";}}
+                  onMouseLeave={function(e){e.currentTarget.style.boxShadow="none";}}
+                >
+                  <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start",marginBottom:8}}>
+                    <p style={{fontWeight:700,fontSize:15,margin:0,color:NAVY}}>Sección {sec}</p>
+                    {s.alerts>0&&<span style={mBg("amber")}>{s.alerts}</span>}
+                  </div>
+                  <p style={{fontSize:13,color:"#666",margin:"0 0 4px"}}>{s.count} producto{s.count!==1?"s":""}</p>
+                  <p style={{fontSize:13,color:TEAL,fontWeight:700,margin:0}}>{s.stock} uds en stock</p>
+                  <p style={{fontSize:11,color:"#aaa",margin:"8px 0 0"}}>Ver productos →</p>
+                </div>
+              );
+            })}
           </div>
         </div>
+      )}
 
-        <div style={{marginBottom:16}}>
-          <input
-            type="text"
-            placeholder="Buscar por nombre, código o ubicación..."
-            value={invQ}
-            onChange={function(e){setInvQ(e.target.value);}}
-            style={{width:"100%",padding:"10px 14px",borderRadius:8,border:"1px solid #ddd",fontSize:14,outline:"none",boxSizing:"border-box"}}
-          />
-          {invQ&&<p style={{fontSize:12,color:"#888",margin:"6px 0 0"}}>{filtered.length} resultado{filtered.length!==1?"s":""} para "{invQ}"</p>}
-        </div>
+      {/* VISTA LISTA */}
+      {invView==="lista"&&(
+        <div>
+          {/* Filtros */}
+          <div style={{display:"flex",gap:8,marginBottom:12,flexWrap:"wrap"}}>
+            <input
+              type="text"
+              placeholder="Buscar por nombre, código o ubicación..."
+              value={invQ}
+              onChange={function(e){goSearch(e.target.value);}}
+              style={{flex:1,minWidth:200,padding:"9px 14px",borderRadius:8,border:"1px solid #ddd",fontSize:14,outline:"none"}}
+            />
+            <select value={secFilter} onChange={function(e){setSecFilter(e.target.value);setInvPage(0);}}
+              style={{padding:"9px 12px",borderRadius:8,border:"1px solid #ddd",fontSize:13,background:"#fff",color:"#333"}}>
+              <option value="">Todas las secciones</option>
+              {Object.keys(secsMap).sort().map(function(s){return <option key={s} value={s}>Sección {s}</option>;})}
+            </select>
+            {(invQ||secFilter)&&<button onClick={function(){setInvQ("");setSecFilter("");setInvPage(0);}} style={{padding:"9px 14px",borderRadius:8,border:"1px solid #ddd",background:"#f5f4f0",cursor:"pointer",fontSize:13,color:"#666"}}>✕ Limpiar</button>}
+          </div>
+          <p style={{fontSize:12,color:"#888",marginBottom:10}}>{listFiltered.length} producto{listFiltered.length!==1?"s":""}{secFilter?" en Sección "+secFilter:""}{invQ?" · búsqueda: \""+invQ+"\"":""}</p>
 
-        <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fill,minmax(265px,1fr))",gap:16}}>
-          {Object.keys(secs).sort().map(function(sec){
-            var prods=secs[sec].slice().sort(function(a,b){return (a.shelf||"").localeCompare(b.shelf||"");});
-            var tot=prods.reduce(function(s,p){return s+p.stock;},0);
-            var al=prods.filter(function(p){return p.stock<5;}).length;
-            var isExp=expanded[sec]||invQ.trim()!=="";
-            var visible=isExp?prods:prods.slice(0,INV_PAGE_SIZE);
-            var hidden=prods.length-INV_PAGE_SIZE;
-            return (
-                <div key={sec} style={sC}>
-                  <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:14}}>
-                    <div><p style={{fontWeight:700,fontSize:16,margin:0}}>Sección {sec}</p><p style={{fontSize:12,color:"#666",margin:"3px 0 0"}}>{prods.length} productos · {tot} uds</p></div>
-                    {al>0&&<span style={mBg("amber")}>{al} alerta{al!==1?"s":""}</span>}
-                  </div>
-                  {visible.map(function(p){
-                    return (
-                        <div key={p.id} style={{display:"flex",justifyContent:"space-between",alignItems:"center",padding:"6px 0",borderBottom:"1px solid rgba(0,0,0,0.06)"}}>
-                          <div style={{fontSize:13}}><span style={{fontFamily:"monospace",fontSize:10,color:"#999",marginRight:6}}>{p.shelf}</span><span>{p.name}</span></div>
-                          <span style={mBg(p.stock===0?"red":p.stock<5?"amber":"green")}>{p.stock}</span>
-                        </div>
-                    );
+          {/* Tabla */}
+          <div style={{background:"#fff",borderRadius:12,border:"1px solid rgba(0,0,0,0.08)",overflow:"hidden"}}>
+            <table style={{width:"100%",borderCollapse:"collapse"}}>
+              <thead>
+                <tr style={{background:NAVY}}>
+                  {["Ubicación","Código","Producto","Categoría","Stock","Precio"].map(function(h){
+                    return <th key={h} style={{padding:"10px 14px",textAlign:"left",color:"#fff",fontSize:12,fontWeight:700}}>{h}</th>;
                   })}
-                  {prods.length>INV_PAGE_SIZE&&(
-                    <button
-                      onClick={function(){toggleExpand(sec);}}
-                      style={{marginTop:10,width:"100%",padding:"7px",borderRadius:6,border:"1px solid #ddd",background:"#f9f9f9",cursor:"pointer",fontSize:13,color:TEAL,fontWeight:600}}
-                    >
-                      {isExp?"▲ Ver menos":"▼ Ver "+hidden+" más"}
-                    </button>
-                  )}
-                </div>
-            );
-          })}
+                </tr>
+              </thead>
+              <tbody>
+                {pageItems.length===0&&(
+                  <tr><td colSpan={6} style={{padding:32,textAlign:"center",color:"#aaa",fontSize:14}}>Sin resultados</td></tr>
+                )}
+                {pageItems.map(function(p,i){
+                  return (
+                    <tr key={p.id} style={{background:i%2===0?"#fff":"#fafafa",borderBottom:"1px solid rgba(0,0,0,0.04)"}}>
+                      <td style={{padding:"9px 14px",fontFamily:"monospace",fontSize:12,color:"#888"}}>{p.shelf||"—"}</td>
+                      <td style={{padding:"9px 14px",fontFamily:"monospace",fontSize:12,color:"#555"}}>{p.code||"—"}</td>
+                      <td style={{padding:"9px 14px",fontSize:13,fontWeight:500,color:NAVY}}>{p.name}</td>
+                      <td style={{padding:"9px 14px",fontSize:12,color:"#666"}}>{p.category||"—"}</td>
+                      <td style={{padding:"9px 14px"}}><span style={mBg(p.stock===0?"red":p.stock<5?"amber":"green")}>{p.stock}</span></td>
+                      <td style={{padding:"9px 14px",fontSize:13,fontWeight:600,color:NAVY}}>Q{Number(p.price).toFixed(2)}</td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
+
+          {/* Paginación */}
+          {totalPages>1&&(
+            <div style={{display:"flex",justifyContent:"center",alignItems:"center",gap:8,marginTop:16}}>
+              <button disabled={invPage===0} onClick={function(){setInvPage(invPage-1);}} style={{padding:"6px 14px",borderRadius:6,border:"1px solid #ddd",background:invPage===0?"#f5f5f5":"#fff",cursor:invPage===0?"default":"pointer",color:invPage===0?"#ccc":"#333"}}>‹ Anterior</button>
+              <span style={{fontSize:13,color:"#666"}}>Página {invPage+1} de {totalPages}</span>
+              <button disabled={invPage>=totalPages-1} onClick={function(){setInvPage(invPage+1);}} style={{padding:"6px 14px",borderRadius:6,border:"1px solid #ddd",background:invPage>=totalPages-1?"#f5f5f5":"#fff",cursor:invPage>=totalPages-1?"default":"pointer",color:invPage>=totalPages-1?"#ccc":"#333"}}>Siguiente ›</button>
+            </div>
+          )}
         </div>
-        {filtered.length===0&&<p style={{textAlign:"center",color:"#aaa",marginTop:40,fontSize:14}}>Sin resultados para "{invQ}"</p>}
-      </div>
+      )}
+    </div>
   );
 }
 
