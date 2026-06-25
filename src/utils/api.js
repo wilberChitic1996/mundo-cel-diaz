@@ -1,46 +1,20 @@
 // src/utils/api.js
 import axios from 'axios';
 
-// ── Resolución robusta de la URL del API ──────────────────────────
-// No dependemos solo de VITE_API_URL en Vercel (es frágil: build-time,
-// oculta y fácil de dejar incompleta). El código detecta el API correcto
-// según el dominio donde está corriendo el frontend. Si VITE_API_URL
-// está bien configurada, tiene prioridad; si está vacía o trae el
-// placeholder de ejemplo, se ignora y se auto-detecta.
-//
-// IMPORTANTE: la URL del API SIEMPRE debe terminar en /api porque todas
-// las rutas del backend están montadas bajo /api (ver app.js).
+// ── URL del API — auto-detección por dominio ──────────────────────
+// NO se usa VITE_API_URL (era frágil y causaba errores en producción).
+// El código detecta la API correcta según el hostname del navegador.
 const API_PROD    = 'https://mundo-cel-diaz-api-production.up.railway.app/api';
 const API_STAGING = 'https://mundo-cel-diaz-api-production-e546.up.railway.app/api';
 
-function isValidApiUrl(value) {
-  if (!value || typeof value !== 'string') return false;
-  var v = value.trim();
-  // Debe ser una URL absoluta http(s), sin espacios ni texto basura.
-  if (!/^https?:\/\//i.test(v)) return false;        // tiene que empezar con http:// o https://
-  if (/\s/.test(v)) return false;                     // sin espacios (ej. "VITE_API_URL - https://...")
-  if (v.indexOf('example.com') !== -1) return false;  // placeholder de ejemplo
-  return true;
-}
-
 function resolveApiUrl() {
-  // 1. Si VITE_API_URL está configurada y es VÁLIDA, usar esa.
-  //    Cualquier valor malformado (nombre de variable, espacios, placeholder)
-  //    se ignora y cae a la auto-detección de abajo.
-  var envUrl = import.meta.env.VITE_API_URL;
-  if (isValidApiUrl(envUrl)) {
-    // Asegurar que termine en /api (tolera que la dejen sin el sufijo).
-    var clean = envUrl.trim().replace(/\/+$/, '');
-    return /\/api$/.test(clean) ? clean : clean + '/api';
-  }
-  // 2. Auto-detección por el dominio del navegador.
   if (typeof window !== 'undefined' && window.location) {
     var host = window.location.hostname;
     if (host === 'localhost' || host === '127.0.0.1') return 'http://localhost:4000/api';
-    if (host.indexOf('staging') !== -1) return API_STAGING; // piloto
-    return API_PROD; // producción (vercel.app o dominio propio)
+    if (host.indexOf('staging') !== -1) return API_STAGING;
+    if (host === 'mundoceldiaz.com' || host === 'www.mundoceldiaz.com') return API_PROD;
+    return API_PROD;
   }
-  // 3. Fallback para entorno sin window (build/SSR).
   return 'http://localhost:4000/api';
 }
 
