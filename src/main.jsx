@@ -4,7 +4,6 @@ import { registerSW } from 'virtual:pwa-register'
 import App from './App.jsx'
 import './styles/global.css'
 
-// ── Service Worker (PWA) — actualización automática y forzada ──────
 var _reloading = false;
 var _updateSW = registerSW({
   immediate: true,
