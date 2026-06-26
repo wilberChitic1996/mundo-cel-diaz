@@ -30,7 +30,7 @@
 
 import React, { useState } from 'react';
 import { TEAL, NAVY, sCard, sInput, sLabel, sTH, sTD, mkBtn, mkBadge } from '../styles/theme.js';
-import { fmtD, fmtT } from '../utils/fmt.js';
+import { fmtD, fmtT } from '../utils/formatters.js';
 import { getStore } from '../utils/receipt.js';
 import { APP_NAME, APP_VERSION, STORE_FALLBACK, ROLE_LABEL } from '../constants/index.js';
 import HelpTip from '../components/ui/HelpTip.jsx';

@@ -24,7 +24,7 @@
 
 import React, { useState, useEffect } from 'react';
 import { TEAL, sCard, sInput, sLabel, sTH, sTD, mkBtn, mkBadge } from '../styles/theme.js';
-import { fmtD, fmtT } from '../utils/fmt.js';
+import { fmtD, fmtT } from '../utils/formatters.js';
 import { auditAPI } from '../utils/api.js';
 import { ROLE_LABEL } from '../constants/index.js';
 
