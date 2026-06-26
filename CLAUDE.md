@@ -138,26 +138,67 @@ Cuando se haga una migración de base de datos:
 
 ```
 src/
-  App.jsx              — Componente raíz, sidebar, routing entre pantallas
-  screens/             — Una pantalla por archivo (24 módulos)
-    LandingPage.jsx, LoginScreen.jsx, DashboardScreen.jsx, POSScreen.jsx,
-    CajaScreen.jsx, AccountsScreen.jsx, ReturnsScreen.jsx, DefectiveScreen.jsx,
-    ProductsScreen.jsx, CatalogosScreen.jsx, InventoryScreen.jsx, HistoryScreen.jsx,
-    ClientsScreen.jsx, RepairsScreen.jsx, WarrantiesScreen.jsx, SuppliersScreen.jsx,
-    UsersScreen.jsx, AuditScreen.jsx, CuadresScreen.jsx, StoreConfigScreen.jsx,
-    BackupScreen.jsx, AyudaScreen.jsx, SuperAdminPanel.jsx, OnboardingWizard.jsx
-  hooks/
-    usePaginator.jsx   — Hook de paginación (DEBE ser .jsx no .js — contiene JSX)
-  utils/
-    api.js             — Instancia axios + todos los endpoints por módulo
-    formatters.js      — Q(), fmtD(), fmtT(), gid()
-    receipt.js         — getStore(), setStore(), buildReceiptHTML(), printVoucher(), compartirWhatsApp()
-    whatsapp.js        — pedirTelYEnviar(), waBoletaVenta(), waRecordatorio()
-    export.js          — exportExcel(), exportPDF()
-  styles/
-    theme.js           — TEAL, NAVY, sCard, sInput, sLabel, sTH, sTD, sQtyBtn, mkBtn(), mkBadge()
-  constants/
-    index.js           — APP_NAME, PERMS, ROLE_LABEL, SESS_KEY, etc.
+│
+├── App.jsx                        ← Raíz: sidebar, routing, sesión (1,946 líneas, antes 8,104)
+├── main.jsx                       ← Entry point de Vite
+│
+├── screens/                       ← 24 pantallas, una por archivo
+│   ├── LandingPage.jsx            ← Pantalla de bienvenida
+│   ├── LoginScreen.jsx            ← Login + recuperación de contraseña
+│   ├── DashboardScreen.jsx        ← Panel de control / métricas
+│   ├── POSScreen.jsx              ← Punto de venta (nueva venta)
+│   ├── CajaScreen.jsx             ← Apertura y cierre de caja
+│   ├── AccountsScreen.jsx         ← Cuentas por cobrar
+│   ├── ReturnsScreen.jsx          ← Devoluciones
+│   ├── DefectiveScreen.jsx        ← Piezas defectuosas
+│   ├── ProductsScreen.jsx         ← Gestión de productos
+│   ├── CatalogosScreen.jsx        ← Catálogos (categorías, ubicaciones)
+│   ├── InventoryScreen.jsx        ← Inventario y stock
+│   ├── HistoryScreen.jsx          ← Historial de movimientos
+│   ├── ClientsScreen.jsx          ← Clientes
+│   ├── RepairsScreen.jsx          ← Reparaciones
+│   ├── WarrantiesScreen.jsx       ← Garantías
+│   ├── SuppliersScreen.jsx        ← Proveedores y compras
+│   ├── UsersScreen.jsx            ← Usuarios del sistema
+│   ├── AuditScreen.jsx            ← Auditoría
+│   ├── CuadresScreen.jsx          ← Cuadres de caja
+│   ├── StoreConfigScreen.jsx      ← Configuración de la tienda
+│   ├── BackupScreen.jsx           ← Respaldos
+│   ├── AyudaScreen.jsx            ← Ayuda
+│   ├── SuperAdminPanel.jsx        ← Panel superadmin (multi-tenant)
+│   └── OnboardingWizard.jsx       ← Asistente de configuración inicial
+│
+├── components/                    ← Componentes reutilizables
+│   ├── Sidebar.jsx                ← Menú lateral
+│   ├── ProductForm.jsx            ← Formulario de producto (POS e Inventario)
+│   ├── MetricBox.jsx              ← Tarjeta de métrica del dashboard
+│   └── ui/
+│       ├── HelpTip.jsx            ← Tooltip de ayuda contextual
+│       └── PagTable.jsx           ← Tabla con paginación
+│
+├── hooks/
+│   ├── usePaginator.jsx           ← Paginación (DEBE ser .jsx — contiene JSX)
+│   └── useIsMobile.js             ← Detección de pantalla móvil
+│
+├── utils/
+│   ├── api.js                     ← Instancia axios + todos los endpoints por módulo
+│   ├── formatters.js              ← Q(), fmtD(), fmtT(), gid()
+│   ├── receipt.js                 ← buildReceiptHTML(), printVoucher()
+│   ├── whatsapp.js                ← waBoletaVenta(), waRecordatorio()
+│   ├── export.js                  ← exportExcel(), exportPDF()
+│   ├── session.js                 ← getSession(), saveSession(), clearSession()
+│   ├── db.js                      ← Utilidades de base de datos local
+│   └── excel.js                   ← Helpers para exportación Excel
+│
+├── constants/
+│   └── index.js                   ← APP_NAME, PERMS, ROLE_LABEL, SESS_KEY, etc.
+│
+├── styles/
+│   ├── theme.js                   ← TEAL, NAVY, sCard, sInput, mkBtn(), mkBadge()
+│   └── global.css
+│
+└── data/
+    └── demo.js                    ← Datos de demo (solo para piloto)
 ```
 
 ---
@@ -206,27 +247,33 @@ Guardada en `sessionStorage` con clave `mnpos-api-session`.
 | #108 | Frontend | Fix api.js en `main`: enrutar dominios staging al API de piloto (no a producción) |
 | API #48 | Backend | Fix CORS: permitir *.vercel.app en el API (rama `main`) |
 | API #49 | Backend | Fix CORS: llevar la misma lógica `*.vercel.app` a la rama `staging` (piloto) |
+| #109 | Frontend | docs: CLAUDE.md con arquitectura + lección CORS + workflow de ramas |
+| #110 | Frontend | Merge `staging → main`: sincroniza doc y deja ambas ramas idénticas |
 
 ---
 
 ## Estado actual del trabajo (actualizar en cada PR)
 
-- **Rama activa:** `claude/gifted-heisenberg-r6n8jo` en frontend y API
-- **Producción (frontend `main`):** YA tiene TODO el código nuevo — App.jsx refactorizado (1946 líneas) + api.js con detección de hostname correcta. El refactor ya está en producción (PRs #104, #105, #108).
-- **Producción (API `main`):** tiene el fix de CORS (`*.vercel.app`).
-- **Piloto (API `staging`):** fix de CORS aplicado en PR #49 (jun 2026). Tras merge, Railway redesplegó el API e546.
-- **Único delta frontend `main` ↔ `staging`:** el archivo `CLAUDE.md` (solo doc). "Pasar a producción" en frontend = llevar este doc a `main`.
-- **Credenciales piloto:** `admin@demo.com` / `Admin2026!` (hash bcrypt en la BD de staging).
-- **Validación piloto:** en curso tras el fix de CORS del API.
+- **`main` y `staging` SINCRONIZADAS** — código idéntico en ambas ramas (jun 2026).
+- **Producción (`main`):** App.jsx refactorizado (1,946 líneas), api.js correcto, CLAUDE.md presente. Todo en orden.
+- **Piloto (`staging`):** funciona. Login OK con `admin@demo.com` / `Admin2026!`. Datos aislados en BD staging.
+- **Vercel piloto:** Production Branch corregido a `staging` (jun 2026).
+- **API staging (e546):** CORS corregido en PR #49, desplegado en Railway `observant-possibility`.
+- **Pendiente de verificar:** Vercel producción (Production Branch = `main`) y Railway (ramas por proyecto).
 
 ---
 
 ## Backlog / Pendientes
 
-### Alta prioridad
-- [ ] **Merge a producción:** Una vez validado piloto, mergear `claude/gifted-heisenberg-r6n8jo` → `main`
+### Alta prioridad — verificar config de aislamiento
+- [x] Vercel piloto: Production Branch → `staging` ✅
+- [x] API staging: fix CORS `*.vercel.app` → PR #49 ✅
+- [x] `staging` y `main` sincronizadas → PR #110 ✅
+- [ ] **Vercel producción** (`mundoceldiaz.com`): confirmar proyecto separado con Production Branch = `main`
+- [ ] **Railway piloto** (`observant-possibility`): confirmar que despliega de rama `staging`
+- [ ] **Railway producción** (`remarkable-warmth`): confirmar que despliega de rama `main`
 
-### Media prioridad
+### Media prioridad — funcionalidades
 - [ ] **Historial de movimientos:** Agregar columna "Artículos" mostrando productos/servicios de cada venta en la misma fila (la boleta ya tiene esa info, solo hay que traerla al listado)
 - [ ] **Secciones en Catálogos:** Gestionar ubicaciones/secciones desde el módulo Catálogos antes de asignarlas a productos (igual que funciona con categorías)
 
