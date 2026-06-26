@@ -1,23 +1,36 @@
 # CLAUDE.md — Mundo Cel Diaz · Frontend
 
-Este archivo documenta la arquitectura, decisiones y contexto del proyecto.
-**Leer SIEMPRE al inicio de cada sesión antes de hacer cualquier cambio.**
+**INSTRUCCIÓN PARA CLAUDE:** Leer este archivo COMPLETO al inicio de cada sesión antes de hacer cualquier cambio o dar cualquier respuesta técnica. Este archivo es la fuente de verdad del proyecto.
+
+---
+
+## Prompt de inicio de sesión (copiar y pegar al iniciar)
+
+```
+Lee el archivo CLAUDE.md del repo wilberchitic1996/mundo-cel-diaz en GitHub
+y dame un resumen de: arquitectura actual, último estado del trabajo,
+y pendientes. No hagas nada hasta que yo te confirme qué tarea seguiremos.
+```
 
 ---
 
 ## Arquitectura de ambientes
 
-El proyecto tiene **dos ambientes completamente independientes**:
+**DOS ambientes COMPLETAMENTE independientes. Nunca mezclar datos entre ellos.**
 
 | | Producción | Staging (Piloto) |
 |---|---|---|
-| **Frontend** | `mundoceldiaz.com` (Vercel, rama `main`) | `mundo-cel-diaz-staging.vercel.app` (Vercel, rama `staging`) |
-| **API** | Railway proyecto producción | Railway proyecto staging |
+| **Frontend URL** | `mundoceldiaz.com` | `mundo-cel-diaz-staging.vercel.app` |
+| **Frontend rama** | `main` (Vercel auto-deploya) | `staging` (Vercel auto-deploya) |
 | **API URL** | `https://mundo-cel-diaz-api-production.up.railway.app/api` | `https://mundo-cel-diaz-api-production-e546.up.railway.app/api` |
+| **API Railway** | Proyecto `remarkable-warmth` o `observant-possibility` | El otro proyecto Railway |
 | **Base de datos** | Supabase `mundo-cel-diaz` (AWS us-west-2) | Supabase `mundo-cel-diaz-staging` (AWS us-east-1) |
 
-**Regla crítica:** Staging y producción tienen datos separados. Nunca se mezclan.
-El frontend detecta automáticamente cuál API usar según el hostname (ver `src/utils/api.js`).
+El frontend detecta automáticamente cuál API usar por hostname (`src/utils/api.js`):
+- `localhost` → API local `http://localhost:4000/api`
+- hostname contiene `staging` → API staging
+- `mundoceldiaz.com` → API producción
+- cualquier otro → API producción (fallback)
 
 ---
 
@@ -26,7 +39,46 @@ El frontend detecta automáticamente cuál API usar según el hostname (ver `src
 - **Frontend:** `wilberchitic1996/mundo-cel-diaz`
 - **API/Backend:** `wilberchitic1996/mundo-cel-diaz-api`
 
-Rama de desarrollo activa: `claude/gifted-heisenberg-r6n8jo` (en ambos repos).
+**Rama de desarrollo activa:** `claude/gifted-heisenberg-r6n8jo` (en AMBOS repos).
+
+---
+
+## Workflow obligatorio — Siempre seguir este orden
+
+```
+1. Desarrollar en rama: claude/gifted-heisenberg-r6n8jo
+2. PR → staging (piloto) → validar que funciona
+3. Solo después de validar en piloto → PR → main (producción)
+4. Si hay cambios de base de datos → aplicar en AMBAS (staging y producción)
+```
+
+**NUNCA** hacer cambios directamente en `main` sin pasar por piloto primero.
+
+---
+
+## Reglas críticas de base de datos
+
+### Sistema multinegocio (multi-tenant)
+Este sistema maneja MÚLTIPLES negocios en la misma base de datos.
+Cada negocio se identifica por su `tenant_id`.
+
+**REGLAS ABSOLUTAS:**
+- Todo `SELECT`, `INSERT`, `UPDATE`, `DELETE` DEBE incluir filtro `WHERE tenant_id = ?`
+- Al crear tablas nuevas, SIEMPRE incluir columna `tenant_id UUID NOT NULL`
+- Al agregar índices, SIEMPRE incluir `tenant_id` como primera columna del índice
+- Nunca hacer queries sin filtro de tenant — expone datos de otros negocios
+
+### Tenant de producción — PROTEGIDO
+- **Negocio:** MUNDO CEL DIAZ
+- **tenant_id:** `00000000-0000-0000-0000-000000000001`
+- **NUNCA** modificar datos de este tenant sin aprobación explícita del usuario
+- Todo cambio de DB debe mostrarse al usuario para aprobación antes de ejecutar
+
+### Aplicar cambios de BD en ambos ambientes
+Cuando se haga una migración de base de datos:
+1. Aplicar primero en **Supabase staging** (`mundo-cel-diaz-staging`)
+2. Validar en piloto que funciona
+3. Aplicar en **Supabase producción** (`mundo-cel-diaz`)
 
 ---
 
@@ -45,57 +97,89 @@ Rama de desarrollo activa: `claude/gifted-heisenberg-r6n8jo` (en ambos repos).
 src/
   App.jsx              — Componente raíz, sidebar, routing entre pantallas
   screens/             — Una pantalla por archivo (24 módulos)
+    LandingPage.jsx, LoginScreen.jsx, DashboardScreen.jsx, POSScreen.jsx,
+    CajaScreen.jsx, AccountsScreen.jsx, ReturnsScreen.jsx, DefectiveScreen.jsx,
+    ProductsScreen.jsx, CatalogosScreen.jsx, InventoryScreen.jsx, HistoryScreen.jsx,
+    ClientsScreen.jsx, RepairsScreen.jsx, WarrantiesScreen.jsx, SuppliersScreen.jsx,
+    UsersScreen.jsx, AuditScreen.jsx, CuadresScreen.jsx, StoreConfigScreen.jsx,
+    BackupScreen.jsx, AyudaScreen.jsx, SuperAdminPanel.jsx, OnboardingWizard.jsx
   hooks/
-    usePaginator.jsx   — Hook de paginación (debe ser .jsx, no .js — contiene JSX)
+    usePaginator.jsx   — Hook de paginación (DEBE ser .jsx no .js — contiene JSX)
   utils/
     api.js             — Instancia axios + todos los endpoints por módulo
     formatters.js      — Q(), fmtD(), fmtT(), gid()
-    receipt.js         — getStore(), setStore(), buildReceiptHTML(), printVoucher()
-    whatsapp.js        — pedirTelYEnviar(), waBoletaVenta(), etc.
+    receipt.js         — getStore(), setStore(), buildReceiptHTML(), printVoucher(), compartirWhatsApp()
+    whatsapp.js        — pedirTelYEnviar(), waBoletaVenta(), waRecordatorio()
     export.js          — exportExcel(), exportPDF()
   styles/
-    theme.js           — TEAL, NAVY, sCard, sInput, sLabel, sTH, sTD, mkBtn(), mkBadge()
+    theme.js           — TEAL, NAVY, sCard, sInput, sLabel, sTH, sTD, sQtyBtn, mkBtn(), mkBadge()
   constants/
     index.js           — APP_NAME, PERMS, ROLE_LABEL, SESS_KEY, etc.
 ```
 
 ---
 
-## Decisiones arquitectónicas importantes
+## Estructura del backend
 
-### api.js — detección de ambiente
-El hostname del navegador determina cuál API usar:
-- `localhost` / `127.0.0.1` → `http://localhost:4000/api`
-- hostname contiene `staging` → API de staging
-- `mundoceldiaz.com` → API de producción
-- cualquier otro → API de producción (fallback)
+```
+mundo-cel-diaz-api/
+  app.js              — Express + CORS (permite *.vercel.app y FRONTEND_URL env var)
+  routes/             — 17 archivos, uno por módulo (ya bien estructurado, no refactorizar)
+    auth.js, products.js, sales.js, accounts.js, returns.js, defectives.js,
+    users.js, clients.js, repairs.js, audit.js, warranties.js, caja.js,
+    settings.js, suppliers.js, categories.js, locations.js, admin.js
+  middleware/
+    rateLimit.js      — Límite de peticiones por IP
+  supabase.js         — Cliente Supabase
+```
 
-### CORS en el API
-El API lee `FRONTEND_URL` env var en Railway para lista blanca de orígenes.
-Adicionalmente, cualquier `*.vercel.app` está permitido (para previews de PR y staging).
-Ver `app.js` en repo `mundo-cel-diaz-api`.
+---
+
+## Decisiones técnicas importantes
 
 ### Hashing de contraseñas
-Bcrypt (10 rounds). Legacy: SHA-256 + salt `mnpos_salt_2026` (auto-migra a bcrypt en login).
+- Actual: Bcrypt (10 rounds) — `$2a$` o `$2b$` al inicio del hash
+- Legacy: SHA-256 + salt `mnpos_salt_2026` — auto-migra a bcrypt en login exitoso
 
-### Sesión
-Guardada en `sessionStorage` con clave `mnpos-api-session`. Ver `src/utils/api.js`.
+### Sesión de usuario
+Guardada en `sessionStorage` con clave `mnpos-api-session`.
 
----
-
-## Historial de cambios importantes
-
-| PR | Descripción |
-|---|---|
-| #104 | Refactorización principal: App.jsx 8,104 → 1,921 líneas, extracción de 24 pantallas |
-| #105 | Fix build: usePaginator.js→.jsx, AccountsScreen import incorrecto, fmt.js→formatters.js |
-| #106 | Fix api.js: restaurar detección staging vs producción |
-| API #48 | Fix CORS: permitir *.vercel.app en el API |
+### CORS del API
+`app.js` en el repo API acepta:
+- Orígenes en variable de entorno `FRONTEND_URL` (Railway)
+- Cualquier `*.vercel.app` (staging y PR previews)
+- Requests sin origen (Postman, server-to-server)
 
 ---
 
-## Pendientes / Backlog
+## Historial de PRs importantes
 
-- **Historial de movimientos:** agregar columna "Artículos" con productos/servicios de cada venta
-- **Secciones en Catálogos:** gestionar ubicaciones desde Catálogos antes de asignar a productos
-- **Reparaciones en Historial:** evaluar si aplica mostrarlas o mantener módulo separado
+| PR | Repo | Descripción |
+|---|---|---|
+| #104 | Frontend | Refactorización: App.jsx 8,104 → 1,921 líneas, extracción de 24 pantallas |
+| #105 | Frontend | Fix build: usePaginator.js→.jsx, AccountsScreen import, fmt.js→formatters.js |
+| #106 | Frontend | Fix api.js: restaurar detección staging vs producción + crear CLAUDE.md |
+| API #48 | Backend | Fix CORS: permitir *.vercel.app en el API |
+
+---
+
+## Estado actual del trabajo (actualizar en cada PR)
+
+- **Rama activa:** `claude/gifted-heisenberg-r6n8jo` en frontend y API
+- **Último cambio:** Restauración de detección staging/producción en api.js (fue roto por error en PR #106, corregido en mismo PR)
+- **Staging:** Pendiente de validar que funciona con las credenciales propias del piloto
+- **Producción:** Aún tiene código viejo (App.jsx monolítico) — merge pendiente de aprobación del usuario
+
+---
+
+## Backlog / Pendientes
+
+### Alta prioridad
+- [ ] **Merge a producción:** Una vez validado piloto, mergear `claude/gifted-heisenberg-r6n8jo` → `main`
+
+### Media prioridad
+- [ ] **Historial de movimientos:** Agregar columna "Artículos" mostrando productos/servicios de cada venta en la misma fila (la boleta ya tiene esa info, solo hay que traerla al listado)
+- [ ] **Secciones en Catálogos:** Gestionar ubicaciones/secciones desde el módulo Catálogos antes de asignarlas a productos (igual que funciona con categorías)
+
+### Baja prioridad / Evaluar
+- [ ] **Reparaciones en Historial:** Evaluar si mostrarlas en historial de movimientos o mantener módulo separado (actualmente solo muestra ventas, créditos, abonos, devoluciones)
