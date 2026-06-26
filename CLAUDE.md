@@ -117,6 +117,12 @@ Cada negocio se identifica por su `tenant_id`.
 - **NUNCA** modificar datos de este tenant sin aprobación explícita del usuario
 - Todo cambio de DB debe mostrarse al usuario para aprobación antes de ejecutar
 
+### Config de despliegue — estado conocido (jun 2026)
+- **Vercel piloto** (`mundo-cel-diaz-staging`) → Production Branch corregido de `main` a **`staging`** (jun 2026). ANTES desplegaba de `main`, por eso el piloto no tenía aislamiento de código. YA corregido.
+- **Vercel producción** (`mundoceldiaz.com`) → PENDIENTE confirmar que es proyecto separado y Production Branch = `main`.
+- **Railway piloto** (`observant-possibility`) → debe desplegar de `staging`. PENDIENTE confirmar.
+- **Railway producción** (`remarkable-warmth`) → debe desplegar de `main`. PENDIENTE confirmar.
+
 ### Aplicar cambios de BD en ambos ambientes
 Cuando se haga una migración de base de datos:
 1. Aplicar primero en **Supabase staging** (`mundo-cel-diaz-staging`)
@@ -223,8 +229,12 @@ Guardada en `sessionStorage` con clave `mnpos-api-session`.
 
 ## Backlog / Pendientes
 
-### Alta prioridad
-- [ ] **Merge a producción:** Una vez validado piloto, mergear `claude/gifted-heisenberg-r6n8jo` → `main`
+### Alta prioridad — verificar config de aislamiento (siguiente sesión)
+- [x] **Vercel piloto:** Production Branch cambiado de `main` → `staging` (jun 2026, hecho).
+- [ ] **Vercel producción:** confirmar que `mundoceldiaz.com` es un proyecto Vercel SEPARADO del piloto y que su Production Branch = `main`.
+- [ ] **Railway:** confirmar que piloto (`observant-possibility`) despliega de `staging` y prod (`remarkable-warmth`) de `main`.
+- [ ] **Merge PR #109 → `staging`:** lleva el CLAUDE.md actualizado a piloto y dispara redeploy del piloto desde `staging` (confirma el aislamiento).
+- [ ] **PR `staging → main`:** lleva el doc a producción y deja ambas ramas idénticas.
 
 ### Media prioridad
 - [ ] **Historial de movimientos:** Agregar columna "Artículos" mostrando productos/servicios de cada venta en la misma fila (la boleta ya tiene esa info, solo hay que traerla al listado)
