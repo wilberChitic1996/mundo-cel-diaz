@@ -2,17 +2,16 @@
 import axios from 'axios';
 
 // ── URL del API — auto-detección por dominio ──────────────────────
-// NO se usa VITE_API_URL (era frágil y causaba errores en producción).
-// El código detecta la API correcta según el hostname del navegador.
-const API_PROD    = 'https://mundo-cel-diaz-api-production.up.railway.app/api';
-const API_STAGING = 'https://mundo-cel-diaz-api-production-e546.up.railway.app/api';
+// Staging y producción comparten el mismo API en Railway.
+// El ambiente staging solo existe para probar cambios de UI antes de
+// publicar a producción — no necesita una instancia de API separada.
+const API_PROD = 'https://mundo-cel-diaz-api-production.up.railway.app/api';
 
 function resolveApiUrl() {
   if (typeof window !== 'undefined' && window.location) {
     var host = window.location.hostname;
     if (host === 'localhost' || host === '127.0.0.1') return 'http://localhost:4000/api';
-    if (host.indexOf('staging') !== -1) return API_STAGING;
-    if (host === 'mundoceldiaz.com' || host === 'www.mundoceldiaz.com') return API_PROD;
+    // staging en Vercel (*.vercel.app) y dominio propio → mismo API de producción
     return API_PROD;
   }
   return 'http://localhost:4000/api';
