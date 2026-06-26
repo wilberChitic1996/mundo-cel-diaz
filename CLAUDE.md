@@ -23,14 +23,35 @@ y pendientes. No hagas nada hasta que yo te confirme qué tarea seguiremos.
 | **Frontend URL** | `mundoceldiaz.com` | `mundo-cel-diaz-staging.vercel.app` |
 | **Frontend rama** | `main` (Vercel auto-deploya) | `staging` (Vercel auto-deploya) |
 | **API URL** | `https://mundo-cel-diaz-api-production.up.railway.app/api` | `https://mundo-cel-diaz-api-production-e546.up.railway.app/api` |
-| **API Railway** | Proyecto `remarkable-warmth` o `observant-possibility` | El otro proyecto Railway |
-| **Base de datos** | Supabase `mundo-cel-diaz` (AWS us-west-2) | Supabase `mundo-cel-diaz-staging` (AWS us-east-1) |
+| **API Railway** | Proyecto `remarkable-warmth` | Proyecto `observant-possibility` |
+| **API rama (deploy)** | `main` | `staging` |
+| **Base de datos** | Supabase `mundo-cel-diaz` (`rhecnmfivygkayfvauxt`, AWS us-west-2) | Supabase `mundo-cel-diaz-staging` (`aawjhttlaydwsipsifre`, AWS us-east-1) |
+| **FRONTEND_URL (Railway)** | dominio de producción | `https://mundo-cel-diaz-staging.vercel.app` |
 
 El frontend detecta automáticamente cuál API usar por hostname (`src/utils/api.js`):
 - `localhost` → API local `http://localhost:4000/api`
 - hostname contiene `staging` → API staging
 - `mundoceldiaz.com` → API producción
 - cualquier otro → API producción (fallback)
+
+---
+
+## ⚠️ CONFIGURACIÓN DE AMBIENTES — NO TOCAR SIN APROBACIÓN
+
+Estos valores ya están correctos y funcionando. **NUNCA cambiarlos** salvo que el usuario lo pida explícitamente. Tocar uno solo rompe el aislamiento piloto/producción:
+
+- **NO** cambiar las URLs de API (`API_PROD` / `API_STAGING`) en `src/utils/api.js`.
+- **NO** cambiar `FRONTEND_URL` en ninguno de los dos proyectos Railway.
+- **NO** cambiar las variables `SUPABASE_URL` / `SUPABASE_KEY` en Railway (cada ambiente apunta a SU propia base de datos).
+- **NO** apuntar staging al API o la BD de producción "para probar". Piloto SIEMPRE usa su propia API (e546) y su propia BD (`aawjhttlaydwsipsifre`).
+- El API tiene **DOS ramas**: `main` (producción) y `staging` (piloto). Un fix de backend debe llegar a AMBAS ramas, no solo a `main`.
+
+### Lección registrada — fallo de login en piloto (jun 2026)
+
+**Síntoma:** login en piloto fallaba con "Sin conexión al servidor".
+**Causa raíz real (confirmada por Network tab → `CORS error`):** el API de staging (e546) despliega de la rama `staging`, que tenía código de CORS viejo (solo coincidencia exacta de `FRONTEND_URL`). El fix de CORS (`*.vercel.app`) solo se había mergeado a `main`, por eso producción funcionaba y piloto no.
+**Fix:** PR #49 (API) llevó la misma lógica de CORS a la rama `staging`.
+**Para diagnosticar este tipo de error:** abrir DevTools → Network → reintentar login → revisar Status de la petición `login` (CORS error / failed / 404 / 401) ANTES de tocar credenciales o URLs.
 
 ---
 
@@ -159,16 +180,22 @@ Guardada en `sessionStorage` con clave `mnpos-api-session`.
 | #104 | Frontend | Refactorización: App.jsx 8,104 → 1,921 líneas, extracción de 24 pantallas |
 | #105 | Frontend | Fix build: usePaginator.js→.jsx, AccountsScreen import, fmt.js→formatters.js |
 | #106 | Frontend | Fix api.js: restaurar detección staging vs producción + crear CLAUDE.md |
-| API #48 | Backend | Fix CORS: permitir *.vercel.app en el API |
+| #107 | Frontend | Merge de refactor + CLAUDE.md a `staging` |
+| #108 | Frontend | Fix api.js en `main`: enrutar dominios staging al API de piloto (no a producción) |
+| API #48 | Backend | Fix CORS: permitir *.vercel.app en el API (rama `main`) |
+| API #49 | Backend | Fix CORS: llevar la misma lógica `*.vercel.app` a la rama `staging` (piloto) |
 
 ---
 
 ## Estado actual del trabajo (actualizar en cada PR)
 
 - **Rama activa:** `claude/gifted-heisenberg-r6n8jo` en frontend y API
-- **Último cambio:** Restauración de detección staging/producción en api.js (fue roto por error en PR #106, corregido en mismo PR)
-- **Staging:** Pendiente de validar que funciona con las credenciales propias del piloto
-- **Producción:** Aún tiene código viejo (App.jsx monolítico) — merge pendiente de aprobación del usuario
+- **Producción (frontend `main`):** YA tiene TODO el código nuevo — App.jsx refactorizado (1946 líneas) + api.js con detección de hostname correcta. El refactor ya está en producción (PRs #104, #105, #108).
+- **Producción (API `main`):** tiene el fix de CORS (`*.vercel.app`).
+- **Piloto (API `staging`):** fix de CORS aplicado en PR #49 (jun 2026). Tras merge, Railway redesplegó el API e546.
+- **Único delta frontend `main` ↔ `staging`:** el archivo `CLAUDE.md` (solo doc). "Pasar a producción" en frontend = llevar este doc a `main`.
+- **Credenciales piloto:** `admin@demo.com` / `Admin2026!` (hash bcrypt en la BD de staging).
+- **Validación piloto:** en curso tras el fix de CORS del API.
 
 ---
 
