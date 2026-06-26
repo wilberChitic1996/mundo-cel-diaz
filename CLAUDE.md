@@ -60,20 +60,42 @@ Estos valores ya están correctos y funcionando. **NUNCA cambiarlos** salvo que 
 - **Frontend:** `wilberchitic1996/mundo-cel-diaz`
 - **API/Backend:** `wilberchitic1996/mundo-cel-diaz-api`
 
-**Rama de desarrollo activa:** `claude/gifted-heisenberg-r6n8jo` (en AMBOS repos).
+**Ramas de cada repo (AMBOS):**
+- `main` = producción
+- `staging` = piloto (rama base para nuevo trabajo)
+- Ramas de trabajo se crean DESDE `staging` y se mergean A `staging` primero.
 
 ---
 
 ## Workflow obligatorio — Siempre seguir este orden
 
+> ### 🔴 REGLA DE ORO: NUNCA hacer PR directo a `main`.
+> Producción (`main` / `mundoceldiaz.com`) SOLO se actualiza con un PR `staging → main`,
+> y SOLO después de que el usuario validó en el piloto. Cualquier otra ruta a `main`
+> está PROHIBIDA. (El error histórico fue mergear PRs #104–#108 directo a `main`, por eso
+> el refactor llegó a producción sin pasar por piloto.)
+
 ```
-1. Desarrollar en rama: claude/gifted-heisenberg-r6n8jo
-2. PR → staging (piloto) → validar que funciona
-3. Solo después de validar en piloto → PR → main (producción)
-4. Si hay cambios de base de datos → aplicar en AMBAS (staging y producción)
+1. Crear rama de trabajo PARTIENDO DE `staging`  (no de main)
+2. PR de esa rama → `staging`
+3. Vercel/Railway despliegan `staging` → el usuario valida en el PILOTO
+4. SOLO si el piloto funciona → PR `staging → main`
+5. Vercel/Railway despliegan `main` → producción actualizada
+6. Si hay cambios de base de datos → aplicar PRIMERO en Supabase staging, validar, luego en producción
 ```
 
-**NUNCA** hacer cambios directamente en `main` sin pasar por piloto primero.
+**Por qué esto protege producción:** mientras los cambios estén en `staging`, `mundoceldiaz.com`
+sigue corriendo `main` sin tocarse. Producción solo cambia cuando el usuario aprueba el PR `staging → main`.
+
+**Invariante:** después de cada release, `staging` y `main` deben quedar idénticas (mismo código),
+para que el piloto siempre refleje lo que está por salir a producción.
+
+### Configuración de despliegue que hace posible el aislamiento (verificar en Vercel)
+- **Proyecto Vercel del PILOTO** → Production Branch = `staging`
+- **Proyecto Vercel de PRODUCCIÓN** → Production Branch = `main`
+- **Railway piloto** (`observant-possibility`) → deploy de rama `staging`
+- **Railway producción** (`remarkable-warmth`) → deploy de rama `main`
+Si el proyecto Vercel del piloto apunta a `main`, NO hay aislamiento de código — corregirlo a `staging`.
 
 ---
 
