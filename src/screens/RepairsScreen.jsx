@@ -39,7 +39,7 @@ import React, { useState } from 'react';
 import { TEAL, NAVY, sCard, sInput, sLabel, sTH, sTD, mkBtn, mkBadge } from '../styles/theme.js';
 import { fmtD, fmtT } from '../utils/formatters.js';
 import { exportExcel, exportPDF } from '../utils/export.js';
-import { usePaginator } from '../hooks/usePaginator.js';
+import { usePaginator } from '../hooks/usePaginator.jsx';
 import { getStore } from '../utils/receipt.js';
 import { APP_NAME, STORE_FALLBACK } from '../constants/index.js';
 import HelpTip from '../components/ui/HelpTip.jsx';

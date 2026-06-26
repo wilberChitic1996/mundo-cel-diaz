@@ -34,7 +34,7 @@
 import React, { useState } from 'react';
 import { TEAL, NAVY, sCard, sInput, sLabel, sTH, sTD, mkBtn, mkBadge } from '../styles/theme.js';
 import { Q, fmtD, fmtT } from '../utils/formatters.js';
-import { usePaginator } from '../hooks/usePaginator.js';
+import { usePaginator } from '../hooks/usePaginator.jsx';
 
 // Estado inicial del formulario de devolución
 var BLANK = {

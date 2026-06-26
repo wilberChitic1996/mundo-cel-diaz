@@ -36,7 +36,7 @@ import { exportExcel, exportPDF } from '../utils/export.js';
 import { printVoucher, compartirWhatsApp } from '../utils/receipt.js';
 import { pedirTelYEnviar } from '../utils/whatsapp.js';
 import { waBoletaVenta } from '../utils/whatsapp.js';
-import { usePaginator } from '../hooks/usePaginator.js';
+import { usePaginator } from '../hooks/usePaginator.jsx';
 import { ROLE_LABEL } from '../constants/index.js';
 import HelpTip from '../components/ui/HelpTip.jsx';
 

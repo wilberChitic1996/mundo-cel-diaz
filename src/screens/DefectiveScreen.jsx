@@ -20,7 +20,7 @@
 import React, { useState } from 'react';
 import { TEAL, sCard, sTH, sTD, mkBtn, mkBadge } from '../styles/theme.js';
 import { fmtD, Q } from '../utils/formatters.js';
-import { usePaginator } from '../hooks/usePaginator.js';
+import { usePaginator } from '../hooks/usePaginator.jsx';
 
 var H1 = { fontSize: 'clamp(17px,4vw,22px)', fontWeight: 600, margin: '0 0 16px', color: 'var(--text-primary,#1a1a1a)' };
 

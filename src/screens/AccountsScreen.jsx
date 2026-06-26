@@ -35,9 +35,10 @@ import React, { useState } from 'react';
 import { TEAL, NAVY, sCard, sInput, sLabel, sTH, sTD, mkBtn, mkBadge } from '../styles/theme.js';
 import { Q, fmtD, fmtT } from '../utils/formatters.js';
 import { exportExcel, exportPDF } from '../utils/export.js';
-import { usePaginator } from '../hooks/usePaginator.js';
+import { usePaginator } from '../hooks/usePaginator.jsx';
 import { abrirWA, waRecordatorio } from '../utils/whatsapp.js';
-import { compartirWhatsApp, pedirTelYEnviar, getStore } from '../utils/receipt.js';
+import { compartirWhatsApp, getStore } from '../utils/receipt.js';
+import { pedirTelYEnviar } from '../utils/whatsapp.js';
 import HelpTip from '../components/ui/HelpTip.jsx';
 
 var H1 = { fontSize: 'clamp(17px,4vw,22px)', fontWeight: 600, margin: 0, color: 'var(--text-primary,#1a1a1a)' };
