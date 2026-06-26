@@ -1,69 +1,228 @@
-import React, { useState } from 'react'
-import { sCard, sInput, sLabel, mkBtn, TEAL } from '../styles/theme.js'
+// ══════════════════════════════════════════════════════════════════════════════
+// COMPONENTE: ProductForm (Formulario de Producto)
+//
+// Formulario inline para crear o editar un producto.
+// Aparece encima de la tabla en ProductsScreen.
+//
+// Validaciones:
+//   - Nombre obligatorio
+//   - Categoría obligatoria (debe elegirse de la lista)
+//   - Precio de venta obligatorio y mayor a cero
+//
+// Al guardar, resuelve category_id → nombre de categoría y
+// location_id + position → campo legacy "shelf" (ej: "Vitrina 1 · B3").
+// Esto mantiene compatibilidad con código antiguo que aún lee "shelf" como texto.
+//
+// Props:
+//   product    {Object}   — producto a editar (o {} para crear nuevo)
+//   categories {Array}    — lista de categorías disponibles
+//   locations  {Array}    — lista de ubicaciones disponibles
+//   onSave     {Function} — (productoGuardado) — llamada al confirmar
+//   onCancel   {Function} — llamada al cancelar
+// ══════════════════════════════════════════════════════════════════════════════
 
-const FIELDS = [
-  { key: 'code',     label: 'Código',           placeholder: 'A001',             type: 'text'   },
-  { key: 'name',     label: 'Nombre',            placeholder: 'Ej: Pantalla...', type: 'text'   },
-  { key: 'category', label: 'Categoría',         placeholder: 'Pantallas',        type: 'text'   },
-  { key: 'shelf',    label: 'Estantería',         placeholder: 'A-01',             type: 'text'   },
-  { key: 'price',    label: 'Precio venta (Q)',   placeholder: '0.00',             type: 'number' },
-  { key: 'cost',     label: 'Costo (Q)',          placeholder: '0.00',             type: 'number' },
-  { key: 'stock',    label: 'Stock',              placeholder: '0',                type: 'number' },
-  { key: 'unit',     label: 'Unidad',             placeholder: 'uni / serv',       type: 'text'   },
-]
+import React, { useState } from 'react';
+import { TEAL, sCard, sInput, sLabel, mkBtn } from '../styles/theme.js';
 
-export default function ProductForm({ product, onSave, onCancel }) {
-  const [form, setForm] = useState({ ...product })
-  const [error, setError] = useState('')
+// Opciones de unidad de medida
+var UNIT_OPTIONS = [
+  { v: 'uni',  l: 'Unidad (uni)'   },
+  { v: 'pza',  l: 'Pieza (pza)'    },
+  { v: 'serv', l: 'Servicio (serv)' },
+];
 
-  const set = (key, value) => setForm(f => ({ ...f, [key]: value }))
+// Convierte la primera letra a mayúscula
+function titleCase(str) {
+  str = str.trim();
+  return str.charAt(0).toUpperCase() + str.slice(1);
+}
 
-  const handleSave = () => {
-    if (!form.code?.trim() || !form.name?.trim()) {
-      setError('Código y Nombre son obligatorios')
-      return
+export default function ProductForm({ product, categories, locations, onSave, onCancel }) {
+  product    = product    || {};
+  categories = categories || [];
+  locations  = locations  || [];
+
+  // Estado del formulario — inicializado con los datos del producto a editar
+  var _s = useState(Object.assign({}, product));
+  var form    = _s[0];
+  var setForm = _s[1];
+
+  // Mensaje de error de validación
+  var _e = useState('');
+  var err    = _e[0];
+  var setErr = _e[1];
+
+  // Actualiza un campo del formulario y limpia el error
+  function set(campo, valor) {
+    setErr('');
+    setForm(function(f) {
+      var nuevo = Object.assign({}, f);
+      nuevo[campo] = valor;
+      return nuevo;
+    });
+  }
+
+  function guardar() {
+    if (!form.name || !form.name.trim()) {
+      setErr('El nombre es obligatorio');
+      return;
     }
-    onSave({
-      ...form,
-      price: parseFloat(form.price) || 0,
-      cost:  parseFloat(form.cost)  || 0,
-      stock: parseInt(form.stock)   || 0,
-    })
+    if (!form.category_id) {
+      setErr('La categoría es obligatoria — elígela de la lista');
+      return;
+    }
+    if (!form.price || isNaN(parseFloat(form.price))) {
+      setErr('El precio es obligatorio');
+      return;
+    }
+
+    // Resolver nombres legibles desde los IDs para mantener compatibilidad
+    var selCat = categories.find(function(c) { return String(c.id) === String(form.category_id); });
+    var selLoc = locations.find(function(l)  { return String(l.id) === String(form.location_id); });
+    var pos      = (form.position || '').trim();
+    // Construir el campo shelf de texto (ej: "Vitrina 1 · B3")
+    var shelfTxt = selLoc ? (selLoc.name + (pos ? ' · ' + pos : '')) : pos;
+
+    onSave(Object.assign({}, form, {
+      name:        titleCase(form.name || ''),
+      category_id: form.category_id,
+      category:    selCat ? selCat.name : '',
+      location_id: form.location_id || null,
+      position:    pos || null,
+      shelf:       shelfTxt,
+      code:        (form.code  || '').trim().toUpperCase(),
+      unit:        form.unit   || 'uni',
+      price:       parseFloat(form.price)    || 0,
+      cost:        parseFloat(form.cost)     || 0,
+      stock:       parseInt(form.stock)      || 0,
+      minStock:    parseInt(form.minStock)   || 0,
+    }));
   }
 
   return (
-    <div style={{ ...sCard, marginBottom: 16, borderColor: TEAL, borderWidth: '1.5px' }}>
+    <div style={Object.assign({}, sCard, { marginBottom: 16, borderColor: TEAL, borderWidth: '1.5px' })}>
       <p style={{ fontWeight: 600, margin: '0 0 14px', fontSize: 15 }}>
-        {product.id ? '✏️ Editar Producto' : '➕ Nuevo Producto'}
+        {product.id ? '✏️ Editar' : '➕ Nuevo Producto'}
       </p>
+      {err && <p style={{ color: '#E24B4A', fontSize: 13, margin: '0 0 10px' }}>⚠ {err}</p>}
 
-      {error && (
-        <p style={{ color: '#E24B4A', fontSize: 13, margin: '0 0 10px' }}>⚠ {error}</p>
-      )}
+      <div className="rg-4" style={{ display: 'grid', gridTemplateColumns: 'repeat(4,1fr)', gap: 12, marginBottom: 14 }}>
+        {/* Nombre */}
+        <div>
+          <label style={sLabel}>Nombre *</label>
+          <input
+            type="text" style={sInput}
+            value={form.name || ''} placeholder="Ej: Pantalla Samsung A24"
+            onChange={function(e) { set('name', e.target.value); }}
+          />
+        </div>
 
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 12, marginBottom: 14 }}>
-        {FIELDS.map(f => (
-          <div key={f.key}>
-            <label style={sLabel}>{f.label}</label>
-            <input
-              type={f.type}
-              style={sInput}
-              value={form[f.key] ?? ''}
-              placeholder={f.placeholder}
-              onChange={e => { setError(''); set(f.key, e.target.value) }}
-            />
-          </div>
-        ))}
+        {/* Categoría — lista cerrada (administrable en Catálogos) */}
+        <div>
+          <label style={sLabel}>Categoría *</label>
+          <select
+            style={Object.assign({}, sInput, { background: '#fff' })}
+            value={form.category_id || ''}
+            onChange={function(e) { set('category_id', e.target.value); }}
+          >
+            <option value="">— Elegir categoría —</option>
+            {categories.map(function(c) {
+              return <option key={c.id} value={c.id}>{(c.icon ? c.icon + ' ' : '') + c.name}</option>;
+            })}
+          </select>
+          {categories.length === 0 && (
+            <p style={{ fontSize: 11, color: '#E65100', margin: '3px 0 0' }}>
+              No hay categorías. Créalas en "Catálogos".
+            </p>
+          )}
+        </div>
+
+        {/* Ubicación (estante) — lista cerrada */}
+        <div>
+          <label style={sLabel}>Estante / Ubicación</label>
+          <select
+            style={Object.assign({}, sInput, { background: '#fff' })}
+            value={form.location_id || ''}
+            onChange={function(e) { set('location_id', e.target.value); }}
+          >
+            <option value="">— Sin ubicación —</option>
+            {locations.map(function(l) {
+              return <option key={l.id} value={l.id}>{l.name}</option>;
+            })}
+          </select>
+        </div>
+
+        {/* Posición dentro del estante (bandeja, gaveta, fila) */}
+        <div>
+          <label style={sLabel}>Posición</label>
+          <input
+            type="text" style={sInput}
+            value={form.position || ''} placeholder="Ej: B3, A2-2"
+            onChange={function(e) { set('position', e.target.value); }}
+            onBlur={function(e)   { set('position', (e.target.value || '').trim()); }}
+          />
+        </div>
+
+        {/* Código de producto */}
+        <div>
+          <label style={sLabel}>Código</label>
+          <input
+            type="text" style={sInput}
+            value={form.code || ''} placeholder="Ej: MCD-001"
+            onChange={function(e) { set('code', e.target.value); }}
+            onBlur={function(e)   { set('code', (e.target.value || '').trim().toUpperCase()); }}
+          />
+        </div>
+
+        {/* Precio de venta */}
+        <div>
+          <label style={sLabel}>Precio venta (Q) *</label>
+          <input
+            type="number" style={sInput}
+            value={form.price || ''} placeholder="0.00"
+            onChange={function(e) { set('price', e.target.value); }}
+          />
+        </div>
+
+        {/* Costo de compra (para calcular margen en reportes) */}
+        <div>
+          <label style={sLabel}>Costo (Q)</label>
+          <input
+            type="number" style={sInput}
+            value={form.cost || ''} placeholder="0.00"
+            onChange={function(e) { set('cost', e.target.value); }}
+          />
+        </div>
+
+        {/* Stock actual */}
+        <div>
+          <label style={sLabel}>Stock actual</label>
+          <input
+            type="number" style={sInput}
+            value={form.stock || ''} placeholder="0"
+            onChange={function(e) { set('stock', e.target.value); }}
+          />
+        </div>
+
+        {/* Unidad de medida */}
+        <div>
+          <label style={sLabel}>Unidad</label>
+          <select
+            style={Object.assign({}, sInput, { background: '#fff' })}
+            value={form.unit || 'uni'}
+            onChange={function(e) { set('unit', e.target.value); }}
+          >
+            {UNIT_OPTIONS.map(function(o) { return <option key={o.v} value={o.v}>{o.l}</option>; })}
+          </select>
+        </div>
       </div>
 
       <div style={{ display: 'flex', gap: 10 }}>
-        <button style={mkBtn('teal')} onClick={handleSave}>
-          {product.id ? 'Guardar cambios' : 'Agregar producto'}
+        <button style={mkBtn('teal')} onClick={guardar}>
+          {product.id ? 'Guardar cambios' : 'Agregar'}
         </button>
-        <button style={mkBtn('gray')} onClick={onCancel}>
-          Cancelar
-        </button>
+        <button style={mkBtn('gray')} onClick={onCancel}>Cancelar</button>
       </div>
     </div>
-  )
+  );
 }
