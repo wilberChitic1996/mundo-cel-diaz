@@ -473,6 +473,7 @@ function LoginScreen(props) {
   var _snp2=useState(false); var showNewPass2=_snp2[0]; var setShowNewPass2=_snp2[1];
   var _recErr=useState(""); var recErr=_recErr[0]; var setRecErr=_recErr[1];
   var _recOk=useState(""); var recOk=_recOk[0]; var setRecOk=_recOk[1];
+  var _recTok=useState(""); var recResetToken=_recTok[0]; var setRecResetToken=_recTok[1];
 
   function handleKey(e){ if(e.key==="Enter") doLogin(); }
 
@@ -548,7 +549,11 @@ function LoginScreen(props) {
     setRecErr("");
     if(!recAnswer.trim()){setRecErr("Ingresá la respuesta.");return;}
     if(recUser&&recUser.source==="api"){
-      try{ await authAPI.verifyAnswer(recUser.email,recAnswer.trim()); setRecMode("newpass"); }
+      try{
+        var vr=await authAPI.verifyAnswer(recUser.email,recAnswer.trim());
+        setRecResetToken(vr.resetToken||"");
+        setRecMode("newpass");
+      }
       catch(e){ setRecErr((e&&e.error)?e.error:"Respuesta incorrecta."); }
       return;
     }
@@ -562,8 +567,8 @@ function LoginScreen(props) {
     if(!newPass||newPass.length<8){setRecErr("La contraseña debe tener mínimo 8 caracteres.");return;}
     if(newPass!==newPass2){setRecErr("Las contraseñas no coinciden.");return;}
     if(recUser&&recUser.source==="api"){
-      try{ await authAPI.resetPassword(recUser.email,recAnswer.trim(),newPass); setRecOk("¡Contraseña actualizada! Ya podés iniciar sesión."); setRecMode("done"); }
-      catch(e){ setRecErr((e&&e.error)?e.error:"No se pudo actualizar la contraseña."); }
+      try{ await authAPI.resetPassword(recResetToken,newPass); setRecOk("¡Contraseña actualizada! Ya podés iniciar sesión."); setRecMode("done"); }
+      catch(e){ setRecErr((e&&e.error)?e.error:"No se pudo actualizar la contraseña. El token puede haber expirado — volvé a verificar tu respuesta."); }
       return;
     }
     var newHash=await hashPass(newPass);
