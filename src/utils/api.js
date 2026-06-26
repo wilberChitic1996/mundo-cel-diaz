@@ -2,8 +2,8 @@
 import axios from 'axios';
 
 // ── URL del API — auto-detección por dominio ──────────────────────
-// NO se usa VITE_API_URL (era frágil y causaba errores en producción).
-// El código detecta la API correcta según el hostname del navegador.
+// Producción y staging tienen instancias de API y DB completamente separadas.
+// El hostname detecta automáticamente cuál usar.
 const API_PROD    = 'https://mundo-cel-diaz-api-production.up.railway.app/api';
 const API_STAGING = 'https://mundo-cel-diaz-api-production-e546.up.railway.app/api';
 
