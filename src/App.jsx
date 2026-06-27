@@ -2061,8 +2061,8 @@ function App(props) {
           {view==="storeconfig"&&canAccess(session.role,"storeconfig")&&<StoreConfigScreen storeInfo={storeInfo} setStoreInfo={setStoreInfo} session={session} showFlash={showFlash}/>}
           {view==="ayuda"      &&canAccess(session.role,"ayuda")&&<AyudaScreen session={session}/>}
         </div>
+        {push.status === 'idle' && <PushPermissionBanner onAllow={push.requestPermission} onDismiss={push.dismiss} />}
       </div>
-      {push.status === 'idle' && <PushPermissionBanner onAllow={push.requestPermission} onDismiss={push.dismiss} />}
   );
 }
 
