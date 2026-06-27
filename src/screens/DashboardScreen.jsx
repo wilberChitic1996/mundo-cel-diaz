@@ -57,6 +57,7 @@ import {
 import { TEAL, NAVY, sCard, mkBtn, mkBadge } from '../styles/theme.js';
 import { Q, fmtD, fmtT } from '../utils/formatters.js';
 import HelpTip from '../components/ui/HelpTip.jsx';
+import RemindersWidget from '../components/ui/RemindersWidget.jsx';
 
 // Nombres cortos de días y meses en español
 var DIAS   = ['Dom', 'Lun', 'Mar', 'Mié', 'Jue', 'Vie', 'Sáb'];
@@ -463,6 +464,9 @@ export default function DashboardScreen({
           }
         </div>
       </div>
+
+      {/* Recordatorios del servidor: cuentas, garantías, reparaciones */}
+      <RemindersWidget />
     </div>
   );
 }
