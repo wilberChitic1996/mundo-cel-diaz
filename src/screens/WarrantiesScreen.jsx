@@ -300,7 +300,8 @@ export default function WarrantiesScreen({ warranties, sales, repairs, saveWarra
                       <td style={Object.assign({}, sTD, { textAlign: 'center', color: '#999', fontSize: 12 })}>{warPag.offset + index + 1}</td>
                       <td style={Object.assign({}, sTD, { fontWeight: 600 })}>
                         {(function() {
-                          var cli = w.clientId && clients.find(function(c) { return c.id === w.clientId; });
+                          var cli = (w.clientId && clients.find(function(c) { return c.id === w.clientId; }))
+                                 || (w.client && clients.find(function(c) { return c.name === w.client; }));
                           if (cli) return <span style={{ cursor: 'pointer', color: 'var(--teal,#1D9E75)', textDecoration: 'underline dotted' }} onClick={function(e) { e.stopPropagation(); navTo('clients', { clientId: cli.id }); }}>{w.client}</span>;
                           return w.client;
                         })()}
