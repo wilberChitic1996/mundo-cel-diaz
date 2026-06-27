@@ -35,7 +35,57 @@ import React, { useState, useEffect } from 'react';
 import { TEAL, NAVY, sCard, sInput, sLabel, sTH, sTD, mkBtn, mkBadge } from '../styles/theme.js';
 import { Q, fmtD, fmtT } from '../utils/formatters.js';
 import { suppliersAPI } from '../utils/api.js';
+import { getStore } from '../utils/receipt.js';
+import { STORE_FALLBACK, APP_NAME } from '../constants/index.js';
 import { usePaginator } from '../hooks/usePaginator.jsx';
+
+// Comprobante INTERNO de compra a proveedor (control del negocio, no se entrega al cliente).
+function printCompra(p) {
+  var _sn = getStore().store_name || STORE_FALLBACK;
+  var items = p.purchase_items || [];
+  var fecha = new Date(p.created_at).toLocaleDateString('es-GT', { day: '2-digit', month: 'long', year: 'numeric' });
+  var hora  = new Date(p.created_at).toLocaleTimeString('es-GT', { hour: '2-digit', minute: '2-digit' });
+  var folio = String(p.id || '').toUpperCase().slice(-8);
+
+  var filas = items.map(function(it) {
+    var costo = it.cost != null ? Number(it.cost) : (it.qty ? Number(it.subtotal) / Number(it.qty) : 0);
+    var sub   = it.subtotal != null ? Number(it.subtotal) : costo * Number(it.qty || 0);
+    return '<tr><td style="padding:7px 10px;border-bottom:1px solid #eee;font-size:12px;">' + (it.product_name || it.name || '—') + '</td>' +
+      '<td style="padding:7px 10px;border-bottom:1px solid #eee;text-align:center;font-size:12px;">' + (it.qty || 0) + '</td>' +
+      '<td style="padding:7px 10px;border-bottom:1px solid #eee;text-align:right;font-size:12px;">Q ' + costo.toFixed(2) + '</td>' +
+      '<td style="padding:7px 10px;border-bottom:1px solid #eee;text-align:right;font-size:12px;font-weight:700;">Q ' + sub.toFixed(2) + '</td></tr>';
+  }).join('');
+
+  var html = '<!DOCTYPE html><html><head><meta charset="UTF-8"><title>Compra ' + folio + '</title>' +
+    '<style>*{margin:0;padding:0;box-sizing:border-box;}body{font-family:Arial,sans-serif;font-size:12px;color:#222;max-width:700px;margin:0 auto;padding:24px;}' +
+    '.header{display:flex;justify-content:space-between;align-items:flex-start;border-bottom:3px solid #1D9E75;padding-bottom:14px;margin-bottom:18px;}' +
+    '.brand h1{font-size:20px;font-weight:900;color:#1a2535;}.brand p{font-size:10px;color:#1D9E75;font-weight:700;letter-spacing:2px;margin-top:2px;}' +
+    '.num .label{font-size:10px;color:#999;text-transform:uppercase;letter-spacing:1px;}.num .val{font-size:20px;font-weight:900;color:#1D9E75;}' +
+    '.grid{display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-bottom:16px;padding:12px;background:#f8f9fa;border-radius:8px;border-left:4px solid #1D9E75;}' +
+    '.block .lbl{font-size:10px;color:#999;text-transform:uppercase;letter-spacing:0.8px;margin-bottom:3px;}.block .val{font-size:13px;font-weight:700;}' +
+    'table{width:100%;border-collapse:collapse;margin-bottom:14px;}thead tr{background:#1a2535;}thead th{padding:8px 10px;color:#fff;font-size:11px;text-transform:uppercase;text-align:left;}' +
+    '.total{display:flex;justify-content:flex-end;}.total-box{min-width:240px;border:1px solid #eee;border-radius:8px;overflow:hidden;}.total-row{display:flex;justify-content:space-between;padding:9px 14px;background:#1D9E75;color:#fff;font-weight:700;font-size:14px;}' +
+    '.aviso{background:#FFF8E1;border:1px solid #FFD54F;border-radius:8px;padding:8px 12px;margin-top:16px;font-size:11px;color:#8a6d00;text-align:center;}' +
+    '@media print{body{padding:12px;}}</style></head><body>' +
+    '<div class="header">' +
+      '<div class="brand"><h1>' + _sn + '</h1><p>COMPROBANTE DE COMPRA · USO INTERNO</p></div>' +
+      '<div class="num"><div class="label">N° Compra</div><div class="val"># ' + folio + '</div></div>' +
+    '</div>' +
+    '<div class="grid">' +
+      '<div class="block"><div class="lbl">Proveedor</div><div class="val">' + (p.supplier_name || '—') + '</div></div>' +
+      '<div class="block"><div class="lbl">Fecha</div><div class="val">' + fecha + '</div><div style="font-size:11px;color:#666;">' + hora + ' hrs</div></div>' +
+      '<div class="block"><div class="lbl">Registrado por</div><div class="val">' + (p.registered_by || '—') + '</div></div>' +
+      '<div class="block"><div class="lbl">Artículos</div><div class="val">' + items.length + ' línea(s)</div></div>' +
+    '</div>' +
+    '<table><thead><tr><th>Producto</th><th style="text-align:center;">Cant.</th><th style="text-align:right;">Costo unit.</th><th style="text-align:right;">Subtotal</th></tr></thead><tbody>' + filas + '</tbody></table>' +
+    '<div class="total"><div class="total-box"><div class="total-row"><span>TOTAL COMPRA</span><span>Q ' + Number(p.total).toFixed(2) + '</span></div></div></div>' +
+    '<div class="aviso">📦 Documento interno de control de inventario. No es comprobante de venta ni documento tributario; no se entrega al cliente.</div>' +
+    '</body></html>';
+
+  var w = window.open('', '_blank', 'width=800,height=700');
+  w.document.write(html + '<scr' + 'ipt>window.onload=function(){setTimeout(function(){window.print();},400);};</scr' + 'ipt>');
+  w.document.close();
+}
 
 var H1 = { fontSize: 'clamp(17px,4vw,22px)', fontWeight: 600, margin: 0, color: 'var(--text-primary,#1a1a1a)' };
 
@@ -272,7 +322,7 @@ export default function SuppliersScreen({ products, session, showFlash, onStockU
               <table style={{ width: '100%', borderCollapse: 'collapse' }}>
                 <thead>
                   <tr>
-                    {['#', 'Fecha', 'Proveedor', 'Artículos', 'Total', 'Registrado por'].map(function(h) {
+                    {['#', 'Fecha', 'Proveedor', 'Artículos', 'Total', 'Registrado por', ''].map(function(h) {
                       return <th key={h} style={h === '#' ? Object.assign({}, sTH, { width: 40, textAlign: 'center' }) : sTH}>{h}</th>;
                     })}
                   </tr>
@@ -293,6 +343,9 @@ export default function SuppliersScreen({ products, session, showFlash, onStockU
                         </td>
                         <td style={Object.assign({}, sTD, { fontWeight: 700, color: TEAL })}>Q {Number(p.total).toFixed(2)}</td>
                         <td style={sTD}>{p.registered_by}</td>
+                        <td style={Object.assign({}, sTD, { textAlign: 'right' })}>
+                          <button style={Object.assign({}, mkBtn('blue'), { padding: '4px 10px', fontSize: 11 })} onClick={function() { printCompra(p); }}>🖨</button>
+                        </td>
                       </tr>
                     );
                   })}

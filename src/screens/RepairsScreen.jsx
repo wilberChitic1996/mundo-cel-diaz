@@ -99,7 +99,7 @@ function printRepairTicket(rep) {
     '@media print{body{padding:12px;}}' +
     '</style></head><body>' +
     '<div class="header">' +
-      '<div class="brand"><h1>' + _sn + '</h1><p>ORDEN DE TRABAJO</p></div>' +
+      '<div class="brand"><h1>' + _sn + '</h1><p>' + (rep.status === 'entregado' ? 'COMPROBANTE DE ENTREGA' : 'ORDEN DE TRABAJO · RECEPCIÓN') + '</p></div>' +
       '<div style="display:flex;align-items:flex-start;gap:14px;">' +
         '<div class="rep-num"><div class="label">N° Orden</div><div class="num">' + rep.repCode + '</div></div>' +
         '<div style="text-align:center;margin-top:4px;"><div id="qrr" style="display:inline-block;"></div><div style="font-size:9px;color:#999;margin-top:3px;">ESCANEAR</div></div>' +
@@ -127,6 +127,7 @@ function printRepairTicket(rep) {
     (rep.internalNote ? '<div class="section"><div class="section-title">📝 Nota interna</div><div class="section-body" style="color:#666;">' + rep.internalNote + '</div></div>' : '') +
     '<div class="footer"><div><b>' + _sn + '</b> · Guatemala</div><div>Ref: ' + rep.repCode + ' · ' + rep.id.slice(0, 8).toUpperCase() + '</div></div>' +
     '<div class="firma">Firma del cliente: _____________________________ &nbsp;&nbsp;&nbsp; Fecha entrega: _______________</div>' +
+    '<p style="text-align:center;margin:10px 0 0;font-size:9px;color:#bbb;">Comprobante interno · No es documento tributario (no válido como factura)</p>' +
     '</body></html>';
 
   var w = window.open('', '_blank', 'width=800,height=700');

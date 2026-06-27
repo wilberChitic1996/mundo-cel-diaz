@@ -5,7 +5,7 @@ import { AreaChart, Area, BarChart, Bar, PieChart, Pie, Cell, XAxis, YAxis, Cart
 import { db } from './utils/db.js';
 import { authAPI, productsAPI, salesAPI, accountsAPI, returnsAPI, defectivesAPI, usersAPI, checkAPI, clientsAPI, repairsAPI, auditAPI, warrantiesAPI, cajaAPI, settingsAPI, suppliersAPI, adminAPI, categoriesAPI, locationsAPI } from './utils/api.js';
 // Sincroniza la config de tienda con el módulo de impresión (receipt.js usa su propio estado).
-import { setStore as setReceiptStore } from './utils/receipt.js';
+import { setStore as setReceiptStore, printVoucher as printVoucherDoc, descargarImagen as descargarBoletaImagen } from './utils/receipt.js';
 
 
 // ── Pantallas extraídas a módulos independientes ──────────────────────────────
@@ -923,6 +923,10 @@ function App(props) {
   var _on=useState(false); var isOnline=_on[0]; var setIsOnline=_on[1];
   var _si=useState({store_name:"",store_tagline:"",store_phone:"",store_address:"",store_email:"",store_logo_url:""});
   var storeInfo=_si[0]; var setStoreInfo=_si[1];
+  // Boleta post-venta: {sale, opts} cuando hay una venta recién cobrada para ofrecer comprobante.
+  var _psr=useState(null); var postSale=_psr[0]; var setPostSale=_psr[1];
+  // Si el negocio quiere que se ofrezca la boleta al cobrar (configurable). Por defecto sí.
+  var _ofr=useState(true); var offerReceipt=_ofr[0]; var setOfferReceipt=_ofr[1];
   var _ob=useState(false); var showOnboarding=_ob[0]; var setShowOnboarding=_ob[1];
   var _sub=useState(null); var subInfo=_sub[0]; var setSubInfo=_sub[1];
 
@@ -953,6 +957,7 @@ function App(props) {
         categoriesAPI.getAll().then(function(c){setCategories(c||[]);}).catch(function(){});
         locationsAPI.getAll().then(function(l){setLocations(l||[]);}).catch(function(){});
         if(cfg&&cfg.store_name){ setStoreInfo(function(prev){return Object.assign({},prev,cfg);}); setStore(cfg); setReceiptStore(cfg); }
+        if(cfg){ setOfferReceipt(cfg.offer_receipt!=="false"); }
         if(session.role==="admin"&&(!cfg||cfg.onboarding_done!=="true")){
           if((prods||[]).length>0){
             settingsAPI.update({onboarding_done:"true"}).catch(function(){});
@@ -1112,8 +1117,9 @@ function App(props) {
     function deduct(){ setProducts(function(p){return p.map(function(x){var ci=cart.find(function(i){return i.id===x.id;});return ci&&x.unit!=="serv"?Object.assign({},x,{stock:x.stock-ci.qty}):x;}); }); }
     var idempotencyKey=gid()+"-"+Date.now();
     if(payType==="completo"){
+      var _createdSale=null;
       try {
-        await salesAPI.create({client:client,total:cartTotal,method:payMethod,items:cart,nota:nota,idempotencyKey:idempotencyKey});
+        _createdSale = await salesAPI.create({client:client,total:cartTotal,method:payMethod,items:cart,nota:nota,idempotencyKey:idempotencyKey});
         var freshSales = await salesAPI.getAll();
         var ns = (freshSales||[]).map(function(s){return Object.assign({},s,{items:s.sale_items||[],total:Number(s.total),date:s.created_at,registradoPor:s.registrado_por||null,payType:s.pay_type||'completo',status:s.status||'completado'});});
         setSales(ns);
@@ -1125,11 +1131,16 @@ function App(props) {
       }
       deduct();
       showFlash("✓ Venta cobrada — "+Q(cartTotal),"ok");
+      if(offerReceipt){
+        var _rsale={id:(_createdSale&&_createdSale.id)||idempotencyKey,client:client,total:cartTotal,method:payMethod,items:cart.slice(),date:(_createdSale&&_createdSale.created_at)||new Date().toISOString(),nota:nota,registradoPor:registradoPor};
+        setPostSale({sale:_rsale,opts:{usuario:session.name,usuarioRole:session.role}});
+      }
     } else {
       var paid=payType==="parcial"?Math.min(initPaidVal,cartTotal):0;
       var balance=cartTotal-paid;
+      var _createdAcc=null;
       try{
-        await salesAPI.create({client:client,total:cartTotal,method:payMethod,items:cart,payType:payType,initialPay:paid,nota:nota,idempotencyKey:idempotencyKey});
+        _createdAcc = await salesAPI.create({client:client,total:cartTotal,method:payMethod,items:cart,payType:payType,initialPay:paid,nota:nota,idempotencyKey:idempotencyKey});
         var freshAccs = await accountsAPI.getAll();
         var na=(freshAccs||[]).map(function(a){return Object.assign({},a,{items:a.account_items||[],payments:(a.account_payments||[]).map(function(_pp){return Object.assign({},_pp,{date:_pp.date||_pp.created_at,amount:Number(_pp.amount),registradoPor:_pp.registrado_por||_pp.registradoPor||null});}),total:Number(a.total),paid:Number(a.paid),balance:Number(a.balance),date:a.created_at,registradoPor:a.registrado_por||null});});
         setAccounts(na);
@@ -1141,6 +1152,11 @@ function App(props) {
       }
       deduct();
       showFlash(payType==="pendiente"?"⏳ Pendiente — "+Q(cartTotal)+" por cobrar":"💰 Abono "+Q(paid)+" — Saldo: "+Q(balance),"warn");
+      if(offerReceipt){
+        var _estado=payType==="pendiente"?"pendiente":"parcial";
+        var _rsale2={id:(_createdAcc&&_createdAcc.id)||idempotencyKey,client:client,total:cartTotal,method:payMethod,items:cart.slice(),date:new Date().toISOString(),nota:nota,registradoPor:registradoPor,paid:paid,balance:balance};
+        setPostSale({sale:_rsale2,opts:{usuario:session.name,usuarioRole:session.role,estado:_estado,abonoHoy:payType==="parcial"?paid:null,pagado:paid,saldo:balance}});
+      }
     }
     resetPOS();
     checkoutInProgress.current=false;
@@ -1848,6 +1864,23 @@ function App(props) {
                 <button onClick={handleContinueSession} style={{flex:2,padding:"11px",borderRadius:8,border:"none",background:TEAL,color:"#fff",fontSize:14,cursor:"pointer",fontWeight:700}}>
                   ✓ Continuar sesión
                 </button>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Modal: ofrecer boleta tras una venta */}
+        {postSale&&(
+          <div style={{position:"fixed",inset:0,zIndex:9500,background:"rgba(20,30,45,0.55)",display:"flex",alignItems:"center",justifyContent:"center",padding:16}} onClick={function(){setPostSale(null);}}>
+            <div style={{background:"#fff",borderRadius:14,padding:24,maxWidth:380,width:"100%",boxShadow:"0 12px 40px rgba(0,0,0,0.25)"}} onClick={function(e){e.stopPropagation();}}>
+              <div style={{textAlign:"center",marginBottom:6,fontSize:34}}>🧾</div>
+              <p style={{textAlign:"center",fontWeight:800,fontSize:17,margin:"0 0 4px",color:"#1a2535"}}>Venta registrada</p>
+              <p style={{textAlign:"center",fontSize:13,color:"#777",margin:"0 0 18px"}}>{Q(postSale.sale.total)} · {postSale.sale.client||"Cliente ocasional"}<br/>¿Entregar comprobante al cliente?</p>
+              <div style={{display:"grid",gap:8}}>
+                <button style={Object.assign({},mkBtn("teal"),{padding:"11px"})} onClick={function(){printVoucherDoc(postSale.sale,postSale.opts);}}>🖨 Imprimir / PDF</button>
+                <button style={Object.assign({},mkBtn("blue"),{padding:"11px"})} onClick={function(){descargarBoletaImagen(postSale.sale,postSale.opts).then(function(ok){showFlash(ok?"🖼 Imagen de boleta descargada":"⛔ No se pudo generar la imagen",ok?"ok":"err");});}}>🖼 Descargar imagen</button>
+                <button style={Object.assign({},mkBtn("green"),{background:"#25D366",padding:"11px"})} onClick={function(){var _ps=postSale; pedirTelYEnviar(_ps.sale.client,function(){return waBoletaVenta(_ps.sale);},{sale:_ps.sale,receiptOpts:_ps.opts});}}>💬 Enviar por WhatsApp</button>
+                <button style={Object.assign({},mkBtn("gray"),{padding:"10px"})} onClick={function(){setPostSale(null);}}>No entregar</button>
               </div>
             </div>
           </div>
