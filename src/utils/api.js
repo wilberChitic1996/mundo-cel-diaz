@@ -203,6 +203,12 @@ export const remindersAPI = {
   accounts: function() { return api.get('/reminders/accounts'); },
 };
 
+export const pushAPI = {
+  vapidKey:   function()    { return api.get('/push/vapid-public-key'); },
+  subscribe:  function(sub) { return api.post('/push/subscribe', sub); },
+  unsubscribe:function(ep)  { return api.delete('/push/subscribe', { data: { endpoint: ep } }); },
+};
+
 export const checkAPI = async function() {
   try {
     var baseUrl = API_URL.replace('/api', '');

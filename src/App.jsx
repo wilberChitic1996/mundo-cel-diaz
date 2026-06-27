@@ -33,6 +33,8 @@ import OnboardingWizard from './screens/OnboardingWizard.jsx';
 import AuditScreen     from './screens/AuditScreen.jsx';
 import RepairsScreen   from './screens/RepairsScreen.jsx';
 import CuadresScreen   from './screens/CuadresScreen.jsx';
+import PushPermissionBanner from './components/ui/PushPermissionBanner.jsx';
+import usePushNotifications from './hooks/usePushNotifications.js';
 const TEAL    = "#1D9E75";
 const NAVY    = "#1a2535";
 const APP_NAME = "PraxisGT";
@@ -1095,6 +1097,9 @@ function App(props) {
     setView(screen);
   }
 
+  // ── Push notifications ──
+  var push = usePushNotifications(session);
+
   // ── Silent JWT refresh (7 min before expiry) ──
   useEffect(function() {
     var refreshTimer = null;
@@ -2057,6 +2062,7 @@ function App(props) {
           {view==="ayuda"      &&canAccess(session.role,"ayuda")&&<AyudaScreen session={session}/>}
         </div>
       </div>
+      {push.status === 'idle' && <PushPermissionBanner onAllow={push.requestPermission} onDismiss={push.dismiss} />}
   );
 }
 
