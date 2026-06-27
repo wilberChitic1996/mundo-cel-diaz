@@ -255,18 +255,21 @@ mundo-cel-diaz-api/
 | API #57–#60 | Backend | Web Push notifications VAPID + tabla push_subscriptions + Docker |
 | API #61 | Backend | node-pg-migrate para migraciones versionadas (008+) |
 | API #62–#63 | Backend | Tests cobertura push/reminders/auth-refresh (61/61 passing) |
+| #139–#140 | Frontend | BackupScreen enterprise — historial, health card, descarga, backup manual |
+| API #64–#66 | Backend | Backup enterprise (snapshots diarios 2 AM por tenant → Supabase Storage) + monitoreo almacenamiento + retención audit_logs 180d |
 
 ---
 
 ## Estado actual del trabajo
 
-- **Versión en producción:** 2.4.0
-- **Último cambio (27 jun 2026):** CSP estricta, push notifications PWA, Docker, node-pg-migrate, tests 61/61 (PRs #135–#137, API #57–#63)
+- **Versión en producción:** 2.5.0
+- **Último cambio (27 jun 2026):** Backup enterprise, monitoreo de almacenamiento con alertas push, retención audit_logs automática, STORAGE_GUIDE.md (PRs #139–#140, API #64–#66)
 - **Producción frontend:** ✅ Actualizada — mundoceldiaz.com
 - **Producción API:** ✅ Actualizada — mundo-cel-diaz-api-production.up.railway.app
 - **Staging:** ✅ Sincronizado con main en ambos repos
 - **2FA:** Implementado para superadmin, deshabilitado temporalmente (esperando verificación DNS Resend: DKIM ✓, SPF ✓, pendiente propagación)
 - **Credenciales piloto:** `admin@demo.com` / `Admin2026!` (hash bcrypt en la BD de staging).
+- **Bucket Supabase Storage `backups`:** ✅ Creado en staging y producción — backups automáticos activos desde las 2 AM.
 
 ---
 
@@ -302,7 +305,8 @@ mundo-cel-diaz-api/
 - [x] **Versionado de API:** ✅ Implementado — prefijo `/api/v1/` disponible junto a `/api/` (retrocompatible)
 - [x] **Redis caché:** ✅ Implementado — `utils/cache.js` usa Redis si `REDIS_URL` está en env, Map en memoria como fallback
 - [ ] **Colas de procesamiento:** BullMQ para tareas pesadas (exports grandes, emails masivos)
-- [ ] **Supabase Storage:** Fotos de productos, imágenes de reparaciones, logos de negocios
+- [x] **Backup enterprise:** ✅ Snapshots JSON diarios a Supabase Storage (bucket `backups`), historial en app, descarga con URL firmada, retención 30 días, alerta push si almacenamiento crítico
+- [ ] **Supabase Storage (media):** Fotos de productos, imágenes de reparaciones, logos de negocios
 - [x] **Docker + Docker Compose:** ✅ Implementado — `Dockerfile` (node:20-alpine, USER node) + `docker-compose.yml` (api + redis:7-alpine)
 - [x] **GitHub Actions CI:** ✅ Implementado — `ci.yml` y `test.yml` en ambos repos
 - [x] **Migraciones versionadas:** ✅ node-pg-migrate configurado — ignorar 001-007 (aplicados manualmente), nuevas migraciones desde 008 con up/down
@@ -335,6 +339,8 @@ Esta lista evita re-implementar cosas que ya existen:
 | **Multi-tenant** | tenant_id en todas las tablas, withTenant() en API, RLS en Supabase |
 | **BD** | audit_logs completo, índices en tenant_id+created_at, migraciones en /migrations (SQL manual) |
 | **Tests** | Vitest + Supertest — 61/61 passing (push, reminders, auth/refresh, accounts, settings) |
+| **Backup** | Snapshots JSON diarios por tenant → Supabase Storage bucket `backups`; retención 30d; alerta push si límite cercano; limpieza mensual audit_logs >180d |
+| **Storage monitoring** | `/admin/storage-stats` superadmin, `docs/STORAGE_GUIDE.md`, cron alerta push lunes si >100k audit_logs |
 | **Monitoring** | GET /health en API, Sentry frontend, Pino logs backend, GitHub Actions uptime |
 | **Push PWA** | Web Push VAPID, banner suscripción, `push_subscriptions` por tenant, cron jobs con push real |
 | **Docker** | Dockerfile node:20-alpine (USER node) + docker-compose con redis para desarrollo local |
