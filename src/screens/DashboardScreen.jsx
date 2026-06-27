@@ -117,8 +117,9 @@ function TooltipPie(p) {
 export default function DashboardScreen({
   sales, todaySales, accounts, pendingAccs, totalPend,
   products, top5, returns: devos, repairs, warranties,
-  setSelectedSale, setView,
+  setSelectedSale, setView, navTo,
 }) {
+  navTo = navTo || function(s) { setView(s); };
   sales       = sales       || [];
   todaySales  = todaySales  || [];
   accounts    = accounts    || [];
@@ -234,22 +235,22 @@ export default function DashboardScreen({
           <p style={{ fontWeight: 700, fontSize: 13, color: '#791F1F', margin: '0 0 8px' }}>⚠ Atención requerida</p>
           <div style={{ display: 'flex', gap: 20, flexWrap: 'wrap' }}>
             {repsVencidas.length > 0 && (
-              <span style={{ fontSize: 13, color: '#791F1F', cursor: 'pointer' }} onClick={function() { setView('repairs'); }}>
+              <span style={{ fontSize: 13, color: '#791F1F', cursor: 'pointer' }} onClick={function() { navTo('repairs', { filter: 'activas' }); }}>
                 🔧 {repsVencidas.length} reparación{repsVencidas.length > 1 ? 'es' : ''} vencida{repsVencidas.length > 1 ? 's' : ''} →
               </span>
             )}
             {stockCero.length > 0 && (
-              <span style={{ fontSize: 13, color: '#791F1F', cursor: 'pointer' }} onClick={function() { setView('products'); }}>
+              <span style={{ fontSize: 13, color: '#791F1F', cursor: 'pointer' }} onClick={function() { navTo('products', { search: 'sin stock' }); }}>
                 📦 {stockCero.length} producto{stockCero.length > 1 ? 's' : ''} sin stock →
               </span>
             )}
             {cuentasVencidas.length > 0 && (
-              <span style={{ fontSize: 13, color: '#791F1F', cursor: 'pointer' }} onClick={function() { setView('accounts'); }}>
+              <span style={{ fontSize: 13, color: '#791F1F', cursor: 'pointer' }} onClick={function() { navTo('accounts', { filter: 'aging-2' }); }}>
                 💳 {cuentasVencidas.length} cuenta{cuentasVencidas.length > 1 ? 's' : ''} +30 días →
               </span>
             )}
             {garantiasPorVencer.length > 0 && (
-              <span style={{ fontSize: 13, color: '#791F1F', cursor: 'pointer' }} onClick={function() { setView('warranties'); }}>
+              <span style={{ fontSize: 13, color: '#791F1F', cursor: 'pointer' }} onClick={function() { navTo('warranties', { search: '' }); }}>
                 🛡️ {garantiasPorVencer.length} garantía{garantiasPorVencer.length > 1 ? 's' : ''} por vencer →
               </span>
             )}
