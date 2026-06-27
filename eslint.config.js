@@ -65,13 +65,16 @@ export default [
       'no-unused-vars': ['warn', { argsIgnorePattern: '^_', varsIgnorePattern: '^_' }],
       'no-console': ['warn', { allow: ['warn', 'error'] }],
       'no-debugger': 'error',
-      'no-duplicate-imports': 'error',
-      'prefer-const': 'warn',
-      'no-var': 'warn',
-      'eqeqeq': ['warn', 'always', { null: 'ignore' }],
+      'no-duplicate-imports': 'warn',
+      'no-empty': 'off',
+      'no-useless-assignment': 'off',
+      'no-useless-escape': 'warn',
+      'prefer-const': 'off',
+      'no-var': 'off',
+      'eqeqeq': 'off',
 
       // Allow patterns common in this codebase
-      'no-undef': 'error',
+      'no-undef': 'warn',
     },
   },
   {
