@@ -229,11 +229,11 @@ var DEMO = [
   {id:"p10",code:"E002",name:"Funda silicona",        category:"Accesorios", price:35, cost:12, stock:25, shelf:"E-02",unit:"uni"},
 ];
 
-var sC  = {background:"var(--bg-card,#fff)",borderRadius:12,border:"1px solid var(--border-card,rgba(0,0,0,0.09))",padding:"20px 24px"};
-var sI  = {width:"100%",padding:"8px 12px",borderRadius:8,border:"1px solid var(--border-input,rgba(0,0,0,0.2))",fontSize:14,background:"var(--bg-input,#fff)",color:"var(--text-primary,#1a1a1a)",boxSizing:"border-box"};
-var sL  = {fontSize:13,color:"var(--text-secondary,#666)",marginBottom:4,display:"block"};
-var sTH = {textAlign:"left",padding:"10px 12px",color:"var(--text-secondary,#666)",fontSize:13,borderBottom:"1px solid var(--border-table,rgba(0,0,0,0.08))",fontWeight:500,background:"var(--bg-table-head,transparent)"};
-var sTD = {padding:"10px 12px",borderBottom:"1px solid var(--border-row,rgba(0,0,0,0.05))",color:"var(--text-primary,#1a1a1a)",fontSize:14};
+var sC  = {background:"var(--bg-card,#fff)",borderRadius:14,border:"1px solid var(--border-card,rgba(0,0,0,0.07))",padding:"20px 24px",boxShadow:"var(--shadow-md,0 2px 12px rgba(0,0,0,0.06))"};
+var sI  = {width:"100%",padding:"9px 12px",borderRadius:9,border:"1px solid var(--border-input,rgba(0,0,0,0.18))",fontSize:14,background:"var(--bg-input,#fff)",color:"var(--text-primary,#1a1a1a)",boxSizing:"border-box",transition:"border-color 0.18s,box-shadow 0.18s"};
+var sL  = {fontSize:12,fontWeight:500,color:"var(--text-secondary,#6b7280)",marginBottom:5,display:"block",letterSpacing:"0.02em"};
+var sTH = {textAlign:"left",padding:"9px 12px",color:"var(--text-secondary,#6b7280)",fontSize:11,fontWeight:600,letterSpacing:"0.06em",textTransform:"uppercase",borderBottom:"1px solid var(--border-table,rgba(0,0,0,0.07))",background:"var(--bg-table-head,#f8f9fa)",whiteSpace:"nowrap"};
+var sTD = {padding:"11px 12px",borderBottom:"1px solid var(--border-row,rgba(0,0,0,0.04))",color:"var(--text-primary,#111827)",fontSize:13.5};
 var sQB = {cursor:"pointer",background:"#f0efeb",width:26,height:26,borderRadius:5,display:"flex",alignItems:"center",justifyContent:"center",fontSize:16,userSelect:"none",flexShrink:0,border:"1px solid rgba(0,0,0,0.1)"};
 var H1  = {fontSize:"clamp(17px,4vw,22px)",fontWeight:600,margin:"0 0 16px",color:"var(--text-primary,#1a1a1a)"};
 
@@ -301,47 +301,133 @@ function clearSession() { sessionStorage.removeItem(SESS_KEY); }
 
 /* ── Theme CSS ── */
 var THEME_CSS = `
-/* Colores de tema — el resto está en src/styles/global.css */
-
+/* ── Variables de tema ─────────────────────────────────────── */
 [data-theme="light"] {
-  --bg-main: #eceae4;
+  --bg-main: #f0eee8;
   --bg-card: #ffffff;
   --bg-input: #ffffff;
   --bg-sidebar: #1a2535;
   --bg-hover: rgba(255,255,255,0.1);
-  --text-primary: #1a1a1a;
-  --text-secondary: #666666;
-  --text-muted: #999999;
-  --border-card: rgba(0,0,0,0.09);
-  --border-input: rgba(0,0,0,0.2);
-  --border-table: rgba(0,0,0,0.08);
-  --border-row: rgba(0,0,0,0.05);
-  --bg-table-head: #f5f4f0;
-  --bg-alt: #f5f4f0;
+  --text-primary: #111827;
+  --text-secondary: #6b7280;
+  --text-muted: #9ca3af;
+  --border-card: rgba(0,0,0,0.07);
+  --border-input: rgba(0,0,0,0.18);
+  --border-table: rgba(0,0,0,0.07);
+  --border-row: rgba(0,0,0,0.04);
+  --bg-table-head: #f8f9fa;
+  --bg-alt: #f8f9fa;
   --bg-row: transparent;
-  --bg-error: #FDECEA;
-  --text-error: #791F1F;
-  --shadow: rgba(0,0,0,0.05);
+  --bg-error: #FEF2F2;
+  --text-error: #991b1b;
+  --shadow: rgba(0,0,0,0.06);
+  --shadow-md: 0 4px 16px rgba(0,0,0,0.07);
+  --teal: #1D9E75;
 }
 [data-theme="dark"] {
-  --bg-main: #0f1923;
+  --bg-main: #0d1520;
   --bg-card: #1a2535;
   --bg-input: #243044;
   --bg-sidebar: #0d1520;
   --bg-hover: rgba(255,255,255,0.08);
-  --text-primary: #e8eaed;
-  --text-secondary: #9aa0ab;
-  --text-muted: #666e7a;
+  --text-primary: #e2e8f0;
+  --text-secondary: #94a3b8;
+  --text-muted: #64748b;
   --border-card: rgba(255,255,255,0.08);
-  --border-input: rgba(255,255,255,0.15);
+  --border-input: rgba(255,255,255,0.14);
   --border-table: rgba(255,255,255,0.07);
   --border-row: rgba(255,255,255,0.04);
-  --bg-table-head: #1f2e42;
-  --bg-alt: #1f2e42;
+  --bg-table-head: #1e2d42;
+  --bg-alt: #1e2d42;
   --bg-row: transparent;
-  --bg-error: #3d1f1f;
-  --text-error: #f4a0a0;
+  --bg-error: #3b1f1f;
+  --text-error: #fca5a5;
   --shadow: rgba(0,0,0,0.3);
+  --shadow-md: 0 4px 16px rgba(0,0,0,0.25);
+  --teal: #1D9E75;
+}
+
+/* ── Reset & base ─────────────────────────────────────────── */
+*, *::before, *::after { box-sizing: border-box; }
+body { -webkit-font-smoothing: antialiased; -moz-osx-font-smoothing: grayscale; }
+
+/* ── Selección de texto ──────────────────────────────────── */
+::selection { background: rgba(29,158,117,0.18); }
+
+/* ── Scrollbar personalizado ─────────────────────────────── */
+::-webkit-scrollbar { width: 5px; height: 5px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb { background: rgba(0,0,0,0.15); border-radius: 4px; }
+::-webkit-scrollbar-thumb:hover { background: rgba(0,0,0,0.28); }
+[data-theme="dark"] ::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.12); }
+
+/* ── Botones: transición global ──────────────────────────── */
+button {
+  transition: background 0.15s ease, box-shadow 0.15s ease, transform 0.12s ease, opacity 0.15s ease;
+  font-family: inherit;
+}
+button:active:not(:disabled) { transform: scale(0.97); }
+button:disabled { opacity: 0.5; cursor: not-allowed; }
+
+/* ── Inputs: focus ring teal ─────────────────────────────── */
+input, select, textarea {
+  font-family: inherit;
+  transition: border-color 0.18s ease, box-shadow 0.18s ease;
+}
+input:focus, select:focus, textarea:focus {
+  outline: none;
+  border-color: #1D9E75 !important;
+  box-shadow: 0 0 0 3px rgba(29,158,117,0.14) !important;
+}
+
+/* ── Filas de tabla: hover suave ─────────────────────────── */
+tbody tr { transition: background 0.12s ease; }
+tbody tr:hover { background: rgba(29,158,117,0.04) !important; }
+[data-theme="dark"] tbody tr:hover { background: rgba(29,158,117,0.07) !important; }
+
+/* ── Sidebar: transición en items ────────────────────────── */
+.sidebar-nav-item {
+  transition: background 0.14s ease, color 0.14s ease, transform 0.1s ease !important;
+  border-radius: 10px !important;
+  margin: 1px 8px !important;
+}
+.sidebar-nav-item:hover { background: rgba(255,255,255,0.08) !important; }
+
+/* ── Animación de entrada de pantalla ────────────────────── */
+@keyframes screenEnter {
+  from { opacity: 0; transform: translateY(8px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+.screen-enter { animation: screenEnter 0.2s ease both; }
+
+/* ── Flash: animación slide-up ───────────────────────────── */
+@keyframes flashSlide {
+  from { opacity: 0; transform: translateY(16px) translateX(-50%); }
+  to   { opacity: 1; transform: translateY(0) translateX(-50%); }
+}
+.flash-msg { animation: flashSlide 0.22s ease both; }
+
+/* ── Columnas responsive en formularios ──────────────────── */
+@media(max-width:900px) { .rg-4 { grid-template-columns: repeat(2,1fr) !important; } }
+@media(max-width:560px) { .rg-4 { grid-template-columns: 1fr !important; } }
+
+/* ── Mobile layout ───────────────────────────────────────── */
+@media(max-width:768px) {
+  .sidebar-mobile {
+    position: fixed !important;
+    left: -220px;
+    top: 0;
+    z-index: 200;
+    transition: left 0.26s cubic-bezier(0.4,0,0.2,1);
+    box-shadow: none;
+  }
+  .sidebar-mobile.open {
+    left: 0 !important;
+    box-shadow: 6px 0 28px rgba(0,0,0,0.4);
+  }
+  .sidebar-overlay { display: block !important; position: fixed; inset: 0; background: rgba(0,0,0,0.5); z-index: 199; backdrop-filter: blur(2px); }
+  .mobile-header   { display: flex !important; }
+  .main-content    { padding-top: 60px !important; }
 }
 `;
 
@@ -492,11 +578,14 @@ function AppWrapper() {
 
 /* ── MetricBox ── */
 function MetricBox(props) {
+  var accent = props.color || TEAL;
   return (
-      <div style={{background:"#f5f4f0",borderRadius:10,padding:"16px",border:"1px solid rgba(0,0,0,0.07)"}}>
-        <p style={{fontSize:12,color:"#666",margin:"0 0 6px"}}>{props.label}</p>
-        <p style={{fontSize:22,fontWeight:600,margin:0,color:props.color||"#1a1a1a"}}>{props.value}</p>
-      </div>
+    <div style={{background:"var(--bg-card,#fff)",borderRadius:14,padding:"18px 20px",border:"1px solid var(--border-card,rgba(0,0,0,0.07))",boxShadow:"var(--shadow-md,0 2px 12px rgba(0,0,0,0.06))",display:"flex",flexDirection:"column",gap:6,position:"relative",overflow:"hidden"}}>
+      <div style={{position:"absolute",top:0,left:0,width:3,height:"100%",background:accent,borderRadius:"14px 0 0 14px"}}/>
+      <p style={{fontSize:11,fontWeight:600,letterSpacing:"0.06em",textTransform:"uppercase",color:"var(--text-secondary,#6b7280)",margin:0}}>{props.label}</p>
+      <p style={{fontSize:24,fontWeight:700,margin:0,color:accent,lineHeight:1}}>{props.value}</p>
+      {props.sub&&<p style={{fontSize:11,color:"var(--text-muted,#9ca3af)",margin:0}}>{props.sub}</p>}
+    </div>
   );
 }
 
@@ -730,7 +819,7 @@ function Sidebar(props) {
           {NAV.filter(function(item){return canAccess(session.role||"cajero",item.id);}).map(function(item){
             var isActive=view===item.id;
             return (
-                <div key={item.id} className="sidebar-nav-item" tabIndex={isActive?0:-1} onClick={function(){setView(item.id);setSidebarOpen(false);}} onKeyDown={function(e){if(e.key==="Enter")setView(item.id);}} style={{display:"flex",alignItems:"center",gap:10,padding:"10px 16px",cursor:"pointer",background:isActive?"rgba(255,255,255,0.1)":"transparent",color:isActive?"#fff":"rgba(255,255,255,0.52)",fontSize:13,borderLeft:isActive?"3px solid "+TEAL:"3px solid transparent",marginBottom:1}}>
+                <div key={item.id} className="sidebar-nav-item" tabIndex={isActive?0:-1} onClick={function(){setView(item.id);setSidebarOpen(false);}} onKeyDown={function(e){if(e.key==="Enter")setView(item.id);}} style={{display:"flex",alignItems:"center",gap:10,padding:"9px 14px",cursor:"pointer",background:isActive?"rgba(29,158,117,0.18)":"transparent",color:isActive?"#fff":"rgba(255,255,255,0.52)",fontSize:13,borderRadius:10,marginBottom:1,fontWeight:isActive?600:400}}>
                   <span style={{fontSize:14}}>{item.ic}</span>
                   <span style={{flex:1}}>{item.lb}</span>
                   {item.id==="pos"&&cartLen>0&&<span style={{background:TEAL,color:"#fff",borderRadius:10,fontSize:10,padding:"1px 5px",fontWeight:700}}>{cartLen}</span>}
@@ -1910,7 +1999,7 @@ function App(props) {
         </div>
         <Sidebar view={view} setView={setView} cartCount={cart.length} pendingCount={pendingAccs.length} products={products} sales={sales} session={session} onLogout={onLogout} isOnline={isOnline} theme={theme} toggleTheme={toggleTheme} sidebarOpen={sidebarOpen} setSidebarOpen={setSidebarOpen} onSearch={function(){setGsOpen(true);}} storeInfo={storeInfo}/>
         {gsOpen&&<GlobalSearch onClose={function(){setGsOpen(false);}} setView={setView} sales={sales} clients={clients} products={products} repairs={repairs} setSelectedSale={setSelSale}/>}
-        <div style={{flex:1,padding:"clamp(12px,3vw,28px)",overflowY:"auto",minWidth:0}} className="main-content">
+        <div key={view} style={{flex:1,padding:"clamp(12px,3vw,28px)",overflowY:"auto",minWidth:0}} className="main-content screen-enter">
           {view==="dashboard"&&canAccess(session.role,"dashboard")&&<DashboardScreen sales={sales} todaySales={todaySales} pendingAccs={pendingAccs} totalPend={totalPend} products={products} top5={top5} setSelectedSale={setSelSale} setView={setView} accounts={accounts} returns={returns} repairs={repairs} warranties={warranties}/>}
           {view==="pos"      &&canAccess(session.role,"pos")&&<POSScreen products={products} filteredPOS={filteredPOS} cart={cart} posQ={posQ} setPosQ={setPosQ} payMethod={payMethod} setPayMethod={setPayMethod} payType={payType} setPayType={setPayType} cashIn={cashIn} setCashIn={setCashIn} initialPay={initialPay} setInitialPay={setInitialPay} clientName={clientName} setClientName={setClientName} selectedClientId={selectedClientId} setSelectedClientId={setSelectedClientId} saleNote={saleNote} setSaleNote={setSaleNote} cartTotal={cartTotal} vuelto={vuelto} initPaidVal={initPaidVal} addToCart={addToCart} changeQty={changeQty} removeFromCart={removeFromCart} applyDiscount={applyDiscount} checkout={checkout} resetPOS={resetPOS} flash={flash} clients={clients} accounts={accounts}/>}
           {view==="caja"     &&canAccess(session.role,"caja")&&<CajaScreen sales={sales} accounts={accounts} returns={returns} session={session}/>}
