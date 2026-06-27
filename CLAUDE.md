@@ -272,8 +272,8 @@ mundo-cel-diaz-api/
 - [ ] **Colas de procesamiento:** BullMQ para tareas pesadas (exports grandes, emails masivos)
 - [ ] **Supabase Storage:** Fotos de productos, imágenes de reparaciones, logos de negocios
 - [ ] **Docker + Docker Compose:** Contenedorizar API para entorno de desarrollo consistente
-- [ ] **GitHub Actions CI:** Pipeline automático de tests en cada PR (actualmente CI/CD es solo deploy)
-- [ ] **Migraciones versionadas:** Herramienta formal (ej. node-pg-migrate) en lugar de scripts SQL manuales
+- [x] **GitHub Actions CI:** ✅ Implementado — `ci.yml` y `test.yml` en ambos repos
+- [x] **Migraciones versionadas:** ✅ node-pg-migrate configurado — ignorar 001-007 (aplicados manualmente), nuevas migraciones desde 008 con up/down
 - [ ] **Cifrado de datos sensibles:** DPI y datos personales cifrados en reposo
 
 ### ⬜ Roadmap futuro — Nuevas funcionalidades
