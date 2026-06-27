@@ -51,7 +51,7 @@ export default function StoreConfigScreen({ storeInfo, setStoreInfo, session, sh
 
   // Copia local del formulario (no muta el estado global hasta guardar)
   var _form = useState(Object.assign(
-    { store_name: '', store_tagline: '', store_phone: '', store_address: '', store_email: '', store_logo_url: '' },
+    { store_name: '', store_tagline: '', store_phone: '', store_address: '', store_email: '', store_logo_url: '', offer_receipt: 'true' },
     storeInfo
   ));
   var form    = _form[0];
@@ -113,6 +113,18 @@ export default function StoreConfigScreen({ storeInfo, setStoreInfo, session, sh
         {/* ── Formulario ── */}
         <div style={sCard}>
           <p style={{ fontWeight: 600, fontSize: 15, margin: '0 0 18px' }}>Información del negocio</p>
+
+          <div style={{ marginBottom: 16, padding: '12px 14px', background: '#f8f9fa', borderRadius: 8, display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12 }}>
+            <div>
+              <div style={{ fontWeight: 600, fontSize: 13 }}>Ofrecer boleta al cobrar</div>
+              <div style={{ fontSize: 11, color: '#888', marginTop: 2 }}>Al terminar una venta, preguntar si se entrega comprobante (imprimir, imagen o WhatsApp).</div>
+            </div>
+            <label style={{ position: 'relative', display: 'inline-block', width: 46, height: 26, flexShrink: 0, cursor: 'pointer' }}>
+              <input type="checkbox" checked={form.offer_receipt !== 'false'} onChange={function(e) { handleChange('offer_receipt', e.target.checked ? 'true' : 'false'); }} style={{ opacity: 0, width: 0, height: 0 }} />
+              <span style={{ position: 'absolute', inset: 0, borderRadius: 26, transition: '0.2s', background: form.offer_receipt !== 'false' ? TEAL : '#ccc' }}></span>
+              <span style={{ position: 'absolute', height: 20, width: 20, left: form.offer_receipt !== 'false' ? 23 : 3, top: 3, background: '#fff', borderRadius: '50%', transition: '0.2s' }}></span>
+            </label>
+          </div>
 
           {FIELDS.map(function(f) {
             return (

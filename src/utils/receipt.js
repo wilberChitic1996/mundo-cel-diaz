@@ -110,8 +110,47 @@ export function buildReceiptHTML(sale, opts, si) {
         '<span>Generado por ' + sn + ' POS</span><span>' + fecha + ' · ' + hora + '</span>' +
       '</div>' +
       '<div style="text-align:center;margin-top:16px;font-size:13px;color:#1D9E75;font-weight:700;letter-spacing:1px;">¡Gracias por su compra!</div>' +
+      '<div style="text-align:center;margin-top:6px;font-size:9px;color:#bbb;">Comprobante interno · No es documento tributario (no válido como factura)</div>' +
     '</div>'
   );
+}
+
+/**
+ * Descarga la boleta de una venta como imagen PNG (alternativa al PDF).
+ * Reutiliza buildReceiptHTML + html2canvas (mismo render que el envío por WhatsApp).
+ *
+ * @param {Object} sale - Venta a renderizar
+ * @param {Object} opts - Opciones de recibo (usuario, estado, etc.)
+ * @returns {Promise<boolean>} true si se descargó, false si falló
+ */
+export async function descargarImagen(sale, opts) {
+  opts = opts || {};
+  try {
+    var wrapper = document.createElement('div');
+    wrapper.style.cssText = 'position:fixed;left:-9999px;top:0;background:#fff;z-index:-1;width:650px;';
+    wrapper.innerHTML = buildReceiptHTML(sale, opts);
+    document.body.appendChild(wrapper);
+    await new Promise(function(r) { setTimeout(r, 400); });
+
+    var canvas = await html2canvas(wrapper.firstChild, { scale: 2, useCORS: true, backgroundColor: '#ffffff', logging: false });
+    document.body.removeChild(wrapper);
+
+    var blob = await new Promise(function(r) { canvas.toBlob(r, 'image/png', 0.95); });
+    var _name = (getStore().store_name || APP_NAME).replace(/\s+/g, '-').toLowerCase();
+    var _folio = String(sale.id || '').toUpperCase().slice(-8);
+    var imgUrl = URL.createObjectURL(blob);
+    var dl = document.createElement('a');
+    dl.href = imgUrl;
+    dl.download = 'boleta-' + _name + '-' + _folio + '.png';
+    document.body.appendChild(dl);
+    dl.click();
+    document.body.removeChild(dl);
+    setTimeout(function() { URL.revokeObjectURL(imgUrl); }, 5000);
+    return true;
+  } catch (err) {
+    console.warn('[BOLETA] Error generando imagen:', err);
+    return false;
+  }
 }
 
 /**
@@ -180,7 +219,25 @@ export function printVoucher(sale, opts) {
   var ventaNum  = sale.id.toUpperCase().slice(-8);
   var fecha     = new Date(sale.date).toLocaleDateString('es-GT', { day: '2-digit', month: 'long', year: 'numeric' });
   var hora      = new Date(sale.date).toLocaleTimeString('es-GT', { hour: '2-digit', minute: '2-digit' });
-  var _rSn      = getStore().store_name || STORE_FALLBACK;
+  var _store    = getStore();
+  var _rSn      = _store.store_name    || STORE_FALLBACK;
+  var _rSt      = _store.store_tagline || APP_TAGLINE;
+  var _rPhone   = _store.store_phone   || '';
+  var _rAddr    = _store.store_address || '';
+  var _rEmail   = _store.store_email   || '';
+
+  // Línea de contacto del negocio (solo lo que esté configurado en la BD — nada inventado)
+  var _contactBits = [];
+  if (_rAddr)  _contactBits.push('📍 ' + _rAddr);
+  if (_rPhone) _contactBits.push('📞 ' + _rPhone);
+  if (_rEmail) _contactBits.push('✉ ' + _rEmail);
+  var _contactLine = _contactBits.length
+    ? '<p class="sub" style="margin-top:3px;">' + _contactBits.join(' &nbsp;·&nbsp; ') + '</p>'
+    : '';
+
+  // URL de verificación pública del comprobante (el QR apunta aquí)
+  var _origin    = (typeof window !== 'undefined' && window.location) ? window.location.origin : '';
+  var _verifyUrl = _origin + '/?verify=' + encodeURIComponent(sale.id);
 
   var html = '<!DOCTYPE html><html><head><meta charset="UTF-8"><title>Comprobante ' + ventaNum + '</title>' +
   '<style>' +
@@ -214,7 +271,7 @@ export function printVoucher(sale, opts) {
     '@media print{body{padding:12px;}button{display:none!important;}}' +
   '</style></head><body>' +
   '<div class="header">' +
-    '<div class="brand"><h1>' + _rSn + '</h1><p>SISTEMA DE GESTIÓN</p><p class="sub">Tecnología · Accesorios · Reparaciones · Guatemala</p></div>' +
+    '<div class="brand"><h1>' + _rSn + '</h1><p>' + _rSt + '</p>' + _contactLine + '</div>' +
     '<div class="venta-num"><div class="label">' + _docLabel + '</div><div class="num"># ' + ventaNum + '</div></div>' +
     '<div style="text-align:center;margin-top:4px;"><div id="qrv" style="display:inline-block;"></div><div style="font-size:9px;color:#999;margin-top:3px;letter-spacing:0.5px;">ESCANEAR PARA VERIFICAR</div></div>' +
   '</div>' +
@@ -264,13 +321,18 @@ export function printVoucher(sale, opts) {
         '</tbody></table></div>'
     : '') +
   '<div class="footer">' +
-    '<div class="footer-left"><strong>' + APP_NAME + '</strong><br>Guatemala, C.A.<br>' + APP_TAGLINE + '</div>' +
-    '<div class="footer-right">Cantidad de artículos: <strong>' + (sale.items || []).reduce(function(s, i) { return s + i.qty; }, 0) + '</strong><br>Líneas de producto: <strong>' + (sale.items || []).length + '</strong><br>Ref: ' + sale.id.slice(0, 12).toUpperCase() + '</div>' +
+    '<div class="footer-left"><strong>' + _rSn + '</strong>' +
+      (_rAddr ? '<br>' + _rAddr : '') +
+      (_rPhone ? '<br>Tel: ' + _rPhone : '') +
+      (_rEmail ? '<br>' + _rEmail : '') +
+      '<br><span style="color:#bbb;font-size:9px;">Comprobante generado por ' + APP_NAME + '</span></div>' +
+    '<div class="footer-right">Cantidad de artículos: <strong>' + (sale.items || []).reduce(function(s, i) { return s + i.qty; }, 0) + '</strong><br>Líneas de producto: <strong>' + (sale.items || []).length + '</strong><br><span style="font-family:monospace;font-size:9px;">Ref: ' + String(sale.id).toUpperCase() + '</span></div>' +
   '</div>' +
   '<p class="gracias">¡Gracias por su preferencia!</p>' +
+  '<p style="text-align:center;margin:8px 0 0;font-size:9px;color:#bbb;">Comprobante interno · No es documento tributario (no válido como factura)</p>' +
   '</body></html>';
 
-  var qrTxt = _rSn + ' | #' + ventaNum + ' | ' + sale.client + ' | ' + fecha + ' | Q' + Number(sale.total).toFixed(2);
+  var qrTxt = _verifyUrl;
   var w = window.open('', '_blank', 'width=800,height=700');
   w.document.write(html + '<scr' + 'ipt src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></scr' + 'ipt><scr' + 'ipt>window.onload=function(){try{new QRCode(document.getElementById("qrv"),{text:' + JSON.stringify(qrTxt) + ',width:90,height:90,colorDark:"#1a2535",colorLight:"#fff"});}catch(e){}setTimeout(function(){window.print();},800);};</scr' + 'ipt>');
   w.document.close();
