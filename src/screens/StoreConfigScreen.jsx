@@ -41,6 +41,7 @@ var FIELDS = [
   { key: 'store_phone',   label: 'Teléfono',              placeholder: 'Ej: 5555-1234' },
   { key: 'store_address', label: 'Dirección',             placeholder: 'Ej: Zona 1, Guatemala' },
   { key: 'store_email',   label: 'Correo electrónico',    placeholder: 'Ej: info@mitienda.com' },
+  { key: 'iva_percent',   label: 'IVA (%)',               placeholder: 'Ej: 12', type: 'number' },
 ];
 
 export default function StoreConfigScreen({ storeInfo, setStoreInfo, session, showFlash }) {
@@ -51,7 +52,7 @@ export default function StoreConfigScreen({ storeInfo, setStoreInfo, session, sh
 
   // Copia local del formulario (no muta el estado global hasta guardar)
   var _form = useState(Object.assign(
-    { store_name: '', store_tagline: '', store_phone: '', store_address: '', store_email: '', store_logo_url: '', offer_receipt: 'true' },
+    { store_name: '', store_tagline: '', store_phone: '', store_address: '', store_email: '', store_logo_url: '', offer_receipt: 'true', iva_percent: '12' },
     storeInfo
   ));
   var form    = _form[0];
@@ -130,7 +131,7 @@ export default function StoreConfigScreen({ storeInfo, setStoreInfo, session, sh
             return (
               <div key={f.key} style={{ marginBottom: 14 }}>
                 <label style={{ display: 'block', fontWeight: 600, fontSize: 13, marginBottom: 5 }}>{f.label}</label>
-                <input style={sInput} value={form[f.key] || ''} placeholder={f.placeholder} onChange={function(e) { handleChange(f.key, e.target.value); }} />
+                <input type={f.type || 'text'} style={sInput} value={form[f.key] || ''} placeholder={f.placeholder} onChange={function(e) { handleChange(f.key, e.target.value); }} min={f.type === 'number' ? '0' : undefined} max={f.type === 'number' ? '100' : undefined} />
               </div>
             );
           })}

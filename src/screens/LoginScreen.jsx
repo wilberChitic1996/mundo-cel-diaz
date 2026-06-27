@@ -93,7 +93,11 @@ export default function LoginScreen({ onLogin, onBack }) {
       }
       if (apiResp && apiResp.user) {
         setLoading(false);
-        onLogin(createSession({ id: apiResp.user.id, name: apiResp.user.name, email: apiResp.user.email, role: apiResp.user.role, tenant_id: apiResp.user.tenant_id }));
+        onLogin(createSession(
+          { id: apiResp.user.id, name: apiResp.user.name, email: apiResp.user.email, role: apiResp.user.role, tenant_id: apiResp.user.tenant_id },
+          apiResp.token,
+          apiResp.refreshToken
+        ));
         return;
       }
       setLoading(false);
@@ -129,7 +133,11 @@ export default function LoginScreen({ onLogin, onBack }) {
       var r = await authAPI.verify2fa(twoFaEmail, twoFaCode.trim());
       if (r && r.user) {
         setTwoFaLoading(false);
-        onLogin(createSession({ id: r.user.id, name: r.user.name, email: r.user.email, role: r.user.role, tenant_id: r.user.tenant_id }));
+        onLogin(createSession(
+          { id: r.user.id, name: r.user.name, email: r.user.email, role: r.user.role, tenant_id: r.user.tenant_id },
+          r.token,
+          r.refreshToken
+        ));
       }
     } catch (e) {
       setTwoFaLoading(false);
