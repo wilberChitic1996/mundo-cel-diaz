@@ -59,7 +59,11 @@ export const authAPI = {
     saveLocalSession(data);
     return data;
   },
-  logout: function() { clearLocalSession(); },
+  logout: function(refreshToken) {
+    clearLocalSession();
+    if (refreshToken) return api.post('/auth/logout', { refreshToken }).catch(function() {});
+  },
+  refresh: function(refreshToken)                     { return api.post('/auth/refresh', { refreshToken }); },
   getSession: getLocalSession,
   verify2fa:     function(email, code)                { return api.post('/auth/verify-2fa', { email, code }); },
   findUser:      function(email)                      { return api.post('/auth/find-user', { email }); },

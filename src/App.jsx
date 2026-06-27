@@ -1086,6 +1086,29 @@ function App(props) {
   var _ss=useState(null); var selSale=_ss[0]; var setSelSale=_ss[1];
   var _gs=useState(false); var gsOpen=_gs[0]; var setGsOpen=_gs[1];
 
+  // ── Silent JWT refresh (7 min before expiry) ──
+  useEffect(function() {
+    var refreshTimer = null;
+    function scheduleRefresh() {
+      var rt = localStorage.getItem('mnpos-refresh-token');
+      if (!rt) return;
+      var msTillExpiry = session.expiresAt - Date.now();
+      var delay = Math.max(msTillExpiry - 7 * 60 * 1000, 5000);
+      refreshTimer = setTimeout(function() {
+        import('./utils/session.js').then(function(m) {
+          m.tryRefreshSession().then(function(newSession) {
+            if (newSession) {
+              var update = Object.assign({}, session, { token: newSession.token, expiresAt: newSession.expiresAt });
+              sessionStorage.setItem('mnpos-session-v1', JSON.stringify(update));
+            }
+          });
+        });
+      }, delay);
+    }
+    scheduleRefresh();
+    return function() { clearTimeout(refreshTimer); };
+  }, [session.expiresAt]);
+
   // ── Timeout de inactividad ──
   var INACTIVITY_MS = 15 * 60 * 1000; // 15 minutos de inactividad
   var WARNING_SEC   = 60;           // segundos de cuenta regresiva antes de cerrar sesión
