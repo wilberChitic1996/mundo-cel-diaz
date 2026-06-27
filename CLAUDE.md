@@ -14,6 +14,14 @@ y pendientes. No hagas nada hasta que yo te confirme qué tarea seguiremos.
 
 ---
 
+## 🔴 REGLA ESTRICTA: NO TOCAR LO QUE FUNCIONA
+
+Si una funcionalidad está funcionando correctamente, Claude **NO debe modificarla, reescribirla, ni "mejorarla"** sin instrucción explícita del usuario. Esto incluye pantallas, endpoints, botones, exports, y cualquier otro componente en uso. Antes de reescribir algo que funciona, **preguntar al usuario** si realmente lo quiere cambiar.
+
+> **Origen de esta regla:** Al reescribir `BackupScreen.jsx` para agregar funcionalidad nueva, se eliminaron los botones de export Excel/JSON que ya existían y funcionaban. Esto causó pérdida de funcionalidad sin que el usuario lo autorizara. Este error no debe repetirse.
+
+---
+
 ## Arquitectura de ambientes
 
 **DOS ambientes COMPLETAMENTE independientes. Nunca mezclar datos entre ellos.**
