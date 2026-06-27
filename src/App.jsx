@@ -442,6 +442,7 @@ class ErrorBoundary extends React.Component {
   }
   componentDidCatch(error,info){
     console.error("[ErrorBoundary]",error,info);
+    try { import('./utils/sentry.js').then(function(m){ m.Sentry.captureException(error, { extra: info }); }); } catch(_e) {}
   }
   render(){
     if(this.state.hasError){
