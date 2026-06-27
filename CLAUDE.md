@@ -184,7 +184,8 @@ mundo-cel-diaz-api/
 ### Sesión de usuario
 - JWT con duración 8 horas
 - Guardado en `sessionStorage` (clave `mnpos-session-v1`)
-- Sin refresh token actualmente
+- Refresh token en `localStorage` (`mnpos-refresh-token`), válido 30 días, rotación automática
+- Auto-refresh silencioso 7 minutos antes de expirar el JWT (`App.jsx` + `utils/session.js`)
 
 ### CORS del API
 - Orígenes en variable de entorno `FRONTEND_URL` (Railway)
@@ -224,13 +225,18 @@ mundo-cel-diaz-api/
 | API #48 | Backend | Fix CORS: permitir *.vercel.app en el API (rama `main`) |
 | API #49 | Backend | Fix CORS: llevar la misma lógica `*.vercel.app` a la rama `staging` (piloto) |
 | API #50 | Backend | Endpoint público /api/public/verify/:id para QR de boletas |
+| #120–#122 | Frontend | Enterprise checklist: ESLint, Sentry, Swagger UI, refresh tokens, IVA configurable, Redis cache, API v1 |
+| API #51–#52 | Backend | Enterprise checklist: Pino logger, Swagger, refresh tokens, Redis cache, services layer, CI/CD, uptime |
+| #123–#128 | Frontend | Recordatorios automáticos: RemindersWidget, aging clickeable en Cuentas |
+| #129–#131 | Frontend | Sistema navTo: hipervínculos entre módulos (Dashboard→Cuentas, Reparaciones, Garantías, Productos, Clientes) |
+| #132–#134 | Frontend | Fix hipervínculos en registros históricos (fallback por nombre en Historial, Reparaciones, Garantías) |
 
 ---
 
 ## Estado actual del trabajo
 
-- **Versión en producción:** 2.2.0
-- **Último cambio (27 jun 2026):** Enterprise checklist — ESLint, Pino logger, Sentry, Swagger, Refresh tokens, IVA configurable, Redis cache, API v1, Services layer, CI/CD, Uptime monitoring (PRs #122, API #52)
+- **Versión en producción:** 2.3.0
+- **Último cambio (27 jun 2026):** Sistema de hipervínculos entre módulos (navTo + deepLink), RemindersWidget en Dashboard, aging clickeable en Cuentas, fix hipervínculos en registros históricos (PRs #120–#134)
 - **Producción:** ✅ Actualizada — mundoceldiaz.com
 - **Staging:** ✅ Actualizado — mundo-cel-diaz-staging.vercel.app
 - **2FA:** Implementado para superadmin, deshabilitado temporalmente (esperando verificación DNS Resend: DKIM ✓, SPF ✓, pendiente propagación)
@@ -243,37 +249,37 @@ mundo-cel-diaz-api/
 ### 🔴 Alta prioridad — Funcional
 
 - [ ] **2FA reactivar:** Cuando Resend termine de verificar dominio, descomentar código en `auth.js` líneas 82-99
-- [ ] **Refresh token:** Implementar rotación JWT/Refresh Token (actualmente solo 8h sin renovación)
-- [ ] **IVA configurable:** Campo `iva_percent` en store_settings, aplicar en boletas
-- [ ] **Cuentas aging:** Reporte de cuentas por cobrar por 30/60/90 días de vencimiento
+- [x] **Refresh token:** ✅ Implementado — rotación JWT/Refresh Token 30 días (`routes/auth.js`, `utils/session.js`, migration `006_refresh_tokens.sql`)
+- [x] **IVA configurable:** ✅ Implementado — campo `iva_percent` en `store_settings` (migration `005_iva_configurable.sql`), configurable en Configuración de Tienda, aplicado en boletas
+- [x] **Cuentas aging:** ✅ Implementado — RemindersWidget en Dashboard, aging 30/60/90 días clickeable en Cuentas
 
 ### 🟡 Media prioridad — Calidad y seguridad
 
-- [ ] **ESLint + Prettier:** Configurar linting y formato automático en ambos repos
-- [ ] **Logs estructurados:** Reemplazar console.error por logger (ej. pino o winston) con nivel/contexto
-- [ ] **Monitoreo de errores:** Integrar Sentry en frontend y backend para alertas en producción
-- [ ] **Uptime monitoring:** Configurar monitor de uptime para mundoceldiaz.com y la API
+- [x] **ESLint + Prettier:** ✅ Implementado — `eslint.config.js` en ambos repos
+- [x] **Logs estructurados:** ✅ Implementado — Pino logger en API (`utils/logger.js`)
+- [x] **Monitoreo de errores:** ✅ Implementado — Sentry en frontend (`utils/sentry.js`) e iniciado en `main.jsx`
+- [x] **Uptime monitoring:** ✅ Implementado — GitHub Actions `uptime.yml`
 - [ ] **CSP estricta:** Configurar Content-Security-Policy explícita en helmet
-- [ ] **Swagger/OpenAPI:** Documentar los 18 grupos de rutas del API
+- [x] **Swagger/OpenAPI:** ✅ Implementado — `swagger.js` en API, rutas documentadas con `@openapi`
 - [ ] **Cobertura de tests:** Aumentar cobertura con Vitest (unitarios) y Supertest (endpoints) — herramientas ya instaladas
 
 ### 🟢 Media prioridad — Funcional
 
 - [ ] **WhatsApp automático:** Integrar UltraMsg o Twilio para envíos programados (requiere API de pago)
-- [ ] **Recordatorios automáticos:** Cron backend para alertas de vencimiento de cuentas y garantías
+- [x] **Recordatorios automáticos:** ✅ Implementado — cron jobs diarios en `utils/reminders.js` (cuentas, garantías, reparaciones)
 - [ ] **Notificaciones push:** PWA push notifications para eventos clave
 - [ ] **Cobros automáticos SaaS:** Stripe/Wompi para suscripciones de tenants
 
 ### 🔵 Baja prioridad — Arquitectura y escala
 
-- [ ] **Separar capas backend:** Mover lógica de routes/ a services/ + repositories/ (Clean Architecture gradual)
-- [ ] **Versionado de API:** Prefijo `/v1/` en todas las rutas para permitir evolución sin romper clientes
-- [ ] **Redis caché:** Cachear queries frecuentes (productos, configuración) para reducir carga en Supabase
+- [x] **Separar capas backend:** ✅ Parcial — `services/` con clientService, productService, saleService
+- [x] **Versionado de API:** ✅ Implementado — prefijo `/api/v1/` disponible junto a `/api/` (retrocompatible)
+- [x] **Redis caché:** ✅ Implementado — `utils/cache.js` usa Redis si `REDIS_URL` está en env, Map en memoria como fallback
 - [ ] **Colas de procesamiento:** BullMQ para tareas pesadas (exports grandes, emails masivos)
 - [ ] **Supabase Storage:** Fotos de productos, imágenes de reparaciones, logos de negocios
 - [ ] **Docker + Docker Compose:** Contenedorizar API para entorno de desarrollo consistente
-- [ ] **GitHub Actions CI:** Pipeline automático de tests en cada PR (actualmente CI/CD es solo deploy)
-- [ ] **Migraciones versionadas:** Herramienta formal (ej. node-pg-migrate) en lugar de scripts SQL manuales
+- [x] **GitHub Actions CI:** ✅ Implementado — `ci.yml` y `test.yml` en ambos repos
+- [ ] **Migraciones versionadas:** Herramienta formal (ej. node-pg-migrate) — scripts SQL manuales en `/migrations`
 - [ ] **Cifrado de datos sensibles:** DPI y datos personales cifrados en reposo
 
 ### ⬜ Roadmap futuro — Nuevas funcionalidades
@@ -298,12 +304,15 @@ Esta lista evita re-implementar cosas que ya existen:
 
 | Categoría | Ya implementado |
 |---|---|
-| **Auth** | JWT 8h, bcrypt 10 rounds, auto-migración SHA-256→bcrypt, RBAC 4 roles, 2FA código (deshabilitado) |
+| **Auth** | JWT 8h, bcrypt 10 rounds, auto-migración SHA-256→bcrypt, RBAC 4 roles, 2FA código (deshabilitado), Refresh token 30d con rotación |
 | **Seguridad** | Helmet, rate limiting por IP, CORS estricto, idempotency keys, SELECT FOR UPDATE en stock |
 | **Multi-tenant** | tenant_id en todas las tablas, withTenant() en API, RLS en Supabase |
-| **BD** | audit_logs completo, índices en tenant_id+created_at, migraciones en /migrations |
+| **BD** | audit_logs completo, índices en tenant_id+created_at, migraciones en /migrations (SQL manual) |
 | **Tests** | Vitest + Supertest instalados (cobertura baja, pendiente aumentar) |
-| **Monitoring** | GET /health en API |
+| **Monitoring** | GET /health en API, Sentry frontend, Pino logs backend, GitHub Actions uptime |
+| **Cache** | Redis (si REDIS_URL configurado) o Map en memoria como fallback — settings cacheados 5 min |
+| **API** | Prefijo `/api/v1/` disponible retrocompatiblemente con `/api/` |
+| **Servicios** | services/ con clientService, productService, saleService |
 | **Backup** | Supabase auto-backups diarios + exportación manual Excel/JSON desde la app |
 | **WhatsApp** | wa.me con mensaje pre-formateado, imagen PNG (html2canvas), números GT auto-format |
 | **PDF/Excel** | jsPDF + SheetJS, exportación desde Historial, Cuadres y Backup |
