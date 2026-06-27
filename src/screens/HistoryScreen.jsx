@@ -52,7 +52,8 @@ function MetricBox({ label, value, color }) {
   );
 }
 
-export default function HistoryScreen({ sales, selectedSale, setSelectedSale, accounts, returns, products, session, clients }) {
+export default function HistoryScreen({ sales, selectedSale, setSelectedSale, accounts, returns, products, session, clients, navTo }) {
+  navTo = navTo || function() {};
   sales    = sales    || [];
   accounts = accounts || [];
   returns  = returns  || [];
@@ -377,7 +378,15 @@ export default function HistoryScreen({ sales, selectedSale, setSelectedSale, ac
                       <td style={sTD}>{fmtD(m.date)}</td>
                       <td style={sTD}>{fmtT(m.date)}</td>
                       <td style={sTD}><span style={mkBadge(m.color)}>{m.tipo}</span></td>
-                      <td style={Object.assign({}, sTD, { fontWeight: 500 })}>{m.cliente}</td>
+                      <td style={Object.assign({}, sTD, { fontWeight: 500 })}>
+                        {(function() {
+                          // Buscar por clientId primero; si no, buscar por nombre exacto (para registros históricos sin clientId)
+                          var cli = (m.obj && m.obj.clientId && clients.find(function(c) { return c.id === m.obj.clientId; }))
+                                 || (m.cliente && clients.find(function(c) { return c.name === m.cliente; }));
+                          if (cli) return <span style={{ cursor: 'pointer', color: 'var(--teal,#1D9E75)', textDecoration: 'underline dotted' }} onClick={function(e) { e.stopPropagation(); navTo('clients', { clientId: cli.id }); }}>{m.cliente}</span>;
+                          return m.cliente;
+                        })()}
+                      </td>
                       <td style={Object.assign({}, sTD, { fontSize: 12, color: '#555', maxWidth: 240 })}>
                         {(function() {
                           var its = artLista(m);

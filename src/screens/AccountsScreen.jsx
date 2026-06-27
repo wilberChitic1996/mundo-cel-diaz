@@ -62,7 +62,8 @@ var FILTROS = [
   ['todas',     'Todas'],
 ];
 
-export default function AccountsScreen({ accounts, pendingAccs, totalPend, products, clients, session, addPayment, showFlash }) {
+export default function AccountsScreen({ accounts, pendingAccs, totalPend, products, clients, session, addPayment, showFlash, navTo, initialSearch }) {
+  navTo = navTo || function() {};
   accounts    = accounts    || [];
   pendingAccs = pendingAccs || [];
   totalPend   = totalPend   || 0;
@@ -77,7 +78,7 @@ export default function AccountsScreen({ accounts, pendingAccs, totalPend, produ
   // Filtro de estado activo
   var _f      = useState('activas');    var filtro       = _f[0];        var setFiltro       = _f[1];
   // Búsqueda por nombre de cliente
-  var _cq     = useState('');           var clientQ      = _cq[0];       var setClientQ      = _cq[1];
+  var _cq     = useState(initialSearch||''); var clientQ = _cq[0]; var setClientQ = _cq[1];
 
   // Formulario de pago
   var _pa     = useState('');           var pmtAmount    = _pa[0];       var setPmtAmount    = _pa[1];
@@ -458,7 +459,13 @@ export default function AccountsScreen({ accounts, pendingAccs, totalPend, produ
                     <tr key={a.id} style={{ cursor: 'pointer' }} onClick={function() { setSelAcc(a.id); }}>
                       <td style={Object.assign({}, sTD, { textAlign: 'center', color: '#999', fontSize: 12 })}>{accPag.offset + index + 1}</td>
                       <td style={sTD}>{fmtD(a.date)}</td>
-                      <td style={Object.assign({}, sTD, { fontWeight: 600 })}>{a.client}</td>
+                      <td style={Object.assign({}, sTD, { fontWeight: 600 })}>
+                        {(function() {
+                          var cli = a.clientId && clients.find(function(c) { return c.id === a.clientId; });
+                          if (cli) return <span style={{ cursor: 'pointer', color: 'var(--teal,#1D9E75)', textDecoration: 'underline dotted' }} onClick={function(e) { e.stopPropagation(); navTo('clients', { clientId: cli.id }); }}>{a.client}</span>;
+                          return a.client;
+                        })()}
+                      </td>
                       <td style={sTD}>{Q(a.total)}</td>
                       <td style={Object.assign({}, sTD, { color: TEAL, fontWeight: 500 })}>{Q(a.paid)}</td>
                       <td style={Object.assign({}, sTD, { fontWeight: 700, color: a.balance > 0 ? '#E24B4A' : TEAL })}>{Q(a.balance)}</td>

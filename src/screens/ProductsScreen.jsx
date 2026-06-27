@@ -50,7 +50,7 @@ var MOTIVOS_AJUSTE = [
 
 var H1 = { fontSize: 'clamp(17px,4vw,22px)', fontWeight: 600, margin: '0 0 20px', color: 'var(--text-primary,#1a1a1a)' };
 
-export default function ProductsScreen({ products, categories, locations, saveProduct, deleteProduct, importProducts, showFlash }) {
+export default function ProductsScreen({ products, categories, locations, saveProduct, deleteProduct, importProducts, showFlash, initialSearch }) {
   products       = products       || [];
   categories     = categories     || [];
   locations      = locations      || [];
@@ -60,7 +60,7 @@ export default function ProductsScreen({ products, categories, locations, savePr
   showFlash      = showFlash      || function() {};
 
   // Búsqueda y filtros de la lista
-  var _s   = useState('');       var search = _s[0];   var setSearch = _s[1];
+  var _s   = useState(initialSearch||'');  var search = _s[0];   var setSearch = _s[1];
   var _c   = useState('Todas');  var cat    = _c[0];   var setCat    = _c[1];
   var _o   = useState('name');   var sort   = _o[0];   var setSort   = _o[1];
 

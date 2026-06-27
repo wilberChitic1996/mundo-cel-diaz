@@ -50,20 +50,22 @@ function MetricBox({ label, value, color }) {
   );
 }
 
-export default function WarrantiesScreen({ warranties, sales, repairs, saveWarranty, updateWarranty, session }) {
+export default function WarrantiesScreen({ warranties, sales, repairs, saveWarranty, updateWarranty, session, initialSearch, initialWarrantyId, clients, navTo }) {
+  navTo   = navTo   || function() {};
+  clients = clients || [];
   warranties = warranties || [];
   sales      = sales      || [];
   repairs    = repairs    || [];
   session    = session    || {};
 
   // ID de la garantía en vista detalle (null = vista lista)
-  var _sel = useState(null);    var selWar   = _sel[0];  var setSelWar    = _sel[1];
+  var _sel = useState(initialWarrantyId||null); var selWar   = _sel[0];  var setSelWar    = _sel[1];
   // Formulario visible o no
   var _sf  = useState(false);   var showForm = _sf[0];   var setShowForm  = _sf[1];
   // Filtro de estado
   var _fil = useState('todas'); var filter   = _fil[0];  var setFilter    = _fil[1];
   // Búsqueda
-  var _q   = useState('');      var q        = _q[0];    var setQ         = _q[1];
+  var _q   = useState(initialSearch||''); var q = _q[0]; var setQ         = _q[1];
 
   // Campos del formulario
   var _fet = useState('repair');                         var fEntityType = _fet[0]; var setFEntityType = _fet[1];
@@ -296,7 +298,14 @@ export default function WarrantiesScreen({ warranties, sales, repairs, saveWarra
                   return (
                     <tr key={w.id} style={{ cursor: 'pointer' }} onClick={function() { setSelWar(w.id); }}>
                       <td style={Object.assign({}, sTD, { textAlign: 'center', color: '#999', fontSize: 12 })}>{warPag.offset + index + 1}</td>
-                      <td style={Object.assign({}, sTD, { fontWeight: 600 })}>{w.client}</td>
+                      <td style={Object.assign({}, sTD, { fontWeight: 600 })}>
+                        {(function() {
+                          var cli = (w.clientId && clients.find(function(c) { return c.id === w.clientId; }))
+                                 || (w.client && clients.find(function(c) { return c.name === w.client; }));
+                          if (cli) return <span style={{ cursor: 'pointer', color: 'var(--teal,#1D9E75)', textDecoration: 'underline dotted' }} onClick={function(e) { e.stopPropagation(); navTo('clients', { clientId: cli.id }); }}>{w.client}</span>;
+                          return w.client;
+                        })()}
+                      </td>
                       <td style={Object.assign({}, sTD, { color: '#666', maxWidth: 180 })}>{w.description}</td>
                       <td style={Object.assign({}, sTD, { fontFamily: 'monospace', fontSize: 12, color: TEAL })}>{w.entityId || '—'}</td>
                       <td style={sTD}>{fmtD(w.startDate)}</td>

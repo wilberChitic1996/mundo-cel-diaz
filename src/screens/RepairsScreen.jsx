@@ -149,7 +149,8 @@ function MetricBox({ label, value, color }) {
 }
 
 // ── Componente principal ───────────────────────────────────────────────────
-export default function RepairsScreen({ repairs, clients, products, saveRepair, updateRepairStatus, session, showFlash, onCobrar }) {
+export default function RepairsScreen({ repairs, clients, products, saveRepair, updateRepairStatus, session, showFlash, onCobrar, initialRepairId, navTo }) {
+  navTo = navTo || function() {};
   repairs   = repairs   || [];
   clients   = clients   || [];
   products  = products  || [];
@@ -158,8 +159,8 @@ export default function RepairsScreen({ repairs, clients, products, saveRepair, 
   onCobrar  = onCobrar  || function() {};
 
   // Vista actual: 'list' o 'detail' (controlada por selRep)
-  var _view = useState('list');     var repView = _view[0]; var setRepView = _view[1];
-  var _sel  = useState(null);       var selRep  = _sel[0];  var setSelRep  = _sel[1];
+  var _view = useState(initialRepairId ? 'detail' : 'list'); var repView = _view[0]; var setRepView = _view[1];
+  var _sel  = useState(initialRepairId||null);               var selRep  = _sel[0];  var setSelRep  = _sel[1];
   var _sf   = useState(false);      var showForm = _sf[0];  var setShowForm = _sf[1];
   var _fil  = useState('activas');  var filter   = _fil[0]; var setFilter   = _fil[1];
 
@@ -663,7 +664,12 @@ export default function RepairsScreen({ repairs, clients, products, saveRepair, 
                         <td style={{ ...sTD, textAlign: 'center', color: '#999', fontSize: 12 }}>{repPag.offset + index + 1}</td>
                         <td style={Object.assign({}, sTD, { fontFamily: 'monospace', fontSize: 12, color: TEAL, fontWeight: 700 })}>{r.repCode}</td>
                         <td style={Object.assign({}, sTD, { fontWeight: 600 })}>
-                          {r.clientName}
+                          {(function() {
+                            var cli = (r.clientId && clients.find(function(c) { return c.id === r.clientId; }))
+                                   || (r.clientName && clients.find(function(c) { return c.name === r.clientName; }));
+                            if (cli) return <span style={{ cursor: 'pointer', color: 'var(--teal,#1D9E75)', textDecoration: 'underline dotted' }} onClick={function(e) { e.stopPropagation(); navTo('clients', { clientId: cli.id }); }}>{r.clientName}</span>;
+                            return r.clientName;
+                          })()}
                           {r.clientCli && <div style={{ fontSize: 10, color: '#999', fontFamily: 'monospace' }}>{r.clientCli}</div>}
                         </td>
                         <td style={sTD}>
