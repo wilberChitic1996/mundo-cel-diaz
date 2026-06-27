@@ -99,6 +99,10 @@ export default function AccountsScreen({ accounts, pendingAccs, totalPend, produ
     if (clientQ) return (a.client || '').toLowerCase().indexOf(clientQ.toLowerCase()) >= 0;
     if (filtro === 'todas')    return true;
     if (filtro === 'activas')  return a.status !== 'pagado';
+    if (filtro.startsWith('aging-')) {
+      var idx = parseInt(filtro.split('-')[1]);
+      return aging[idx] && aging[idx].accs.some(function(x) { return x.id === a.id; });
+    }
     return a.status === filtro;
   });
 
@@ -378,18 +382,30 @@ export default function AccountsScreen({ accounts, pendingAccs, totalPend, produ
         <MetricBox label="Cuentas activas" value={pendingAccs.length}  color="#378ADD" />
       </div>
 
-      {/* Antigüedad de cuentas */}
+      {/* Antigüedad de cuentas — clickeable para filtrar */}
       {pendingAccs.length > 0 && (
         <div style={Object.assign({}, sCard, { marginBottom: 14 })}>
-          <p style={{ fontWeight: 600, fontSize: 14, margin: '0 0 12px' }}>📊 Antigüedad de cuentas</p>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
+            <p style={{ fontWeight: 600, fontSize: 14, margin: 0 }}>📊 Antigüedad de cuentas</p>
+            {filtro.startsWith('aging-') && (
+              <button style={Object.assign({}, mkBtn('gray'), { padding: '3px 10px', fontSize: 11 })} onClick={function() { setFiltro('activas'); }}>✕ Quitar filtro</button>
+            )}
+          </div>
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4,1fr)', gap: 10 }}>
             {aging.map(function(b, i) {
               var tot = b.accs.reduce(function(s, a) { return s + a.balance; }, 0);
+              var key = 'aging-' + i;
+              var activo = filtro === key;
               return (
-                <div key={i} style={{ background: b.bg, borderRadius: 8, padding: '10px 12px', borderLeft: '4px solid ' + b.color }}>
+                <div key={i}
+                  onClick={function() { setFiltro(activo ? 'activas' : key); setClientQ(''); }}
+                  style={{ background: b.bg, borderRadius: 8, padding: '10px 12px', borderLeft: '4px solid ' + b.color, cursor: b.accs.length > 0 ? 'pointer' : 'default', outline: activo ? '2px solid ' + b.color : 'none', opacity: b.accs.length === 0 ? 0.5 : 1, transition: 'opacity 0.15s' }}
+                  title={b.accs.length > 0 ? 'Ver ' + b.accs.length + ' cuenta(s) de ' + b.label : ''}
+                >
                   <div style={{ fontSize: 11, color: b.color, fontWeight: 700, marginBottom: 4 }}>{b.label}</div>
                   <div style={{ fontSize: 18, fontWeight: 800, color: b.color }}>{b.accs.length}</div>
                   <div style={{ fontSize: 12, color: '#666', marginTop: 2 }}>{Q(tot)}</div>
+                  {b.accs.length > 0 && <div style={{ fontSize: 10, color: b.color, marginTop: 4, fontWeight: 600 }}>Ver →</div>}
                 </div>
               );
             })}
