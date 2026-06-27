@@ -67,6 +67,11 @@ export const authAPI = {
   resetPassword: function(resetToken, newPassword) { return api.post('/auth/reset-password', { resetToken, newPassword }); },
 };
 
+// Verificación pública de comprobantes (sin autenticación — la usa la página /?verify=)
+export const publicAPI = {
+  verify: function(saleId) { return api.get('/public/verify/' + encodeURIComponent(saleId)); },
+};
+
 export const productsAPI = {
   getAll:       function(cfg)   { return api.get('/products', cfg); },
   create:       function(data)  { return api.post('/products', data); },

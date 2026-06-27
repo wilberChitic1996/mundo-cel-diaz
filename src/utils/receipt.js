@@ -180,7 +180,25 @@ export function printVoucher(sale, opts) {
   var ventaNum  = sale.id.toUpperCase().slice(-8);
   var fecha     = new Date(sale.date).toLocaleDateString('es-GT', { day: '2-digit', month: 'long', year: 'numeric' });
   var hora      = new Date(sale.date).toLocaleTimeString('es-GT', { hour: '2-digit', minute: '2-digit' });
-  var _rSn      = getStore().store_name || STORE_FALLBACK;
+  var _store    = getStore();
+  var _rSn      = _store.store_name    || STORE_FALLBACK;
+  var _rSt      = _store.store_tagline || APP_TAGLINE;
+  var _rPhone   = _store.store_phone   || '';
+  var _rAddr    = _store.store_address || '';
+  var _rEmail   = _store.store_email   || '';
+
+  // Línea de contacto del negocio (solo lo que esté configurado en la BD — nada inventado)
+  var _contactBits = [];
+  if (_rAddr)  _contactBits.push('📍 ' + _rAddr);
+  if (_rPhone) _contactBits.push('📞 ' + _rPhone);
+  if (_rEmail) _contactBits.push('✉ ' + _rEmail);
+  var _contactLine = _contactBits.length
+    ? '<p class="sub" style="margin-top:3px;">' + _contactBits.join(' &nbsp;·&nbsp; ') + '</p>'
+    : '';
+
+  // URL de verificación pública del comprobante (el QR apunta aquí)
+  var _origin    = (typeof window !== 'undefined' && window.location) ? window.location.origin : '';
+  var _verifyUrl = _origin + '/?verify=' + encodeURIComponent(sale.id);
 
   var html = '<!DOCTYPE html><html><head><meta charset="UTF-8"><title>Comprobante ' + ventaNum + '</title>' +
   '<style>' +
@@ -214,7 +232,7 @@ export function printVoucher(sale, opts) {
     '@media print{body{padding:12px;}button{display:none!important;}}' +
   '</style></head><body>' +
   '<div class="header">' +
-    '<div class="brand"><h1>' + _rSn + '</h1><p>SISTEMA DE GESTIÓN</p><p class="sub">Tecnología · Accesorios · Reparaciones · Guatemala</p></div>' +
+    '<div class="brand"><h1>' + _rSn + '</h1><p>' + _rSt + '</p>' + _contactLine + '</div>' +
     '<div class="venta-num"><div class="label">' + _docLabel + '</div><div class="num"># ' + ventaNum + '</div></div>' +
     '<div style="text-align:center;margin-top:4px;"><div id="qrv" style="display:inline-block;"></div><div style="font-size:9px;color:#999;margin-top:3px;letter-spacing:0.5px;">ESCANEAR PARA VERIFICAR</div></div>' +
   '</div>' +
@@ -264,13 +282,17 @@ export function printVoucher(sale, opts) {
         '</tbody></table></div>'
     : '') +
   '<div class="footer">' +
-    '<div class="footer-left"><strong>' + APP_NAME + '</strong><br>Guatemala, C.A.<br>' + APP_TAGLINE + '</div>' +
-    '<div class="footer-right">Cantidad de artículos: <strong>' + (sale.items || []).reduce(function(s, i) { return s + i.qty; }, 0) + '</strong><br>Líneas de producto: <strong>' + (sale.items || []).length + '</strong><br>Ref: ' + sale.id.slice(0, 12).toUpperCase() + '</div>' +
+    '<div class="footer-left"><strong>' + _rSn + '</strong>' +
+      (_rAddr ? '<br>' + _rAddr : '') +
+      (_rPhone ? '<br>Tel: ' + _rPhone : '') +
+      (_rEmail ? '<br>' + _rEmail : '') +
+      '<br><span style="color:#bbb;font-size:9px;">Comprobante generado por ' + APP_NAME + '</span></div>' +
+    '<div class="footer-right">Cantidad de artículos: <strong>' + (sale.items || []).reduce(function(s, i) { return s + i.qty; }, 0) + '</strong><br>Líneas de producto: <strong>' + (sale.items || []).length + '</strong><br><span style="font-family:monospace;font-size:9px;">Ref: ' + String(sale.id).toUpperCase() + '</span></div>' +
   '</div>' +
   '<p class="gracias">¡Gracias por su preferencia!</p>' +
   '</body></html>';
 
-  var qrTxt = _rSn + ' | #' + ventaNum + ' | ' + sale.client + ' | ' + fecha + ' | Q' + Number(sale.total).toFixed(2);
+  var qrTxt = _verifyUrl;
   var w = window.open('', '_blank', 'width=800,height=700');
   w.document.write(html + '<scr' + 'ipt src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></scr' + 'ipt><scr' + 'ipt>window.onload=function(){try{new QRCode(document.getElementById("qrv"),{text:' + JSON.stringify(qrTxt) + ',width:90,height:90,colorDark:"#1a2535",colorLight:"#fff"});}catch(e){}setTimeout(function(){window.print();},800);};</scr' + 'ipt>');
   w.document.close();

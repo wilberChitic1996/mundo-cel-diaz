@@ -2,7 +2,22 @@ import React from 'react'
 import ReactDOM from 'react-dom/client'
 import { registerSW } from 'virtual:pwa-register'
 import App from './App.jsx'
+import VerifyReceipt from './screens/VerifyReceipt.jsx'
 import './styles/global.css'
+
+// Página pública de verificación: si la URL trae ?verify=<id> (el QR de la boleta),
+// se muestra la verificación sin requerir sesión y se omite toda la app y el PWA.
+var _verifyId = (function() {
+  try { return new URLSearchParams(window.location.search).get('verify'); }
+  catch (e) { return null; }
+})();
+if (_verifyId) {
+  ReactDOM.createRoot(document.getElementById('root')).render(
+    <React.StrictMode>
+      <VerifyReceipt saleId={_verifyId} />
+    </React.StrictMode>
+  );
+} else {
 
 var _reloading = false;
 var _updateSW = registerSW({
@@ -35,3 +50,5 @@ ReactDOM.createRoot(document.getElementById('root')).render(
     <App />
   </React.StrictMode>
 )
+
+}
