@@ -4,6 +4,8 @@ import html2canvas from 'html2canvas';
 import { AreaChart, Area, BarChart, Bar, PieChart, Pie, Cell, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend } from 'recharts';
 import { db } from './utils/db.js';
 import { authAPI, productsAPI, salesAPI, accountsAPI, returnsAPI, defectivesAPI, usersAPI, checkAPI, clientsAPI, repairsAPI, auditAPI, warrantiesAPI, cajaAPI, settingsAPI, suppliersAPI, adminAPI, categoriesAPI, locationsAPI } from './utils/api.js';
+// Sincroniza la config de tienda con el módulo de impresión (receipt.js usa su propio estado).
+import { setStore as setReceiptStore } from './utils/receipt.js';
 
 
 // ── Pantallas extraídas a módulos independientes ──────────────────────────────
@@ -950,7 +952,7 @@ function App(props) {
         var cfg  = await settingsAPI.getAll().catch(function(){return {};});
         categoriesAPI.getAll().then(function(c){setCategories(c||[]);}).catch(function(){});
         locationsAPI.getAll().then(function(l){setLocations(l||[]);}).catch(function(){});
-        if(cfg&&cfg.store_name){ setStoreInfo(function(prev){return Object.assign({},prev,cfg);}); setStore(cfg); }
+        if(cfg&&cfg.store_name){ setStoreInfo(function(prev){return Object.assign({},prev,cfg);}); setStore(cfg); setReceiptStore(cfg); }
         if(session.role==="admin"&&(!cfg||cfg.onboarding_done!=="true")){
           if((prods||[]).length>0){
             settingsAPI.update({onboarding_done:"true"}).catch(function(){});
@@ -1852,7 +1854,7 @@ function App(props) {
         )}
 
         {/* Onboarding wizard */}
-        {showOnboarding&&<OnboardingWizard session={session} showFlash={showFlash} onDone={function(){setShowOnboarding(false); setStoreInfo(function(prev){return Object.assign({},prev,{store_name:getStore().store_name,store_tagline:getStore().store_tagline});});}}/>}
+        {showOnboarding&&<OnboardingWizard session={session} showFlash={showFlash} onDone={function(){setShowOnboarding(false); var _cfg=Object.assign({},getStore()); setStoreInfo(function(prev){return Object.assign({},prev,_cfg);}); setReceiptStore(_cfg);}}/>}
 
         {/* Banner de suscripción vencida/por vencer */}
         {subInfo&&subInfo.daysLeft!==null&&subInfo.daysLeft<=7&&<div style={{position:"fixed",bottom:0,left:0,right:0,zIndex:9000,background:subInfo.daysLeft<0?"#E24B4A":"#F39C12",color:"#fff",padding:"10px 20px",display:"flex",alignItems:"center",justifyContent:"space-between",gap:12,boxShadow:"0 -2px 12px rgba(0,0,0,0.2)"}}>
