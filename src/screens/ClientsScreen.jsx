@@ -67,7 +67,7 @@ function MetricBox({ label, value, color }) {
   );
 }
 
-export default function ClientsScreen({ clients, sales, accounts, returns, saveClient, session, showFlash }) {
+export default function ClientsScreen({ clients, sales, accounts, returns, saveClient, session, showFlash, initialSearch, initialClientId }) {
   clients  = clients  || [];
   sales    = sales    || [];
   accounts = accounts || [];
@@ -75,9 +75,9 @@ export default function ClientsScreen({ clients, sales, accounts, returns, saveC
   session  = session  || {};
 
   // Búsqueda en la lista
-  var _q   = useState('');    var q       = _q[0];   var setQ       = _q[1];
+  var _q   = useState(initialSearch||'');    var q       = _q[0];   var setQ       = _q[1];
   // ID del cliente cuyo perfil se está viendo (null = vista lista)
-  var _sel = useState(null);  var selCli  = _sel[0]; var setSelCli  = _sel[1];
+  var _sel = useState(initialClientId||null);  var selCli  = _sel[0]; var setSelCli  = _sel[1];
   // Formulario visible o no
   var _sf  = useState(false); var showForm = _sf[0]; var setShowForm = _sf[1];
   // Cliente que se está editando (null = nuevo)

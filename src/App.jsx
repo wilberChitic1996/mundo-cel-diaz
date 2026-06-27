@@ -1086,6 +1086,14 @@ function App(props) {
   var _fl=useState({msg:"",type:"ok"}); var flash=_fl[0]; var setFlash=_fl[1];
   var _ss=useState(null); var selSale=_ss[0]; var setSelSale=_ss[1];
   var _gs=useState(false); var gsOpen=_gs[0]; var setGsOpen=_gs[1];
+  // deepLink: { search } para pre-filtrar pantallas al navegar desde otro módulo
+  var _dl=useState(null); var deepLink=_dl[0]; var setDeepLink=_dl[1];
+
+  // navTo(screen, params) — navega y pasa parámetros iniciales a la pantalla destino
+  function navTo(screen, params) {
+    setDeepLink(params || null);
+    setView(screen);
+  }
 
   // ── Silent JWT refresh (7 min before expiry) ──
   useEffect(function() {
@@ -1993,6 +2001,9 @@ function App(props) {
                 <button style={Object.assign({},mB("teal"),{padding:"11px"})} onClick={function(){printVoucherDoc(postSale.sale,postSale.opts);}}>🖨 Imprimir / PDF</button>
                 <button style={Object.assign({},mB("blue"),{padding:"11px"})} onClick={function(){descargarBoletaImagen(postSale.sale,postSale.opts).then(function(ok){showFlash(ok?"🖼 Imagen de boleta descargada":"⛔ No se pudo generar la imagen",ok?"ok":"err");});}}>🖼 Descargar imagen</button>
                 <button style={Object.assign({},mB("green"),{background:"#25D366",padding:"11px"})} onClick={function(){var _ps=postSale; pedirTelYEnviar(_ps.sale.client,function(){return waBoletaVenta(_ps.sale);},{sale:_ps.sale,receiptOpts:_ps.opts});}}>💬 Enviar por WhatsApp</button>
+                {postSale.opts&&(postSale.opts.estado==="pendiente"||postSale.opts.estado==="parcial")&&(
+                  <button style={Object.assign({},mB("amber"),{padding:"10px",background:"#F59E0B",color:"#fff"})} onClick={function(){setPostSale(null);navTo("accounts",{search:postSale.sale.client||""});}}>💳 Ver cuenta por cobrar →</button>
+                )}
                 <button style={Object.assign({},mB("gray"),{padding:"10px"})} onClick={function(){setPostSale(null);}}>No entregar</button>
               </div>
             </div>
@@ -2024,22 +2035,22 @@ function App(props) {
         <Sidebar view={view} setView={setView} cartCount={cart.length} pendingCount={pendingAccs.length} products={products} sales={sales} session={session} onLogout={onLogout} isOnline={isOnline} theme={theme} toggleTheme={toggleTheme} sidebarOpen={sidebarOpen} setSidebarOpen={setSidebarOpen} onSearch={function(){setGsOpen(true);}} storeInfo={storeInfo}/>
         {gsOpen&&<GlobalSearch onClose={function(){setGsOpen(false);}} setView={setView} sales={sales} clients={clients} products={products} repairs={repairs} setSelectedSale={setSelSale}/>}
         <div key={view} style={{flex:1,padding:"clamp(12px,3vw,28px)",overflowY:"auto",minWidth:0}} className="main-content screen-enter">
-          {view==="dashboard"&&canAccess(session.role,"dashboard")&&<DashboardScreen sales={sales} todaySales={todaySales} pendingAccs={pendingAccs} totalPend={totalPend} products={products} top5={top5} setSelectedSale={setSelSale} setView={setView} accounts={accounts} returns={returns} repairs={repairs} warranties={warranties}/>}
+          {view==="dashboard"&&canAccess(session.role,"dashboard")&&<DashboardScreen sales={sales} todaySales={todaySales} pendingAccs={pendingAccs} totalPend={totalPend} products={products} top5={top5} setSelectedSale={setSelSale} setView={setView} navTo={navTo} accounts={accounts} returns={returns} repairs={repairs} warranties={warranties}/>}
           {view==="pos"      &&canAccess(session.role,"pos")&&<POSScreen products={products} filteredPOS={filteredPOS} cart={cart} posQ={posQ} setPosQ={setPosQ} payMethod={payMethod} setPayMethod={setPayMethod} payType={payType} setPayType={setPayType} cashIn={cashIn} setCashIn={setCashIn} initialPay={initialPay} setInitialPay={setInitialPay} clientName={clientName} setClientName={setClientName} selectedClientId={selectedClientId} setSelectedClientId={setSelectedClientId} saleNote={saleNote} setSaleNote={setSaleNote} cartTotal={cartTotal} vuelto={vuelto} initPaidVal={initPaidVal} addToCart={addToCart} changeQty={changeQty} removeFromCart={removeFromCart} applyDiscount={applyDiscount} checkout={checkout} resetPOS={resetPOS} flash={flash} clients={clients} accounts={accounts}/>}
           {view==="caja"     &&canAccess(session.role,"caja")&&<CajaScreen sales={sales} accounts={accounts} returns={returns} session={session}/>}
-          {view==="accounts" &&canAccess(session.role,"accounts")&&<AccountsScreen accounts={accounts} pendingAccs={pendingAccs} totalPend={totalPend} addPayment={addPayment} showFlash={showFlash} products={products} session={session} clients={clients}/>}
+          {view==="accounts" &&canAccess(session.role,"accounts")&&<AccountsScreen accounts={accounts} pendingAccs={pendingAccs} totalPend={totalPend} addPayment={addPayment} showFlash={showFlash} products={products} session={session} clients={clients} navTo={navTo} initialSearch={view==="accounts"&&deepLink?deepLink.search||'':''}/>}
           {view==="returns"  &&canAccess(session.role,"returns")&&<ReturnsScreen returns={returns} products={products} onProcess={processReturn} showFlash={showFlash} clients={clients} sales={sales}/>}
           {view==="defective"&&canAccess(session.role,"defective")&&<DefectiveScreen defectives={defectives} onUpdateStatus={updateDefectiveStatus} onReingress={reingresarDefective}/>}
-          {view==="products" &&canAccess(session.role,"products")&&<ProductsScreen products={products} categories={categories} locations={locations} saveProduct={saveProduct} deleteProduct={deleteProduct} importProducts={importProducts} showFlash={showFlash} setProducts={setProducts}/>}
+          {view==="products" &&canAccess(session.role,"products")&&<ProductsScreen products={products} categories={categories} locations={locations} saveProduct={saveProduct} deleteProduct={deleteProduct} importProducts={importProducts} showFlash={showFlash} setProducts={setProducts} initialSearch={view==="products"&&deepLink?deepLink.search||'':''}/>}
           {view==="catalogos"&&canAccess(session.role,"catalogos")&&<CatalogosScreen categories={categories} locations={locations} products={products} reloadCatalogos={reloadCatalogos} showFlash={showFlash}/>}
           {view==="inventory"&&canAccess(session.role,"inventory")&&<InventoryScreen products={products}/>}
-          {view==="history"  &&canAccess(session.role,"history")&&<HistoryScreen sales={sales} selectedSale={selSale} setSelectedSale={setSelSale} accounts={accounts} returns={returns} products={products} session={session} clients={clients}/>}
+          {view==="history"  &&canAccess(session.role,"history")&&<HistoryScreen sales={sales} selectedSale={selSale} setSelectedSale={setSelSale} accounts={accounts} returns={returns} products={products} session={session} clients={clients} navTo={navTo}/>}
           {view==="cuadres"  &&canAccess(session.role,"cuadres")&&<CuadresScreen sales={sales} accounts={accounts} returns={returns} products={products} repairs={repairs} session={session}/>}
           {view==="backup"   &&canAccess(session.role,"backup")&&<BackupScreen products={products} sales={sales} accounts={accounts} returns={returns} defectives={defectives} clients={clients} repairs={repairs} warranties={warranties} onExportJSON={exportJSON} onExportExcel={exportExcel}/>}
           {view==="users"    &&canAccess(session.role,"users")&&<UsersScreen session={session} showFlash={showFlash}/>}
-          {view==="clients"  &&canAccess(session.role,"clients")&&<ClientsScreen clients={clients} sales={sales} accounts={accounts} returns={returns} saveClient={saveClient} session={session} showFlash={showFlash}/>}
-          {view==="repairs"    &&canAccess(session.role,"repairs")&&<RepairsScreen repairs={repairs} clients={clients} products={products} saveRepair={saveRepair} updateRepairStatus={updateRepairStatus} onCobrar={cobrarReparacion} session={session} showFlash={showFlash} warranties={warranties} saveWarranty={saveWarranty}/>}
-          {view==="warranties" &&canAccess(session.role,"warranties")&&<WarrantiesScreen warranties={warranties} sales={sales} repairs={repairs} updateWarranty={updateWarranty} saveWarranty={saveWarranty} session={session}/>}
+          {view==="clients"  &&canAccess(session.role,"clients")&&<ClientsScreen clients={clients} sales={sales} accounts={accounts} returns={returns} saveClient={saveClient} session={session} showFlash={showFlash} initialSearch={view==="clients"&&deepLink?deepLink.search||'':''} initialClientId={view==="clients"&&deepLink?deepLink.clientId||null:null}/>}
+          {view==="repairs"    &&canAccess(session.role,"repairs")&&<RepairsScreen repairs={repairs} clients={clients} products={products} saveRepair={saveRepair} updateRepairStatus={updateRepairStatus} onCobrar={cobrarReparacion} session={session} showFlash={showFlash} warranties={warranties} saveWarranty={saveWarranty} initialSearch={view==="repairs"&&deepLink?deepLink.search||'':''} initialRepairId={view==="repairs"&&deepLink?deepLink.repairId||null:null} navTo={navTo}/>}
+          {view==="warranties" &&canAccess(session.role,"warranties")&&<WarrantiesScreen warranties={warranties} sales={sales} repairs={repairs} updateWarranty={updateWarranty} saveWarranty={saveWarranty} session={session} clients={clients} navTo={navTo} initialSearch={view==="warranties"&&deepLink?deepLink.search||'':''} initialWarrantyId={view==="warranties"&&deepLink?deepLink.warrantyId||null:null}/>}
           {view==="audit"      &&canAccess(session.role,"audit")&&<AuditScreen session={session}/>}
           {view==="suppliers"  &&canAccess(session.role,"suppliers")&&<SuppliersScreen products={products} session={session} showFlash={showFlash} onStockUpdate={function(){ productsAPI.getAll().then(function(p){ setProducts((p||[]).map(function(x){return Object.assign({},x,{price:Number(x.price),cost:Number(x.cost),stock:Number(x.stock)});})); }); }}/>}
           {view==="storeconfig"&&canAccess(session.role,"storeconfig")&&<StoreConfigScreen storeInfo={storeInfo} setStoreInfo={setStoreInfo} session={session} showFlash={showFlash}/>}
