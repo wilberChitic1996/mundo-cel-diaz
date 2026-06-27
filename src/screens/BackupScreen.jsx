@@ -118,22 +118,44 @@ export default function BackupScreen() {
     }
   }
 
-  // Exporta el historial de backups a Excel
-  function handleExportExcel() {
-    var cols = ['Fecha', 'Hora', 'Tipo', 'Estado', 'Tamaño', 'Registros totales'];
-    var rows = backups.map(function(b) {
-      var total = 0;
-      if (b.record_counts) Object.values(b.record_counts).forEach(function(n) { total += (n || 0); });
-      return [
-        fmtD(new Date(b.created_at)),
-        fmtT(new Date(b.created_at)),
-        b.type === 'auto' ? 'Automático' : 'Manual',
-        b.status === 'success' ? 'Exitoso' : b.status === 'failed' ? 'Fallido' : 'Pendiente',
-        fmtSize(b.size_bytes),
-        total || '—',
-      ];
-    });
-    exportExcel(rows, cols, 'historial-backups-' + new Date().toISOString().slice(0, 10));
+  // Descarga el último backup exitoso y lo convierte a Excel con una hoja por tabla
+  async function handleExportExcel() {
+    var lastOk = backups.find(function(b) { return b.status === 'success' && b.storage_path; });
+    if (!lastOk) { showMsg('No hay backups exitosos para exportar', 'error'); return; }
+    setExporting(true);
+    try {
+      var res = await backupAPI.download(lastOk.id);
+      if (!res || !res.url) throw new Error('No se pudo obtener el enlace');
+      // Descargar el JSON del backup
+      var resp = await fetch(res.url);
+      var data = await resp.json();
+      var XLSX = await import('xlsx');
+      var wb = XLSX.utils.book_new();
+      var tables = data.tables || {};
+      var LABELS = {
+        clients: 'Clientes', products: 'Productos', sales: 'Ventas',
+        sale_items: 'Items Ventas', accounts: 'Cuentas', repairs: 'Reparaciones',
+        warranties: 'Garantías', returns: 'Devoluciones', defectives: 'Defectuosos',
+        suppliers: 'Proveedores', categories: 'Categorías', locations: 'Ubicaciones',
+        store_settings: 'Config Tienda', users: 'Usuarios',
+      };
+      Object.keys(tables).forEach(function(tbl) {
+        var rows = tables[tbl];
+        if (!rows || rows.length === 0) return;
+        var cols = Object.keys(rows[0]);
+        var wsData = [cols].concat(rows.map(function(r) { return cols.map(function(c) { return r[c] != null ? r[c] : ''; }); }));
+        var ws = XLSX.utils.aoa_to_sheet(wsData);
+        var sheetName = (LABELS[tbl] || tbl).slice(0, 31);
+        XLSX.utils.book_append_sheet(wb, ws, sheetName);
+      });
+      var fecha = new Date().toISOString().slice(0, 10);
+      XLSX.writeFile(wb, 'backup-completo-' + fecha + '.xlsx');
+      showMsg('Excel descargado con todos los datos', 'ok');
+    } catch (err) {
+      showMsg(err && err.message ? err.message : 'Error al exportar Excel', 'error');
+    } finally {
+      setExporting(false);
+    }
   }
 
   function showError(errMsg) {
