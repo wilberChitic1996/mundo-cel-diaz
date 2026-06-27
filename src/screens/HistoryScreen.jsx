@@ -181,6 +181,15 @@ export default function HistoryScreen({ sales, selectedSale, setSelectedSale, ac
     }
   }
 
+  // Resumen de artículos de un movimiento (productos/servicios de la venta, crédito o devolución)
+  function artLista(m) {
+    return (m.obj && m.obj.items) ? m.obj.items : [];
+  }
+  // Versión en texto plano para exportar a Excel/PDF
+  function artTexto(m) {
+    return artLista(m).map(function(it) { return (it.name || it.code || '?') + ' x' + it.qty; }).join('; ') || '—';
+  }
+
   var hfilters = [['todos', 'Todos'], ['sale', 'Ventas'], ['credito', 'Créditos'], ['abono', 'Abonos'], ['devolucion', 'Devoluciones']];
 
   // ── Vista detalle de una venta ──
@@ -274,8 +283,8 @@ export default function HistoryScreen({ sales, selectedSale, setSelectedSale, ac
             style={Object.assign({}, mkBtn('teal'), { padding: '6px 12px', fontSize: 12 })}
             onClick={function() {
               exportExcel(
-                fmovs.map(function(m) { return [fmtD(m.date) + ' ' + fmtT(m.date), m.tipo, m.cliente || '', m.metodo || '', m.atendio || '', (m.signo < 0 ? '-' : '+') + m.monto.toFixed(2)]; }),
-                ['Fecha', 'Tipo', 'Cliente', 'Método', 'Atendió', 'Monto'],
+                fmovs.map(function(m) { return [fmtD(m.date) + ' ' + fmtT(m.date), m.tipo, m.cliente || '', artTexto(m), m.metodo || '', m.atendio || '', (m.signo < 0 ? '-' : '+') + m.monto.toFixed(2)]; }),
+                ['Fecha', 'Tipo', 'Cliente', 'Artículos', 'Método', 'Atendió', 'Monto'],
                 'historial_movimientos'
               );
             }}
@@ -285,8 +294,8 @@ export default function HistoryScreen({ sales, selectedSale, setSelectedSale, ac
             onClick={function() {
               exportPDF(
                 'Historial de Movimientos',
-                ['Fecha', 'Tipo', 'Cliente', 'Método', 'Atendió', 'Monto'],
-                fmovs.map(function(m) { return [fmtD(m.date) + ' ' + fmtT(m.date), m.tipo, m.cliente || '', m.metodo || '', m.atendio || '', (m.signo < 0 ? '-Q' : '+Q') + m.monto.toFixed(2)]; }),
+                ['Fecha', 'Tipo', 'Cliente', 'Artículos', 'Método', 'Atendió', 'Monto'],
+                fmovs.map(function(m) { return [fmtD(m.date) + ' ' + fmtT(m.date), m.tipo, m.cliente || '', artTexto(m), m.metodo || '', m.atendio || '', (m.signo < 0 ? '-Q' : '+Q') + m.monto.toFixed(2)]; }),
                 'historial_movimientos'
               );
             }}
@@ -350,7 +359,7 @@ export default function HistoryScreen({ sales, selectedSale, setSelectedSale, ac
             <table style={{ width: '100%', borderCollapse: 'collapse' }}>
               <thead>
                 <tr>
-                  {['#', 'Fecha', 'Hora', 'Tipo', 'Cliente', 'Método', 'Atendió', 'Monto', ''].map(function(h) {
+                  {['#', 'Fecha', 'Hora', 'Tipo', 'Cliente', 'Artículos', 'Método', 'Atendió', 'Monto', ''].map(function(h) {
                     return <th key={h} style={h === '#' ? Object.assign({}, sTH, { width: 40, textAlign: 'center' }) : sTH}>{h}</th>;
                   })}
                 </tr>
@@ -369,6 +378,16 @@ export default function HistoryScreen({ sales, selectedSale, setSelectedSale, ac
                       <td style={sTD}>{fmtT(m.date)}</td>
                       <td style={sTD}><span style={mkBadge(m.color)}>{m.tipo}</span></td>
                       <td style={Object.assign({}, sTD, { fontWeight: 500 })}>{m.cliente}</td>
+                      <td style={Object.assign({}, sTD, { fontSize: 12, color: '#555', maxWidth: 240 })}>
+                        {(function() {
+                          var its = artLista(m);
+                          if (!its.length) return <span style={{ color: '#bbb' }}>—</span>;
+                          var full  = its.map(function(it) { return (it.name || it.code || '?') + ' ×' + it.qty; }).join(', ');
+                          var shown = its.slice(0, 2).map(function(it) { return (it.name || it.code || '?') + ' ×' + it.qty; }).join(', ');
+                          var extra = its.length > 2 ? ' +' + (its.length - 2) + ' más' : '';
+                          return <span title={full} style={{ display: 'inline-block', maxWidth: 240, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', verticalAlign: 'bottom' }}>{shown}{extra}</span>;
+                        })()}
+                      </td>
                       <td style={Object.assign({}, sTD, { fontSize: 12, color: '#666' })}>{m.metodo}</td>
                       <td style={Object.assign({}, sTD, { fontSize: 12, color: '#666' })}>{m.atendio}</td>
                       <td style={Object.assign({}, sTD, { fontWeight: 700, color: m.signo < 0 ? '#E24B4A' : TEAL })}>
