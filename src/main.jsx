@@ -3,7 +3,10 @@ import ReactDOM from 'react-dom/client'
 import { registerSW } from 'virtual:pwa-register'
 import App from './App.jsx'
 import VerifyReceipt from './screens/VerifyReceipt.jsx'
+import { initSentry } from './utils/sentry.js'
 import './styles/global.css'
+
+initSentry();
 
 // Página pública de verificación: si la URL trae ?verify=<id> (el QR de la boleta),
 // se muestra la verificación sin requerir sesión y se omite toda la app y el PWA.

@@ -208,12 +208,8 @@ mundo-cel-diaz-api/
 | #104 | Frontend | Refactorización: App.jsx 8,104 → 1,921 líneas, extracción de 24 pantallas |
 | #105 | Frontend | Fix build: usePaginator.js→.jsx, AccountsScreen import, fmt.js→formatters.js |
 | #106 | Frontend | Fix api.js: restaurar detección staging vs producción + crear CLAUDE.md |
-<<<<<<< HEAD
 | #107 | Frontend | Merge de refactor + CLAUDE.md a `staging` |
 | #108 | Frontend | Fix api.js en `main`: enrutar dominios staging al API de piloto (no a producción) |
-| API #48 | Backend | Fix CORS: permitir *.vercel.app en el API (rama `main`) |
-| API #49 | Backend | Fix CORS: llevar la misma lógica `*.vercel.app` a la rama `staging` (piloto) |
-=======
 | #109 | Frontend | CLAUDE.md: arquitectura de ambientes + lección CORS de piloto |
 | #110 | Frontend | Merge staging → main (primer release con refactor completo) |
 | #111 | Frontend | Fix boletas: datos reales del negocio + QR verificación funcional |
@@ -225,29 +221,20 @@ mundo-cel-diaz-api/
 | #117 | Frontend | Release landing rediseñada → producción |
 | #118 | Frontend | UI overhaul: design system profesional (cards, tablas, MetricBox, Sidebar) |
 | #119 | Frontend | Release UI overhaul → producción |
-| API #48 | Backend | Fix CORS: permitir *.vercel.app en el API |
+| API #48 | Backend | Fix CORS: permitir *.vercel.app en el API (rama `main`) |
+| API #49 | Backend | Fix CORS: llevar la misma lógica `*.vercel.app` a la rama `staging` (piloto) |
 | API #50 | Backend | Endpoint público /api/public/verify/:id para QR de boletas |
->>>>>>> claude/gifted-heisenberg-r6n8jo
 
 ---
 
 ## Estado actual del trabajo
 
-<<<<<<< HEAD
-- **Rama activa:** `claude/gifted-heisenberg-r6n8jo` en frontend y API
-- **Producción (frontend `main`):** YA tiene TODO el código nuevo — App.jsx refactorizado (1946 líneas) + api.js con detección de hostname correcta. El refactor ya está en producción (PRs #104, #105, #108).
-- **Producción (API `main`):** tiene el fix de CORS (`*.vercel.app`).
-- **Piloto (API `staging`):** fix de CORS aplicado en PR #49 (jun 2026). Tras merge, Railway redesplegó el API e546.
-- **Único delta frontend `main` ↔ `staging`:** el archivo `CLAUDE.md` (solo doc). "Pasar a producción" en frontend = llevar este doc a `main`.
-- **Credenciales piloto:** `admin@demo.com` / `Admin2026!` (hash bcrypt en la BD de staging).
-- **Validación piloto:** en curso tras el fix de CORS del API.
-=======
 - **Versión en producción:** 2.2.0
-- **Último cambio (27 jun 2026):** UI overhaul profesional — design system, MetricBox, Sidebar pill, screen transitions, dark mode vars (PR #118, #119)
+- **Último cambio (27 jun 2026):** Enterprise checklist — ESLint, Pino logger, Sentry, Swagger, Refresh tokens, IVA configurable, Redis cache, API v1, Services layer, CI/CD, Uptime monitoring (PRs #122, API #52)
 - **Producción:** ✅ Actualizada — mundoceldiaz.com
 - **Staging:** ✅ Actualizado — mundo-cel-diaz-staging.vercel.app
 - **2FA:** Implementado para superadmin, deshabilitado temporalmente (esperando verificación DNS Resend: DKIM ✓, SPF ✓, pendiente propagación)
->>>>>>> claude/gifted-heisenberg-r6n8jo
+- **Credenciales piloto:** `admin@demo.com` / `Admin2026!` (hash bcrypt en la BD de staging).
 
 ---
 
