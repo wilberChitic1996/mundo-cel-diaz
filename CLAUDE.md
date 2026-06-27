@@ -84,6 +84,14 @@ Estos valores ya están correctos y funcionando. **NUNCA cambiarlos** salvo que 
 6. Si hay cambios de base de datos → aplicar PRIMERO en Supabase staging, validar, luego en producción
 ```
 
+> ### 🔴 REGLA CRÍTICA: VERIFICAR CI ANTES DE MERGEAR — SIEMPRE.
+> Antes de hacer merge de CUALQUIER PR (tanto rama→staging como staging→main),
+> Claude DEBE revisar que todos los checks de CI estén en verde usando las herramientas
+> de GitHub (`mcp__github__actions_list` → jobs del PR). Si algún check está en
+> `failure` o `pending`, NO mergear — diagnosticar y corregir primero.
+> Mergear con CI rojo rompe producción y genera deploys fallidos en Vercel/Railway.
+> Esta regla no tiene excepciones aunque el usuario pida ir rápido.
+
 **Por qué esto protege producción:** mientras los cambios estén en `staging`, `mundoceldiaz.com`
 sigue corriendo `main` sin tocarse. Producción solo cambia cuando el usuario aprueba el PR `staging → main`.
 
