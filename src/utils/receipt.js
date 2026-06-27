@@ -110,8 +110,47 @@ export function buildReceiptHTML(sale, opts, si) {
         '<span>Generado por ' + sn + ' POS</span><span>' + fecha + ' · ' + hora + '</span>' +
       '</div>' +
       '<div style="text-align:center;margin-top:16px;font-size:13px;color:#1D9E75;font-weight:700;letter-spacing:1px;">¡Gracias por su compra!</div>' +
+      '<div style="text-align:center;margin-top:6px;font-size:9px;color:#bbb;">Comprobante interno · No es documento tributario (no válido como factura)</div>' +
     '</div>'
   );
+}
+
+/**
+ * Descarga la boleta de una venta como imagen PNG (alternativa al PDF).
+ * Reutiliza buildReceiptHTML + html2canvas (mismo render que el envío por WhatsApp).
+ *
+ * @param {Object} sale - Venta a renderizar
+ * @param {Object} opts - Opciones de recibo (usuario, estado, etc.)
+ * @returns {Promise<boolean>} true si se descargó, false si falló
+ */
+export async function descargarImagen(sale, opts) {
+  opts = opts || {};
+  try {
+    var wrapper = document.createElement('div');
+    wrapper.style.cssText = 'position:fixed;left:-9999px;top:0;background:#fff;z-index:-1;width:650px;';
+    wrapper.innerHTML = buildReceiptHTML(sale, opts);
+    document.body.appendChild(wrapper);
+    await new Promise(function(r) { setTimeout(r, 400); });
+
+    var canvas = await html2canvas(wrapper.firstChild, { scale: 2, useCORS: true, backgroundColor: '#ffffff', logging: false });
+    document.body.removeChild(wrapper);
+
+    var blob = await new Promise(function(r) { canvas.toBlob(r, 'image/png', 0.95); });
+    var _name = (getStore().store_name || APP_NAME).replace(/\s+/g, '-').toLowerCase();
+    var _folio = String(sale.id || '').toUpperCase().slice(-8);
+    var imgUrl = URL.createObjectURL(blob);
+    var dl = document.createElement('a');
+    dl.href = imgUrl;
+    dl.download = 'boleta-' + _name + '-' + _folio + '.png';
+    document.body.appendChild(dl);
+    dl.click();
+    document.body.removeChild(dl);
+    setTimeout(function() { URL.revokeObjectURL(imgUrl); }, 5000);
+    return true;
+  } catch (err) {
+    console.warn('[BOLETA] Error generando imagen:', err);
+    return false;
+  }
 }
 
 /**
@@ -290,6 +329,7 @@ export function printVoucher(sale, opts) {
     '<div class="footer-right">Cantidad de artículos: <strong>' + (sale.items || []).reduce(function(s, i) { return s + i.qty; }, 0) + '</strong><br>Líneas de producto: <strong>' + (sale.items || []).length + '</strong><br><span style="font-family:monospace;font-size:9px;">Ref: ' + String(sale.id).toUpperCase() + '</span></div>' +
   '</div>' +
   '<p class="gracias">¡Gracias por su preferencia!</p>' +
+  '<p style="text-align:center;margin:8px 0 0;font-size:9px;color:#bbb;">Comprobante interno · No es documento tributario (no válido como factura)</p>' +
   '</body></html>';
 
   var qrTxt = _verifyUrl;
