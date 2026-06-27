@@ -466,7 +466,7 @@ export default function DashboardScreen({
       </div>
 
       {/* Recordatorios del servidor: cuentas, garantías, reparaciones */}
-      <RemindersWidget />
+      <RemindersWidget setView={setView} />
     </div>
   );
 }
