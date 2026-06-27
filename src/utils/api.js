@@ -198,6 +198,11 @@ export const adminAPI = {
   deleteUser:          function(id)        { return api.delete('/admin/users/' + id); },
 };
 
+export const remindersAPI = {
+  summary:  function() { return api.get('/reminders/summary'); },
+  accounts: function() { return api.get('/reminders/accounts'); },
+};
+
 export const checkAPI = async function() {
   try {
     var baseUrl = API_URL.replace('/api', '');
