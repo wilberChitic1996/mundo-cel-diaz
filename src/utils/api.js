@@ -203,6 +203,13 @@ export const remindersAPI = {
   accounts: function() { return api.get('/reminders/accounts'); },
 };
 
+export const backupAPI = {
+  list:     function()   { return api.get('/backup'); },
+  create:   function()   { return api.post('/backup'); },
+  download: function(id) { return api.get('/backup/' + id + '/download'); },
+  health:   function()   { return api.get('/backup/health'); },
+};
+
 export const pushAPI = {
   vapidKey:   function()    { return api.get('/push/vapid-public-key'); },
   subscribe:  function(sub) { return api.post('/push/subscribe', sub); },
