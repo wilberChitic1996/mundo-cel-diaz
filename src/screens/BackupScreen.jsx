@@ -7,9 +7,9 @@
 // ══════════════════════════════════════════════════════════════════════════════
 
 import React, { useState, useEffect, useCallback } from 'react';
-import { TEAL, NAVY, sCard, sTH, sTD, mkBtn, mkBadge, H1 } from '../../styles/theme.js';
-import { fmtD, fmtT } from '../../utils/formatters.js';
-import { backupAPI } from '../../utils/api.js';
+import { TEAL, NAVY, sCard, sTH, sTD, mkBtn, mkBadge, H1 } from '../styles/theme.js';
+import { fmtD, fmtT } from '../utils/formatters.js';
+import { backupAPI } from '../utils/api.js';
 
 var PAGE_SIZE = 20;
 
