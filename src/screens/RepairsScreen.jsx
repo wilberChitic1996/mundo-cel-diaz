@@ -665,7 +665,8 @@ export default function RepairsScreen({ repairs, clients, products, saveRepair, 
                         <td style={Object.assign({}, sTD, { fontFamily: 'monospace', fontSize: 12, color: TEAL, fontWeight: 700 })}>{r.repCode}</td>
                         <td style={Object.assign({}, sTD, { fontWeight: 600 })}>
                           {(function() {
-                            var cli = r.clientId && clients.find(function(c) { return c.id === r.clientId; });
+                            var cli = (r.clientId && clients.find(function(c) { return c.id === r.clientId; }))
+                                   || (r.clientName && clients.find(function(c) { return c.name === r.clientName; }));
                             if (cli) return <span style={{ cursor: 'pointer', color: 'var(--teal,#1D9E75)', textDecoration: 'underline dotted' }} onClick={function(e) { e.stopPropagation(); navTo('clients', { clientId: cli.id }); }}>{r.clientName}</span>;
                             return r.clientName;
                           })()}
