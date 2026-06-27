@@ -1877,10 +1877,10 @@ function App(props) {
               <p style={{textAlign:"center",fontWeight:800,fontSize:17,margin:"0 0 4px",color:"#1a2535"}}>Venta registrada</p>
               <p style={{textAlign:"center",fontSize:13,color:"#777",margin:"0 0 18px"}}>{Q(postSale.sale.total)} · {postSale.sale.client||"Cliente ocasional"}<br/>¿Entregar comprobante al cliente?</p>
               <div style={{display:"grid",gap:8}}>
-                <button style={Object.assign({},mkBtn("teal"),{padding:"11px"})} onClick={function(){printVoucherDoc(postSale.sale,postSale.opts);}}>🖨 Imprimir / PDF</button>
-                <button style={Object.assign({},mkBtn("blue"),{padding:"11px"})} onClick={function(){descargarBoletaImagen(postSale.sale,postSale.opts).then(function(ok){showFlash(ok?"🖼 Imagen de boleta descargada":"⛔ No se pudo generar la imagen",ok?"ok":"err");});}}>🖼 Descargar imagen</button>
-                <button style={Object.assign({},mkBtn("green"),{background:"#25D366",padding:"11px"})} onClick={function(){var _ps=postSale; pedirTelYEnviar(_ps.sale.client,function(){return waBoletaVenta(_ps.sale);},{sale:_ps.sale,receiptOpts:_ps.opts});}}>💬 Enviar por WhatsApp</button>
-                <button style={Object.assign({},mkBtn("gray"),{padding:"10px"})} onClick={function(){setPostSale(null);}}>No entregar</button>
+                <button style={Object.assign({},mB("teal"),{padding:"11px"})} onClick={function(){printVoucherDoc(postSale.sale,postSale.opts);}}>🖨 Imprimir / PDF</button>
+                <button style={Object.assign({},mB("blue"),{padding:"11px"})} onClick={function(){descargarBoletaImagen(postSale.sale,postSale.opts).then(function(ok){showFlash(ok?"🖼 Imagen de boleta descargada":"⛔ No se pudo generar la imagen",ok?"ok":"err");});}}>🖼 Descargar imagen</button>
+                <button style={Object.assign({},mB("green"),{background:"#25D366",padding:"11px"})} onClick={function(){var _ps=postSale; pedirTelYEnviar(_ps.sale.client,function(){return waBoletaVenta(_ps.sale);},{sale:_ps.sale,receiptOpts:_ps.opts});}}>💬 Enviar por WhatsApp</button>
+                <button style={Object.assign({},mB("gray"),{padding:"10px"})} onClick={function(){setPostSale(null);}}>No entregar</button>
               </div>
             </div>
           </div>
