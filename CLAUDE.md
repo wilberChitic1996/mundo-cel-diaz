@@ -139,13 +139,18 @@ src/
     UsersScreen.jsx, AuditScreen.jsx, CuadresScreen.jsx, StoreConfigScreen.jsx,
     BackupScreen.jsx, AyudaScreen.jsx, SuperAdminPanel.jsx, OnboardingWizard.jsx
   hooks/
-    usePaginator.jsx   — Hook de paginación (DEBE ser .jsx no .js — contiene JSX)
+    usePaginator.jsx        — Hook de paginación (DEBE ser .jsx no .js — contiene JSX)
+    usePushNotifications.js — Web Push: estados idle/requesting/granted/denied/unsupported
+  components/ui/
+    PushPermissionBanner.jsx — Banner inferior de solicitud de permiso push
   utils/
-    api.js             — Instancia axios + todos los endpoints por módulo
+    api.js             — Instancia axios + todos los endpoints por módulo (incluye pushAPI)
     formatters.js      — Q(), fmtD(), fmtT(), gid()
     receipt.js         — getStore(), setStore(), buildReceiptHTML(), printVoucher(), compartirWhatsApp()
     whatsapp.js        — pedirTelYEnviar(), waBoletaVenta(), waRecordatorio()
     export.js          — exportExcel(), exportPDF()
+    session.js         — Auto-refresh JWT 7 min antes de expirar, refresh token 30d
+    sentry.js          — Sentry init para frontend
   styles/
     theme.js           — TEAL, NAVY, sCard, sInput, sLabel, sTH, sTD, sQtyBtn, mkBtn(), mkBadge()
   constants/
@@ -159,18 +164,32 @@ src/
 ```
 mundo-cel-diaz-api/
   app.js              — Express + CORS + Helmet + Rate Limiting
-  routes/             — 18 archivos, uno por módulo
+  index.js            — Punto de entrada, startCronJobs()
+  routes/             — 20 archivos, uno por módulo
     auth.js, products.js, sales.js, accounts.js, returns.js, defectives.js,
     users.js, clients.js, repairs.js, audit.js, warranties.js, caja.js,
-    settings.js, suppliers.js, categories.js, locations.js, admin.js, public.js
+    settings.js, suppliers.js, categories.js, locations.js, admin.js, public.js,
+    reminders.js, push.js
   middleware/
     auth.js           — Validación JWT
     rateLimit.js      — Límite de peticiones por IP
   utils/
     tenant.js         — withTenant(), tid() — filtrado multi-tenant
     audit.js          — logAudit() — registro de acciones
+    logger.js         — Pino logger estructurado
+    cache.js          — Redis o Map en memoria (fallback)
+    reminders.js      — Cron jobs: cuentas, garantías, reparaciones + push
+    sentry.js         — Sentry error tracking
+  services/
+    clientService.js, productService.js, saleService.js
+  swagger.js          — OpenAPI docs en /api-docs
   supabase.js         — Cliente Supabase (service_role key)
-  migrations/         — Scripts SQL versionados
+  Dockerfile          — node:20-alpine, USER node, puerto 4000
+  docker-compose.yml  — api + redis:7-alpine para desarrollo local
+  database.json       — node-pg-migrate config (usa DATABASE_URL)
+  .node-pg-migraterc  — ignora migrations 001-007 (ya aplicadas)
+  migrations/         — 001-007 SQL manuales + README para nuevas desde 008
+  tests/              — Supertest: push, reminders, auth/refresh, accounts, settings
 ```
 
 ---
@@ -230,15 +249,22 @@ mundo-cel-diaz-api/
 | #123–#128 | Frontend | Recordatorios automáticos: RemindersWidget, aging clickeable en Cuentas |
 | #129–#131 | Frontend | Sistema navTo: hipervínculos entre módulos (Dashboard→Cuentas, Reparaciones, Garantías, Productos, Clientes) |
 | #132–#134 | Frontend | Fix hipervínculos en registros históricos (fallback por nombre en Historial, Reparaciones, Garantías) |
+| #135–#136 | Frontend | CSP estricta en Vercel + notificaciones push PWA (banner + suscripción) |
+| #137 | Frontend | CLAUDE.md actualizado — migraciones versionadas completado |
+| API #53–#56 | Backend | Recordatorios automáticos (cron jobs), rutas reminders |
+| API #57–#60 | Backend | Web Push notifications VAPID + tabla push_subscriptions + Docker |
+| API #61 | Backend | node-pg-migrate para migraciones versionadas (008+) |
+| API #62–#63 | Backend | Tests cobertura push/reminders/auth-refresh (61/61 passing) |
 
 ---
 
 ## Estado actual del trabajo
 
-- **Versión en producción:** 2.3.0
-- **Último cambio (27 jun 2026):** Sistema de hipervínculos entre módulos (navTo + deepLink), RemindersWidget en Dashboard, aging clickeable en Cuentas, fix hipervínculos en registros históricos (PRs #120–#134)
-- **Producción:** ✅ Actualizada — mundoceldiaz.com
-- **Staging:** ✅ Actualizado — mundo-cel-diaz-staging.vercel.app
+- **Versión en producción:** 2.4.0
+- **Último cambio (27 jun 2026):** CSP estricta, push notifications PWA, Docker, node-pg-migrate, tests 61/61 (PRs #135–#137, API #57–#63)
+- **Producción frontend:** ✅ Actualizada — mundoceldiaz.com
+- **Producción API:** ✅ Actualizada — mundo-cel-diaz-api-production.up.railway.app
+- **Staging:** ✅ Sincronizado con main en ambos repos
 - **2FA:** Implementado para superadmin, deshabilitado temporalmente (esperando verificación DNS Resend: DKIM ✓, SPF ✓, pendiente propagación)
 - **Credenciales piloto:** `admin@demo.com` / `Admin2026!` (hash bcrypt en la BD de staging).
 
@@ -259,15 +285,15 @@ mundo-cel-diaz-api/
 - [x] **Logs estructurados:** ✅ Implementado — Pino logger en API (`utils/logger.js`)
 - [x] **Monitoreo de errores:** ✅ Implementado — Sentry en frontend (`utils/sentry.js`) e iniciado en `main.jsx`
 - [x] **Uptime monitoring:** ✅ Implementado — GitHub Actions `uptime.yml`
-- [ ] **CSP estricta:** Configurar Content-Security-Policy explícita en helmet
+- [x] **CSP estricta:** ✅ Implementado — `vercel.json` headers CSP + HSTS + X-Frame-Options (frontend) y Helmet CSP (backend)
 - [x] **Swagger/OpenAPI:** ✅ Implementado — `swagger.js` en API, rutas documentadas con `@openapi`
-- [ ] **Cobertura de tests:** Aumentar cobertura con Vitest (unitarios) y Supertest (endpoints) — herramientas ya instaladas
+- [x] **Cobertura de tests:** ✅ 61/61 tests passing — Supertest para push, reminders, auth/refresh (`tests/push.test.js`, `tests/reminders.test.js`, `tests/auth-refresh.test.js`)
 
 ### 🟢 Media prioridad — Funcional
 
 - [ ] **WhatsApp automático:** Integrar UltraMsg o Twilio para envíos programados (requiere API de pago)
-- [x] **Recordatorios automáticos:** ✅ Implementado — cron jobs diarios en `utils/reminders.js` (cuentas, garantías, reparaciones)
-- [ ] **Notificaciones push:** PWA push notifications para eventos clave
+- [x] **Recordatorios automáticos:** ✅ Implementado — cron jobs diarios en `utils/reminders.js` (cuentas, garantías, reparaciones) + push real a dispositivos
+- [x] **Notificaciones push:** ✅ Implementado — PWA Web Push con VAPID, banner de suscripción en login, `routes/push.js`, tabla `push_subscriptions` (migration 007)
 - [ ] **Cobros automáticos SaaS:** Stripe/Wompi para suscripciones de tenants
 
 ### 🔵 Baja prioridad — Arquitectura y escala
@@ -277,7 +303,7 @@ mundo-cel-diaz-api/
 - [x] **Redis caché:** ✅ Implementado — `utils/cache.js` usa Redis si `REDIS_URL` está en env, Map en memoria como fallback
 - [ ] **Colas de procesamiento:** BullMQ para tareas pesadas (exports grandes, emails masivos)
 - [ ] **Supabase Storage:** Fotos de productos, imágenes de reparaciones, logos de negocios
-- [ ] **Docker + Docker Compose:** Contenedorizar API para entorno de desarrollo consistente
+- [x] **Docker + Docker Compose:** ✅ Implementado — `Dockerfile` (node:20-alpine, USER node) + `docker-compose.yml` (api + redis:7-alpine)
 - [x] **GitHub Actions CI:** ✅ Implementado — `ci.yml` y `test.yml` en ambos repos
 - [x] **Migraciones versionadas:** ✅ node-pg-migrate configurado — ignorar 001-007 (aplicados manualmente), nuevas migraciones desde 008 con up/down
 - [ ] **Cifrado de datos sensibles:** DPI y datos personales cifrados en reposo
@@ -308,8 +334,11 @@ Esta lista evita re-implementar cosas que ya existen:
 | **Seguridad** | Helmet, rate limiting por IP, CORS estricto, idempotency keys, SELECT FOR UPDATE en stock |
 | **Multi-tenant** | tenant_id en todas las tablas, withTenant() en API, RLS en Supabase |
 | **BD** | audit_logs completo, índices en tenant_id+created_at, migraciones en /migrations (SQL manual) |
-| **Tests** | Vitest + Supertest instalados (cobertura baja, pendiente aumentar) |
+| **Tests** | Vitest + Supertest — 61/61 passing (push, reminders, auth/refresh, accounts, settings) |
 | **Monitoring** | GET /health en API, Sentry frontend, Pino logs backend, GitHub Actions uptime |
+| **Push PWA** | Web Push VAPID, banner suscripción, `push_subscriptions` por tenant, cron jobs con push real |
+| **Docker** | Dockerfile node:20-alpine (USER node) + docker-compose con redis para desarrollo local |
+| **Migraciones** | node-pg-migrate configurado — 001-007 manuales aplicados, nuevas desde 008 con up/down |
 | **Cache** | Redis (si REDIS_URL configurado) o Map en memoria como fallback — settings cacheados 5 min |
 | **API** | Prefijo `/api/v1/` disponible retrocompatiblemente con `/api/` |
 | **Servicios** | services/ con clientService, productService, saleService |
