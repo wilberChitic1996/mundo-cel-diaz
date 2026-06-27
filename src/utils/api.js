@@ -207,6 +207,7 @@ export const backupAPI = {
   list:     function()   { return api.get('/backup'); },
   create:   function()   { return api.post('/backup'); },
   download: function(id) { return api.get('/backup/' + id + '/download'); },
+  data:     function(id) { return api.get('/backup/' + id + '/data'); },
   health:   function()   { return api.get('/backup/health'); },
 };
 

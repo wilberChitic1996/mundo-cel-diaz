@@ -124,11 +124,7 @@ export default function BackupScreen() {
     if (!lastOk) { showMsg('No hay backups exitosos para exportar', 'error'); return; }
     setExporting(true);
     try {
-      var res = await backupAPI.download(lastOk.id);
-      if (!res || !res.url) throw new Error('No se pudo obtener el enlace');
-      // Descargar el JSON del backup
-      var resp = await fetch(res.url);
-      var data = await resp.json();
+      var data = await backupAPI.data(lastOk.id);
       var XLSX = await import('xlsx');
       var wb = XLSX.utils.book_new();
       var tables = data.tables || {};
