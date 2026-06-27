@@ -14,7 +14,8 @@ function Badge({ count, color }) {
   return <span style={{ ...styles.badge, background: color + '20', color }}>{count}</span>;
 }
 
-export default function RemindersWidget() {
+export default function RemindersWidget({ setView }) {
+  setView = setView || function() {};
   var [data, setData] = useState(null);
   var [loading, setLoading] = useState(true);
 
@@ -42,30 +43,34 @@ export default function RemindersWidget() {
 
       {accounts_overdue.length > 0 && (
         <div>
-          <div style={{ fontSize: 12, fontWeight: 600, color: '#ef4444', marginBottom: 4 }}>
-            Cuentas vencidas ({counts.accounts_overdue})
+          <div style={{ fontSize: 12, fontWeight: 600, color: '#ef4444', marginBottom: 4, cursor: 'pointer' }} onClick={function() { setView('accounts'); }}>
+            Cuentas vencidas ({counts.accounts_overdue}) →
           </div>
           {accounts_overdue.slice(0, 3).map(function(a) {
             return (
-              <div key={a.id} style={styles.row}>
+              <div key={a.id} style={Object.assign({}, styles.row, { cursor: 'pointer' })} onClick={function() { setView('accounts'); }}>
                 <span style={{ flex: 1 }}>{a.client}</span>
                 <span style={{ color: '#ef4444', fontWeight: 600 }}>{Q(a.balance)}</span>
-                <span style={{ color: '#9ca3af', fontSize: 11 }}>{a.days_overdue}d</span>
+                <span style={{ color: '#9ca3af', fontSize: 11 }}>{a.days_overdue}d vencida</span>
               </div>
             );
           })}
-          {accounts_overdue.length > 3 && <p style={{ fontSize: 11, color: '#9ca3af', margin: '4px 0 0' }}>+{accounts_overdue.length - 3} más</p>}
+          {accounts_overdue.length > 3 && (
+            <p style={{ fontSize: 11, color: '#9ca3af', margin: '4px 0 0', cursor: 'pointer' }} onClick={function() { setView('accounts'); }}>
+              +{accounts_overdue.length - 3} más → Ver todas
+            </p>
+          )}
         </div>
       )}
 
       {warranties_expiring.length > 0 && (
         <div style={{ marginTop: 10 }}>
-          <div style={{ fontSize: 12, fontWeight: 600, color: '#f59e0b', marginBottom: 4 }}>
-            Garantías por vencer ({counts.warranties_expiring})
+          <div style={{ fontSize: 12, fontWeight: 600, color: '#f59e0b', marginBottom: 4, cursor: 'pointer' }} onClick={function() { setView('warranties'); }}>
+            Garantías por vencer ({counts.warranties_expiring}) →
           </div>
           {warranties_expiring.slice(0, 3).map(function(w) {
             return (
-              <div key={w.id} style={styles.row}>
+              <div key={w.id} style={Object.assign({}, styles.row, { cursor: 'pointer' })} onClick={function() { setView('warranties'); }}>
                 <span style={{ flex: 1 }}>{w.client}</span>
                 <span style={{ color: '#f59e0b', fontSize: 11 }}>vence en {w.days_left}d</span>
               </div>
@@ -76,13 +81,14 @@ export default function RemindersWidget() {
 
       {repairs_stalled.length > 0 && (
         <div style={{ marginTop: 10 }}>
-          <div style={{ fontSize: 12, fontWeight: 600, color: '#6b7280', marginBottom: 4 }}>
-            Reparaciones sin movimiento ({counts.repairs_stalled})
+          <div style={{ fontSize: 12, fontWeight: 600, color: '#6b7280', marginBottom: 4, cursor: 'pointer' }} onClick={function() { setView('repairs'); }}>
+            Reparaciones sin movimiento ({counts.repairs_stalled}) →
           </div>
           {repairs_stalled.slice(0, 3).map(function(r) {
             return (
-              <div key={r.id} style={styles.row}>
+              <div key={r.id} style={Object.assign({}, styles.row, { cursor: 'pointer' })} onClick={function() { setView('repairs'); }}>
                 <span style={{ flex: 1 }}>{r.client} — {r.device}</span>
+                <span style={{ color: '#9ca3af', fontSize: 11 }}>Atender →</span>
               </div>
             );
           })}
