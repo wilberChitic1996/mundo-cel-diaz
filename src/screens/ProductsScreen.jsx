@@ -28,6 +28,7 @@ import React, { useState } from 'react';
 import { TEAL, NAVY, sCard, sInput, sLabel, sTH, sTD, mkBtn, mkBadge } from '../styles/theme.js';
 import { fmtD, fmtT, Q } from '../utils/formatters.js';
 import { productsAPI } from '../utils/api.js';
+import * as XLSX from 'xlsx';
 import { usePaginator } from '../hooks/usePaginator.jsx';
 import { ROLE_LABEL } from '../constants/index.js';
 import ProductForm from '../components/ProductForm.jsx';

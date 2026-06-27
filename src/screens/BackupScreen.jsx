@@ -3,6 +3,7 @@ import { TEAL, NAVY, sCard, sTH, sTD, mkBtn, mkBadge, H1 } from '../styles/theme
 import { fmtD, fmtT } from '../utils/formatters.js';
 import { exportExcel } from '../utils/export.js';
 import { backupAPI } from '../utils/api.js';
+import * as XLSX from 'xlsx';
 
 var PAGE_SIZE = 20;
 
@@ -125,7 +126,6 @@ export default function BackupScreen() {
     setExporting(true);
     try {
       var data = await backupAPI.data(lastOk.id);
-      var XLSX = await import('xlsx');
       var wb = XLSX.utils.book_new();
       var tables = data.tables || {};
       var LABELS = {

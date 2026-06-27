@@ -17,8 +17,9 @@
  * @param {string[]} cols     — arreglo con los encabezados de columna
  * @param {string}   filename — nombre del archivo (sin extensión)
  */
+import * as XLSX from 'xlsx';
+
 export async function exportExcel(rows, cols, filename) {
-  var XLSX = await import('xlsx');
   var ws = XLSX.utils.aoa_to_sheet([cols].concat(rows));
   var wb = XLSX.utils.book_new();
   XLSX.utils.book_append_sheet(wb, ws, 'Reporte');
