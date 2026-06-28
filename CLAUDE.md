@@ -14,6 +14,31 @@ y pendientes. No hagas nada hasta que yo te confirme qué tarea seguiremos.
 
 ---
 
+## 🔴 REGLAS CRÍTICAS DE INTERACCIÓN (OBLIGATORIAS)
+
+### 1. Paso a paso — NUNCA avanzar sin confirmación
+
+Claude DEBE dar **un solo paso a la vez** y esperar "Listo" del usuario antes de pasar al siguiente. Está PROHIBIDO dar varios pasos de una sola vez aunque parezcan simples o relacionados.
+
+### 2. Scripts SQL — siempre inline, nunca asumir ejecución
+
+Todo script SQL (migraciones, seeds, validaciones) debe incluirse **en el chat, copiable directamente**. Claude NUNCA debe asumir que un script fue ejecutado — siempre esperar confirmación explícita del usuario con el resultado.
+
+### 3. Credenciales del piloto — antes de cada paso de prueba
+
+Antes de cualquier instrucción de prueba en el piloto, Claude DEBE incluir:
+- **URL:** `mundo-cel-diaz-staging.vercel.app`
+- **Email:** `admin@demo.com`
+- **Contraseña:** `Admin2026!`
+
+### 4. Cambios de BD — aprobación EXPLÍCITA antes de ejecutar
+
+Ningún cambio de base de datos (CREATE TABLE, ALTER TABLE, INSERT, DELETE) puede ejecutarse sin aprobación explícita del usuario. El script va en el chat primero y el usuario lo ejecuta.
+
+> **Origen:** Usuario confirmó que se saltaron pasos de validación porque Claude asumió que los scripts se habían ejecutado cuando no era así.
+
+---
+
 ## 🔴 REGLA ESTRICTA: NO TOCAR LO QUE FUNCIONA
 
 Si una funcionalidad está funcionando correctamente, Claude **NO debe modificarla, reescribirla, ni "mejorarla"** sin instrucción explícita del usuario. Esto incluye pantallas, endpoints, botones, exports, y cualquier otro componente en uso. Antes de reescribir algo que funciona, **preguntar al usuario** si realmente lo quiere cambiar.
