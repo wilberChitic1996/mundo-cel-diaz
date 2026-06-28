@@ -27,7 +27,7 @@
 import React, { useState } from 'react';
 import { TEAL, NAVY, sCard, sInput, sLabel, sTH, sTD, mkBtn, mkBadge } from '../styles/theme.js';
 import { fmtD, fmtT, Q } from '../utils/formatters.js';
-import { productsAPI } from '../utils/api.js';
+import { productsAPI, serialsAPI } from '../utils/api.js';
 import * as XLSX from 'xlsx';
 import { usePaginator } from '../hooks/usePaginator.jsx';
 import { ROLE_LABEL } from '../constants/index.js';
@@ -88,6 +88,53 @@ export default function ProductsScreen({ products, categories, locations, savePr
   var _shP = useState(null);     var stockHistProd    = _shP[0];  var setStockHistProd    = _shP[1];
   var _shD = useState([]);       var stockHistData    = _shD[0];  var setStockHistData    = _shD[1];
   var _shL = useState(false);    var stockHistLoading = _shL[0];  var setStockHistLoading = _shL[1];
+
+  // Modal gestión de seriales / IMEI
+  var _sp  = useState(null);  var serialProd    = _sp[0];  var setSerialProd    = _sp[1];
+  var _sd  = useState([]);    var serialData    = _sd[0];  var setSerialData    = _sd[1];
+  var _sl  = useState(false); var serialLoading = _sl[0];  var setSerialLoading = _sl[1];
+  var _si  = useState('');    var serialInput   = _si[0];  var setSerialInput   = _si[1];
+  var _sb  = useState(false); var serialBusy    = _sb[0];  var setSerialBusy    = _sb[1];
+  var _se  = useState('');    var serialErr     = _se[0];  var setSerialErr     = _se[1];
+
+  // ── Abre modal de seriales ────────────────────────────────────────────────
+  function abrirSeriales(p) {
+    setSerialProd(p);
+    setSerialData([]);
+    setSerialInput('');
+    setSerialErr('');
+    setSerialLoading(true);
+    serialsAPI.list(p.id)
+      .then(function(d) { setSerialData(d || []); setSerialLoading(false); })
+      .catch(function() { setSerialLoading(false); });
+  }
+
+  async function agregarSeriales() {
+    if (!serialInput.trim()) { setSerialErr('Ingresa al menos un IMEI/serial'); return; }
+    setSerialBusy(true);
+    setSerialErr('');
+    try {
+      var res = await serialsAPI.add(serialProd.id, { imeis: serialInput });
+      showFlash('✅ ' + (res.message || 'Seriales agregados'), 'ok');
+      setSerialInput('');
+      var d = await serialsAPI.list(serialProd.id);
+      setSerialData(d || []);
+    } catch (e) {
+      setSerialErr((e && e.error) || 'Error al agregar seriales');
+    }
+    setSerialBusy(false);
+  }
+
+  async function eliminarSerial(serialId, imei) {
+    if (!window.confirm('¿Eliminar serial ' + imei + '?')) return;
+    try {
+      await serialsAPI.remove(serialProd.id, serialId);
+      setSerialData(function(prev) { return prev.filter(function(s) { return s.id !== serialId; }); });
+      showFlash('Serial eliminado', 'ok');
+    } catch (e) {
+      showFlash((e && e.error) || 'No se pudo eliminar', 'err');
+    }
+  }
 
   // ── Abre modal de ajuste de stock ──────────────────────────────────────────
   function abrirAjusteStock(p) {
@@ -478,6 +525,14 @@ export default function ProductsScreen({ products, categories, locations, savePr
                           title="Historial de stock"
                           onClick={function() { abrirHistorialStock(p); }}
                         >📋</button>
+                        {/* Seriales / IMEI */}
+                        {p.unit !== 'serv' && (
+                          <button
+                            style={Object.assign({}, mkBtn('teal'), { padding: '4px 10px', fontSize: 12 })}
+                            title="Gestionar seriales / IMEI"
+                            onClick={function() { abrirSeriales(p); }}
+                          >🔢</button>
+                        )}
                         {/* Eliminar */}
                         <button
                           style={Object.assign({}, mkBtn('red'), { padding: '4px 10px', fontSize: 12 })}
@@ -624,6 +679,84 @@ export default function ProductsScreen({ products, categories, locations, savePr
                 {adjBusy ? 'Guardando...' : 'Guardar ajuste'}
               </button>
               <button style={mkBtn('gray')} onClick={function() { setAdjProd(null); }}>Cancelar</button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ── Modal: Gestión de Seriales / IMEI ── */}
+      {serialProd && (
+        <div style={{ position: 'fixed', top: 0, left: 0, width: '100%', height: '100%', background: 'rgba(0,0,0,0.5)', zIndex: 1000, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 16, boxSizing: 'border-box' }}>
+          <div style={{ background: '#fff', borderRadius: 16, padding: '28px 24px', maxWidth: 620, width: '100%', maxHeight: '85vh', overflowY: 'auto', boxShadow: '0 20px 60px rgba(0,0,0,0.3)' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 20 }}>
+              <div>
+                <p style={{ fontWeight: 700, fontSize: 16, margin: '0 0 4px' }}>🔢 Seriales / IMEI</p>
+                <p style={{ fontSize: 13, color: '#666', margin: 0 }}>
+                  {serialProd.name} <span style={{ fontFamily: 'monospace', fontSize: 11, color: '#999' }}>({serialProd.code})</span>
+                </p>
+              </div>
+              <button style={mkBtn('gray')} onClick={function() { setSerialProd(null); }}>✕ Cerrar</button>
+            </div>
+
+            <div style={{ marginBottom: 16 }}>
+              <label style={sLabel}>Agregar IMEIs / seriales</label>
+              <textarea
+                style={Object.assign({}, sInput, { height: 80, resize: 'vertical', fontFamily: 'monospace', fontSize: 12 })}
+                placeholder={'Un serial por línea, o separados por coma\nEj: 355432102345678\n355432102345679'}
+                value={serialInput}
+                onChange={function(e) { setSerialInput(e.target.value); setSerialErr(''); }}
+              />
+              {serialErr && <p style={{ color: '#E24B4A', fontSize: 12, margin: '4px 0 0' }}>⚠ {serialErr}</p>}
+              <button
+                style={Object.assign({}, mkBtn('teal'), { marginTop: 8 })}
+                disabled={serialBusy}
+                onClick={agregarSeriales}
+              >
+                {serialBusy ? 'Agregando...' : '+ Agregar seriales'}
+              </button>
+            </div>
+
+            <div style={{ borderTop: '1px solid #eee', paddingTop: 16 }}>
+              <p style={{ fontWeight: 600, fontSize: 13, margin: '0 0 10px' }}>
+                Seriales registrados ({serialData.length})
+              </p>
+              {serialLoading ? (
+                <p style={{ color: '#999', textAlign: 'center', padding: 16 }}>Cargando...</p>
+              ) : serialData.length === 0 ? (
+                <p style={{ color: '#999', fontSize: 13, textAlign: 'center', padding: 16 }}>
+                  Sin seriales registrados. Agrégalos arriba.
+                </p>
+              ) : (
+                <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+                  <thead>
+                    <tr>
+                      {['IMEI / Serial', 'Estado', 'Notas', ''].map(function(h) {
+                        return <th key={h} style={sTH}>{h}</th>;
+                      })}
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {serialData.map(function(s) {
+                      var colorStatus = s.status === 'disponible' ? 'green' : s.status === 'vendido' ? 'red' : s.status === 'defectuoso' ? 'amber' : 'blue';
+                      return (
+                        <tr key={s.id}>
+                          <td style={Object.assign({}, sTD, { fontFamily: 'monospace', fontSize: 13 })}>{s.imei}</td>
+                          <td style={sTD}><span style={mkBadge(colorStatus)}>{s.status}</span></td>
+                          <td style={Object.assign({}, sTD, { fontSize: 12, color: '#666' })}>{s.notes || '—'}</td>
+                          <td style={sTD}>
+                            {s.status !== 'vendido' && (
+                              <button
+                                style={Object.assign({}, mkBtn('red'), { padding: '3px 8px', fontSize: 11 })}
+                                onClick={function() { eliminarSerial(s.id, s.imei); }}
+                              >🗑</button>
+                            )}
+                          </td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              )}
             </div>
           </div>
         </div>

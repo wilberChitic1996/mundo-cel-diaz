@@ -217,6 +217,17 @@ export const pushAPI = {
   unsubscribe:function(ep)  { return api.delete('/push/subscribe', { data: { endpoint: ep } }); },
 };
 
+export const serialsAPI = {
+  list:    function(productId, status) {
+    var qs = status ? '?status=' + encodeURIComponent(status) : '';
+    return api.get('/serials/products/' + productId + '/serials' + qs);
+  },
+  add:     function(productId, data)   { return api.post('/serials/products/' + productId + '/serials', data); },
+  update:  function(productId, id, d)  { return api.put('/serials/products/' + productId + '/serials/' + id, d); },
+  remove:  function(productId, id)     { return api.delete('/serials/products/' + productId + '/serials/' + id); },
+  search:  function(q)                 { return api.get('/serials/serials/search?q=' + encodeURIComponent(q)); },
+};
+
 export const checkAPI = async function() {
   try {
     var baseUrl = API_URL.replace('/api', '');

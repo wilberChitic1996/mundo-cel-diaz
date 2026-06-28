@@ -1201,8 +1201,12 @@ function App(props) {
   function addToCart(p){
     if(p.stock<=0&&p.unit!=="serv"){showFlash('⚠️ Sin stock: '+p.name,'warn');return;}
     setCart(function(c){
-      var ex=c.find(function(i){return i.id===p.id;});
-      if(ex) return ex.qty>=p.stock?c:c.map(function(i){return i.id===p.id?Object.assign({},i,{qty:i.qty+1}):i;});
+      if(p.serial_id){
+        if(c.find(function(i){return i.serial_id===p.serial_id;})){showFlash('⚠️ Serial ya en carrito','warn');return c;}
+        return c.concat([{id:p.id,code:p.code,name:p.name,price:p.price,shelf:p.shelf,unit:p.unit,qty:1,maxStock:1,serial_id:p.serial_id,imei:p.imei}]);
+      }
+      var ex=c.find(function(i){return i.id===p.id&&!i.serial_id;});
+      if(ex) return ex.qty>=p.stock?c:c.map(function(i){return i.id===p.id&&!i.serial_id?Object.assign({},i,{qty:i.qty+1}):i;});
       return c.concat([{id:p.id,code:p.code,name:p.name,price:p.price,shelf:p.shelf,unit:p.unit,qty:1,maxStock:p.stock}]);
     });
   }
