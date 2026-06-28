@@ -126,6 +126,8 @@ export const repairsAPI = {
   updateStatus: function(id, status)  { return api.put('/repairs/' + id + '/status', { status }); },
   update:       function(id, data)    { return api.put('/repairs/' + id, data); },
   remove:       function(id)          { return api.delete('/repairs/' + id); },
+  uploadPhoto:  function(id, data)    { return api.post('/repairs/' + id + '/photos', data); },
+  deletePhoto:  function(id, data)    { return api.delete('/repairs/' + id + '/photos', { data }); },
 };
 
 export const warrantiesAPI = {
@@ -215,6 +217,24 @@ export const pushAPI = {
   vapidKey:   function()    { return api.get('/push/vapid-public-key'); },
   subscribe:  function(sub) { return api.post('/push/subscribe', sub); },
   unsubscribe:function(ep)  { return api.delete('/push/subscribe', { data: { endpoint: ep } }); },
+};
+
+export const variantsAPI = {
+  list:   function(productId)        { return api.get('/products/' + productId + '/variants'); },
+  add:    function(productId, data)  { return api.post('/products/' + productId + '/variants', data); },
+  update: function(productId, id, d) { return api.put('/products/' + productId + '/variants/' + id, d); },
+  remove: function(productId, id)    { return api.delete('/products/' + productId + '/variants/' + id); },
+};
+
+export const serialsAPI = {
+  list:    function(productId, status) {
+    var qs = status ? '?status=' + encodeURIComponent(status) : '';
+    return api.get('/serials/products/' + productId + '/serials' + qs);
+  },
+  add:     function(productId, data)   { return api.post('/serials/products/' + productId + '/serials', data); },
+  update:  function(productId, id, d)  { return api.put('/serials/products/' + productId + '/serials/' + id, d); },
+  remove:  function(productId, id)     { return api.delete('/serials/products/' + productId + '/serials/' + id); },
+  search:  function(q)                 { return api.get('/serials/serials/search?q=' + encodeURIComponent(q)); },
 };
 
 export const checkAPI = async function() {

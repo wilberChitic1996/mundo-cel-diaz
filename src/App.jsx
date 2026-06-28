@@ -109,6 +109,10 @@ function buildReceiptHTML(sale, opts, si){
   opts=opts||{}; si=si||getStore();
   var sn=si.store_name||STORE_FALLBACK;
   var st=si.store_tagline||"Tecnología · Accesorios · Reparaciones · Guatemala";
+  var ivaPct=parseFloat(si.iva_percent||'0')||0;
+  var total=Number(sale.total)||0;
+  var ivaAmt=ivaPct>0?total-total/(1+ivaPct/100):0;
+  var subtot=total-ivaAmt;
   var items=(sale.items||[]).map(function(it){
     return '<tr>'+
       '<td style="padding:8px 10px;border-bottom:1px solid #eee;font-size:12px;font-weight:600;">'+it.name+'</td>'+
@@ -152,8 +156,9 @@ function buildReceiptHTML(sale, opts, si){
     '</table>'+
     '<div style="display:flex;justify-content:flex-end;margin-bottom:16px;">'+
       '<div style="border:1px solid #eee;border-radius:8px;overflow:hidden;min-width:220px;">'+
-        '<div style="display:flex;justify-content:space-between;padding:7px 12px;font-size:12px;border-bottom:1px solid #eee;"><span>Total</span><span>Q '+Number(sale.total).toFixed(2)+'</span></div>'+
-        '<div style="display:flex;justify-content:space-between;padding:7px 12px;background:#1D9E75;color:#fff;font-weight:700;font-size:14px;"><span>TOTAL</span><span>Q '+Number(sale.total).toFixed(2)+'</span></div>'+
+        (ivaPct>0?'<div style="display:flex;justify-content:space-between;padding:6px 12px;font-size:11px;border-bottom:1px solid #eee;color:#666;"><span>Subtotal (sin IVA)</span><span>Q '+subtot.toFixed(2)+'</span></div>'+
+        '<div style="display:flex;justify-content:space-between;padding:6px 12px;font-size:11px;border-bottom:1px solid #eee;color:#666;"><span>IVA ('+ivaPct+'%)</span><span>Q '+ivaAmt.toFixed(2)+'</span></div>':'')+
+        '<div style="display:flex;justify-content:space-between;padding:7px 12px;background:#1D9E75;color:#fff;font-weight:700;font-size:14px;"><span>TOTAL</span><span>Q '+total.toFixed(2)+'</span></div>'+
       '</div>'+
     '</div>'+
     '<div style="border-top:2px dashed #ccc;padding-top:12px;font-size:10px;color:#999;display:flex;justify-content:space-between;"><span>Generado por '+sn+' POS</span><span>'+fecha+' · '+hora+'</span></div>'+
@@ -1066,7 +1071,7 @@ function App(props) {
         var normalRets  = (rets||[]).map(function(r){return Object.assign({},r,{items:r.return_items||[],refundAmount:Number(r.refund_amount),itemCondition:r.item_condition,refundMethod:r.refund_method,date:r.created_at,saleId:r.sale_id||null});});
         var normalDefs  = (defs||[]).map(function(d){return Object.assign({},d,{price:Number(d.price||0)});});
         var normalClis  = (clis||[]).map(function(c){return Object.assign({},c,{cliCode:c.cli_code,createdAt:c.created_at});});
-        var normalReps  = (reps||[]).map(function(r){return Object.assign({},r,{repCode:r.rep_code,clientId:r.client_id,clientName:r.client_name,clientPhone:r.client_phone,clientCli:r.client_cli,problemDesc:r.problem_desc,techName:r.tech_name,estimatedCost:Number(r.estimated_cost||0),promisedDate:r.promised_date,internalNote:r.internal_note,registradoPor:r.registrado_por||{},parts:r.parts||[],createdAt:r.created_at});});
+        var normalReps  = (reps||[]).map(function(r){return Object.assign({},r,{repCode:r.rep_code,clientId:r.client_id,clientName:r.client_name,clientPhone:r.client_phone,clientCli:r.client_cli,problemDesc:r.problem_desc,techName:r.tech_name,estimatedCost:Number(r.estimated_cost||0),promisedDate:r.promised_date,internalNote:r.internal_note,registradoPor:r.registrado_por||{},parts:r.parts||[],createdAt:r.created_at,finalCost:r.final_cost!=null?Number(r.final_cost):null,receptionPhotos:r.reception_photos||[],deliveryPhotos:r.delivery_photos||[]});});
         setProducts(normalProds);
         setSales(normalSales);
         setAccounts(normalAccs);
@@ -1180,12 +1185,15 @@ function App(props) {
   var _ca=useState([]); var cart=_ca[0]; var setCart=_ca[1];
   var _pq=useState(""); var posQ=_pq[0]; var setPosQ=_pq[1];
   var _pm=useState("Efectivo"); var payMethod=_pm[0]; var setPayMethod=_pm[1];
+  var _sm=useState(""); var secondMethod=_sm[0]; var setSecondMethod=_sm[1];
+  var _sa=useState(""); var secondAmount=_sa[0]; var setSecondAmount=_sa[1];
   var _pt=useState("completo"); var payType=_pt[0]; var setPayType=_pt[1];
   var _ci=useState(""); var cashIn=_ci[0]; var setCashIn=_ci[1];
   var _ip=useState(""); var initialPay=_ip[0]; var setInitialPay=_ip[1];
   var _cn=useState(""); var clientName=_cn[0]; var setClientName=_cn[1];
   var _sci=useState(null); var selectedClientId=_sci[0]; var setSelectedClientId=_sci[1];
   var _sn=useState(""); var saleNote=_sn[0]; var setSaleNote=_sn[1];
+  var _crep=useState(null); var cobrandoRepId=_crep[0]; var setCobrandoRepId=_crep[1];
 
   function showFlash(msg,type){
     setFlash({msg:msg,type:type||"ok"});
@@ -1201,8 +1209,12 @@ function App(props) {
   function addToCart(p){
     if(p.stock<=0&&p.unit!=="serv"){showFlash('⚠️ Sin stock: '+p.name,'warn');return;}
     setCart(function(c){
-      var ex=c.find(function(i){return i.id===p.id;});
-      if(ex) return ex.qty>=p.stock?c:c.map(function(i){return i.id===p.id?Object.assign({},i,{qty:i.qty+1}):i;});
+      if(p.serial_id){
+        if(c.find(function(i){return i.serial_id===p.serial_id;})){showFlash('⚠️ Serial ya en carrito','warn');return c;}
+        return c.concat([{id:p.id,code:p.code,name:p.name,price:p.price,shelf:p.shelf,unit:p.unit,qty:1,maxStock:1,serial_id:p.serial_id,imei:p.imei}]);
+      }
+      var ex=c.find(function(i){return i.id===p.id&&!i.serial_id;});
+      if(ex) return ex.qty>=p.stock?c:c.map(function(i){return i.id===p.id&&!i.serial_id?Object.assign({},i,{qty:i.qty+1}):i;});
       return c.concat([{id:p.id,code:p.code,name:p.name,price:p.price,shelf:p.shelf,unit:p.unit,qty:1,maxStock:p.stock}]);
     });
   }
@@ -1226,9 +1238,12 @@ function App(props) {
   var cartTotal=cart.reduce(function(s,i){return s+i.price*i.qty;},0);
   var cashVal=parseFloat(cashIn)||0;
   var vuelto=payMethod==="Efectivo"&&payType==="completo"&&cashIn?cashVal-cartTotal:null;
+  var ivaPercent=parseFloat((storeInfo&&storeInfo.iva_percent)||0)||0;
+  var ivaAmount=ivaPercent>0?cartTotal-cartTotal/(1+ivaPercent/100):0;
+  var subtotalNeto=cartTotal-ivaAmount;
   var initPaidVal=parseFloat(initialPay)||0;
 
-  function resetPOS(){ setCart([]);setCashIn("");setClientName("");setInitialPay("");setPayType("completo");setPayMethod("Efectivo");setSelectedClientId(null);setSaleNote(""); }
+  function resetPOS(){ setCart([]);setCashIn("");setClientName("");setInitialPay("");setPayType("completo");setPayMethod("Efectivo");setSecondMethod("");setSecondAmount("");setSelectedClientId(null);setSaleNote("");setCobrandoRepId(null); }
 
   var checkoutInProgress=useRef(false);
   async function checkout(){
@@ -1245,7 +1260,7 @@ function App(props) {
     if(payType==="completo"){
       var _createdSale=null;
       try {
-        _createdSale = await salesAPI.create({client:client,total:cartTotal,method:payMethod,items:cart,nota:nota,idempotencyKey:idempotencyKey});
+        _createdSale = await salesAPI.create({client:client,total:cartTotal,method:payMethod,items:cart,nota:nota,idempotencyKey:idempotencyKey,ivaPct:ivaPercent,secondMethod:secondMethod||null,secondAmount:secondAmount?parseFloat(secondAmount):null,repairId:cobrandoRepId||null});
         var freshSales = await salesAPI.getAll();
         var ns = (freshSales||[]).map(function(s){return Object.assign({},s,{items:s.sale_items||[],total:Number(s.total),date:s.created_at,registradoPor:s.registrado_por||null,payType:s.pay_type||'completo',status:s.status||'completado'});});
         setSales(ns);
@@ -1266,7 +1281,7 @@ function App(props) {
       var balance=cartTotal-paid;
       var _createdAcc=null;
       try{
-        _createdAcc = await salesAPI.create({client:client,total:cartTotal,method:payMethod,items:cart,payType:payType,initialPay:paid,nota:nota,idempotencyKey:idempotencyKey});
+        _createdAcc = await salesAPI.create({client:client,total:cartTotal,method:payMethod,items:cart,payType:payType,initialPay:paid,nota:nota,idempotencyKey:idempotencyKey,ivaPct:ivaPercent,secondMethod:secondMethod||null,secondAmount:secondAmount?parseFloat(secondAmount):null,repairId:cobrandoRepId||null});
         var freshAccs = await accountsAPI.getAll();
         var na=(freshAccs||[]).map(function(a){return Object.assign({},a,{items:a.account_items||[],payments:(a.account_payments||[]).map(function(_pp){return Object.assign({},_pp,{date:_pp.date||_pp.created_at,amount:Number(_pp.amount),registradoPor:_pp.registrado_por||_pp.registradoPor||null});}),total:Number(a.total),paid:Number(a.paid),balance:Number(a.balance),date:a.created_at,registradoPor:a.registrado_por||null});});
         setAccounts(na);
@@ -1284,6 +1299,8 @@ function App(props) {
         setPostSale({sale:_rsale2,opts:{usuario:session.name,usuarioRole:session.role,estado:_estado,abonoHoy:payType==="parcial"?paid:null,pagado:paid,saldo:balance}});
       }
     }
+    // Si la venta provino de una reparación, marcarla como entregada para que no se cobre de nuevo
+    if(cobrandoRepId){ try{ await updateRepairStatus(cobrandoRepId,'entregado'); }catch(_e){ /* no bloquear el cierre de venta */ } }
     resetPOS();
     checkoutInProgress.current=false;
   }
@@ -1472,48 +1489,48 @@ function App(props) {
 
   async function saveRepair(rep){
     try{
-      await repairsAPI.create({id:rep.id,repCode:rep.repCode,clientId:rep.clientId||null,clientName:rep.clientName,clientPhone:rep.clientPhone||null,clientCli:rep.clientCli||null,brand:rep.brand,model:rep.model,imei:rep.imei||null,problemDesc:rep.problemDesc,diagnosis:rep.diagnosis||null,techName:rep.techName||null,estimatedCost:rep.estimatedCost||0,promisedDate:rep.promisedDate||null,internalNote:rep.internalNote||null,status:rep.status||'recibido',registradoPor:rep.registradoPor||{},parts:rep.parts||[],createdAt:rep.createdAt});
+      await repairsAPI.create({id:rep.id,repCode:rep.repCode,clientId:rep.clientId||null,clientName:rep.clientName,clientPhone:rep.clientPhone||null,clientCli:rep.clientCli||null,brand:rep.brand,model:rep.model,imei:rep.imei||null,problemDesc:rep.problemDesc,diagnosis:rep.diagnosis||null,techName:rep.techName||null,estimatedCost:rep.estimatedCost||0,promisedDate:rep.promisedDate||null,internalNote:rep.internalNote||null,status:rep.status||'recibido',registradoPor:rep.registradoPor||{},parts:rep.parts||[],receptionChecklist:rep.receptionChecklist||null,receptionPhotos:null,createdAt:rep.createdAt});
       var fr=await repairsAPI.getAll();
-      setRepairs((fr||[]).map(function(r){return Object.assign({},r,{repCode:r.rep_code,clientId:r.client_id,clientName:r.client_name,clientPhone:r.client_phone,clientCli:r.client_cli,problemDesc:r.problem_desc,techName:r.tech_name,estimatedCost:Number(r.estimated_cost||0),promisedDate:r.promised_date,internalNote:r.internal_note,registradoPor:r.registrado_por||{},parts:r.parts||[],createdAt:r.created_at});}));
+      setRepairs((fr||[]).map(function(r){return Object.assign({},r,{repCode:r.rep_code,clientId:r.client_id,clientName:r.client_name,clientPhone:r.client_phone,clientCli:r.client_cli,problemDesc:r.problem_desc,techName:r.tech_name,estimatedCost:Number(r.estimated_cost||0),promisedDate:r.promised_date,internalNote:r.internal_note,registradoPor:r.registrado_por||{},parts:r.parts||[],createdAt:r.created_at,finalCost:r.final_cost!=null?Number(r.final_cost):null,receptionPhotos:r.reception_photos||[],deliveryPhotos:r.delivery_photos||[]});}));
+      return true;
     }catch(e){
       var emRep=e&&e.error?e.error:null;
       showFlash("⛔ "+(emRep||"Error al guardar la reparación. Verifica tu conexión."),"err");
+      return false;
     }
   }
   async function updateRepairStatus(id, status){
     try{
       await repairsAPI.updateStatus(id, status);
       var fr2=await repairsAPI.getAll();
-      setRepairs((fr2||[]).map(function(r){return Object.assign({},r,{repCode:r.rep_code,clientId:r.client_id,clientName:r.client_name,clientPhone:r.client_phone,clientCli:r.client_cli,problemDesc:r.problem_desc,techName:r.tech_name,estimatedCost:Number(r.estimated_cost||0),promisedDate:r.promised_date,internalNote:r.internal_note,registradoPor:r.registrado_por||{},parts:r.parts||[],createdAt:r.created_at});}));
+      setRepairs((fr2||[]).map(function(r){return Object.assign({},r,{repCode:r.rep_code,clientId:r.client_id,clientName:r.client_name,clientPhone:r.client_phone,clientCli:r.client_cli,problemDesc:r.problem_desc,techName:r.tech_name,estimatedCost:Number(r.estimated_cost||0),promisedDate:r.promised_date,internalNote:r.internal_note,registradoPor:r.registrado_por||{},parts:r.parts||[],createdAt:r.created_at,finalCost:r.final_cost!=null?Number(r.final_cost):null,receptionPhotos:r.reception_photos||[],deliveryPhotos:r.delivery_photos||[]});}));
     }catch(e){
       var emRS=e&&e.error?e.error:null;
       showFlash("⛔ "+(emRS||"Error al actualizar la reparación. Verifica tu conexión."),"err");
     }
   }
   function cobrarReparacion(rep){
-    // Pre-carga el POS con los datos de la reparación
+    // Monto a cobrar: costo final si está definido, si no el estimado (Opción A)
+    var monto=parseFloat(rep.finalCost)||parseFloat(rep.estimatedCost)||0;
+    if(monto<=0){
+      showFlash("⚠ Esta reparación no tiene monto. Editá el 'Costo final cobrado' antes de cobrar.","warn");
+      return false;
+    }
+    // Carga una sola línea de servicio con el monto de la reparación (no obliga a elegir producto)
     setClientName(rep.clientName);
     setSelectedClientId(rep.clientId||null);
     setSaleNote("Reparación "+rep.repCode+" — "+rep.brand+" "+rep.model);
-    // Si tiene repuestos, los agrega como items del carrito
-    if(rep.parts&&rep.parts.length>0){
-      var cartItems=rep.parts.map(function(p){
-        var prod=products.find(function(x){return x.code===p.code;});
-        return {id:prod?prod.id:gid(),code:p.code,name:p.name,price:p.price,qty:p.qty,shelf:prod?prod.shelf:"",unit:"uni",maxStock:prod?prod.stock:999};
-      });
-      // Si hay costo estimado mayor a los repuestos, agrega mano de obra
-      var costoRepuestos=rep.parts.reduce(function(s,p){return s+p.price*p.qty;},0);
-      var costo=parseFloat(rep.estimatedCost)||0;
-      if(costo>costoRepuestos){
-        cartItems.push({id:gid(),code:"MO001",name:"Mano de obra — "+rep.brand+" "+rep.model,price:costo-costoRepuestos,qty:1,shelf:"",unit:"serv",maxStock:999});
-      }
-      setCart(cartItems);
-    } else if(rep.estimatedCost>0){
-      // Solo mano de obra
-      setCart([{id:gid(),code:"MO001",name:"Reparación — "+rep.brand+" "+rep.model,price:parseFloat(rep.estimatedCost),qty:1,shelf:"",unit:"serv",maxStock:999}]);
-    }
+    setCobrandoRepId(rep.id);
+    setCart([{id:gid(),code:rep.repCode||"REP",name:"Reparación — "+rep.brand+" "+rep.model,price:monto,qty:1,shelf:"",unit:"serv",maxStock:999}]);
     setView("pos");
-    showFlash("✓ Reparación "+rep.repCode+" cargada en el POS","ok");
+    showFlash("✓ Reparación "+rep.repCode+" cargada (Q"+monto.toFixed(2)+")","ok");
+    return true;
+  }
+  async function reloadRepairs(){
+    try{
+      var fr=await repairsAPI.getAll();
+      setRepairs((fr||[]).map(function(r){return Object.assign({},r,{repCode:r.rep_code,clientId:r.client_id,clientName:r.client_name,clientPhone:r.client_phone,clientCli:r.client_cli,problemDesc:r.problem_desc,techName:r.tech_name,estimatedCost:Number(r.estimated_cost||0),promisedDate:r.promised_date,internalNote:r.internal_note,registradoPor:r.registrado_por||{},parts:r.parts||[],createdAt:r.created_at,finalCost:r.final_cost!=null?Number(r.final_cost):null,receptionPhotos:r.reception_photos||[],deliveryPhotos:r.delivery_photos||[]});}));
+    }catch(e){ /* silencioso */ }
   }
 
   async function saveClient(obj, isEdit){
@@ -2041,7 +2058,7 @@ function App(props) {
         {gsOpen&&<GlobalSearch onClose={function(){setGsOpen(false);}} setView={setView} sales={sales} clients={clients} products={products} repairs={repairs} setSelectedSale={setSelSale}/>}
         <div key={view} style={{flex:1,padding:"clamp(12px,3vw,28px)",overflowY:"auto",minWidth:0}} className="main-content screen-enter">
           {view==="dashboard"&&canAccess(session.role,"dashboard")&&<DashboardScreen sales={sales} todaySales={todaySales} pendingAccs={pendingAccs} totalPend={totalPend} products={products} top5={top5} setSelectedSale={setSelSale} setView={setView} navTo={navTo} accounts={accounts} returns={returns} repairs={repairs} warranties={warranties}/>}
-          {view==="pos"      &&canAccess(session.role,"pos")&&<POSScreen products={products} filteredPOS={filteredPOS} cart={cart} posQ={posQ} setPosQ={setPosQ} payMethod={payMethod} setPayMethod={setPayMethod} payType={payType} setPayType={setPayType} cashIn={cashIn} setCashIn={setCashIn} initialPay={initialPay} setInitialPay={setInitialPay} clientName={clientName} setClientName={setClientName} selectedClientId={selectedClientId} setSelectedClientId={setSelectedClientId} saleNote={saleNote} setSaleNote={setSaleNote} cartTotal={cartTotal} vuelto={vuelto} initPaidVal={initPaidVal} addToCart={addToCart} changeQty={changeQty} removeFromCart={removeFromCart} applyDiscount={applyDiscount} checkout={checkout} resetPOS={resetPOS} flash={flash} clients={clients} accounts={accounts}/>}
+          {view==="pos"      &&canAccess(session.role,"pos")&&<POSScreen products={products} filteredPOS={filteredPOS} cart={cart} posQ={posQ} setPosQ={setPosQ} payMethod={payMethod} setPayMethod={setPayMethod} secondMethod={secondMethod} setSecondMethod={setSecondMethod} secondAmount={secondAmount} setSecondAmount={setSecondAmount} payType={payType} setPayType={setPayType} cashIn={cashIn} setCashIn={setCashIn} initialPay={initialPay} setInitialPay={setInitialPay} clientName={clientName} setClientName={setClientName} selectedClientId={selectedClientId} setSelectedClientId={setSelectedClientId} saleNote={saleNote} setSaleNote={setSaleNote} cartTotal={cartTotal} vuelto={vuelto} initPaidVal={initPaidVal} addToCart={addToCart} changeQty={changeQty} removeFromCart={removeFromCart} applyDiscount={applyDiscount} checkout={checkout} resetPOS={resetPOS} flash={flash} clients={clients} accounts={accounts} ivaPercent={ivaPercent} ivaAmount={ivaAmount} subtotalNeto={subtotalNeto}/>}
           {view==="caja"     &&canAccess(session.role,"caja")&&<CajaScreen sales={sales} accounts={accounts} returns={returns} session={session}/>}
           {view==="accounts" &&canAccess(session.role,"accounts")&&<AccountsScreen accounts={accounts} pendingAccs={pendingAccs} totalPend={totalPend} addPayment={addPayment} showFlash={showFlash} products={products} session={session} clients={clients} navTo={navTo} initialSearch={view==="accounts"&&deepLink?deepLink.search||'':''}/>}
           {view==="returns"  &&canAccess(session.role,"returns")&&<ReturnsScreen returns={returns} products={products} onProcess={processReturn} showFlash={showFlash} clients={clients} sales={sales}/>}
@@ -2054,7 +2071,7 @@ function App(props) {
           {view==="backup"   &&canAccess(session.role,"backup")&&<BackupScreen products={products} sales={sales} accounts={accounts} returns={returns} defectives={defectives} clients={clients} repairs={repairs} warranties={warranties} onExportJSON={exportJSON} onExportExcel={exportExcel}/>}
           {view==="users"    &&canAccess(session.role,"users")&&<UsersScreen session={session} showFlash={showFlash}/>}
           {view==="clients"  &&canAccess(session.role,"clients")&&<ClientsScreen clients={clients} sales={sales} accounts={accounts} returns={returns} saveClient={saveClient} session={session} showFlash={showFlash} initialSearch={view==="clients"&&deepLink?deepLink.search||'':''} initialClientId={view==="clients"&&deepLink?deepLink.clientId||null:null}/>}
-          {view==="repairs"    &&canAccess(session.role,"repairs")&&<RepairsScreen repairs={repairs} clients={clients} products={products} saveRepair={saveRepair} updateRepairStatus={updateRepairStatus} onCobrar={cobrarReparacion} session={session} showFlash={showFlash} warranties={warranties} saveWarranty={saveWarranty} initialSearch={view==="repairs"&&deepLink?deepLink.search||'':''} initialRepairId={view==="repairs"&&deepLink?deepLink.repairId||null:null} navTo={navTo}/>}
+          {view==="repairs"    &&canAccess(session.role,"repairs")&&<RepairsScreen repairs={repairs} clients={clients} products={products} saveRepair={saveRepair} updateRepairStatus={updateRepairStatus} reloadRepairs={reloadRepairs} onCobrar={cobrarReparacion} session={session} showFlash={showFlash} warranties={warranties} saveWarranty={saveWarranty} initialSearch={view==="repairs"&&deepLink?deepLink.search||'':''} initialRepairId={view==="repairs"&&deepLink?deepLink.repairId||null:null} navTo={navTo}/>}
           {view==="warranties" &&canAccess(session.role,"warranties")&&<WarrantiesScreen warranties={warranties} sales={sales} repairs={repairs} updateWarranty={updateWarranty} saveWarranty={saveWarranty} session={session} clients={clients} navTo={navTo} initialSearch={view==="warranties"&&deepLink?deepLink.search||'':''} initialWarrantyId={view==="warranties"&&deepLink?deepLink.warrantyId||null:null}/>}
           {view==="audit"      &&canAccess(session.role,"audit")&&<AuditScreen session={session}/>}
           {view==="suppliers"  &&canAccess(session.role,"suppliers")&&<SuppliersScreen products={products} session={session} showFlash={showFlash} onStockUpdate={function(){ productsAPI.getAll().then(function(p){ setProducts((p||[]).map(function(x){return Object.assign({},x,{price:Number(x.price),cost:Number(x.cost),stock:Number(x.stock)});})); }); }}/>}

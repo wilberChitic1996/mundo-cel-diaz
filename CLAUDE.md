@@ -12,6 +12,87 @@ y dame un resumen de: arquitectura actual, último estado del trabajo,
 y pendientes. No hagas nada hasta que yo te confirme qué tarea seguiremos.
 ```
 
+> **Cómo funciona la memoria (para el usuario):** Claude **no recuerda entre sesiones distintas** — cada sesión NUEVA arranca en blanco y se pone al día leyendo este CLAUDE.md (se carga solo; el prompt de arriba es para que resuma y se alinee). **Dentro de una misma sesión recuerda todo** — no hay que repetir nada. Reconectarse a la MISMA sesión conserva el historial. Por eso CLAUDE.md (estado + pendientes + lecciones) es la memoria del proyecto entre sesiones: **todo lo importante se anota acá (regla #9)**.
+
+---
+
+## 🔴 REGLAS CRÍTICAS DE INTERACCIÓN (OBLIGATORIAS)
+
+### 1. Paso a paso — NUNCA avanzar sin confirmación
+
+Claude DEBE dar **un solo paso a la vez** y esperar "Listo" del usuario antes de pasar al siguiente. Está PROHIBIDO dar varios pasos de una sola vez aunque parezcan simples o relacionados.
+
+### 2. Scripts SQL — siempre inline, nunca asumir ejecución
+
+Todo script SQL (migraciones, seeds, validaciones) debe incluirse **en el chat, copiable directamente**. Claude NUNCA debe asumir que un script fue ejecutado — siempre esperar confirmación explícita del usuario con el resultado.
+
+### 3. Credenciales del piloto — antes de cada paso de prueba
+
+Antes de cualquier instrucción de prueba en el piloto, Claude DEBE incluir:
+- **URL:** `mundo-cel-diaz-staging.vercel.app`
+- **Email:** `admin@demo.com`
+- **Contraseña:** `Admin2026!`
+
+### 4. Cambios de BD — aprobación EXPLÍCITA antes de ejecutar
+
+Ningún cambio de base de datos (CREATE TABLE, ALTER TABLE, INSERT, DELETE) puede ejecutarse sin aprobación explícita del usuario. El script va en el chat primero y el usuario lo ejecuta.
+
+> **Origen:** Usuario confirmó que se saltaron pasos de validación porque Claude asumió que los scripts se habían ejecutado cuando no era así.
+
+### 5. Esperas de CI/deploy — Claude monitorea y reporta, NUNCA deja esperando
+
+Cuando Claude está esperando que termine CI, un deploy de Vercel/Railway, o cualquier proceso externo, **NO debe quedarse pasivo dejando que el usuario espere sin saber**. Claude DEBE:
+
+1. **Sondear activamente** el estado (con `mcp__github__pull_request_read` → `get_check_runs`, no esperar a que llegue un webhook — los webhooks NO entregan "CI success").
+2. **En cuanto el estado cambie** (CI verde/rojo, deploy listo), **actuar de inmediato** (mergear si verde, corregir si rojo) y **reportar al usuario en una sola línea clara**: "✅ CI verde, mergeado" o "⛔ CI falló, corrigiendo".
+3. **Si la espera se alarga**, dar una señal de vida con el estado actual en vez de quedarse callado.
+4. **NUNCA** decir solo "esperando..." y terminar el turno sin un plan de re-verificación. Si no llega webhook, Claude vuelve a sondear por su cuenta.
+
+> **Origen:** Usuario reportó que las esperas lo hacían desconfiar — se podía quedar esperando horas cuando el proceso ya había terminado. Claude debe cerrar el ciclo siempre: verificar → actuar → reportar.
+
+### 6. "Ya podés probar" — SOLO con confirmación real de que el deploy está vivo
+
+Claude **NUNCA** debe decir "ya podés probar" basándose en una estimación de tiempo ("~1-2 min"). Solo lo dice cuando tiene una **señal positiva** de que el código nuevo ya está desplegado:
+
+- **Frontend (Vercel):** confirmar con el estado **"Ready"** del deploy de staging (llega por webhook de Vercel). Recién ahí avisar.
+- **API (Railway):** confirmar abriendo el endpoint de salud del API de staging y verificando que responde:
+  ```
+  curl -s https://mundo-cel-diaz-api-production-e546.up.railway.app/api/health
+  ```
+  Si Claude no puede alcanzar ese endpoint (bloqueo de red del entorno), **debe decirlo con honestidad** — "no puedo confirmar el deploy del API desde aquí" — en vez de adivinar un tiempo.
+
+**Mecanismo elegido (28 jun 2026): abrir la red del entorno a staging.** Para que Claude confirme los deploys por sí mismo, la **política de red del entorno** (Claude Code on the web) debe permitir salida a:
+- `https://mundo-cel-diaz-staging.vercel.app` (frontend staging)
+- `https://mundo-cel-diaz-api-production-e546.up.railway.app` (API staging)
+
+El usuario lo configura en los ajustes del entorno (network access). Doc: https://code.claude.com/docs/en/claude-code-on-the-web. Una vez abierto, Claude hace `curl .../api/health` tras cada merge de API y recién entonces dice "ya podés probar".
+
+> **Origen:** Usuario pidió poder probar "con confianza" sabiendo que el deploy ya está, sin esperas a ciegas. Hoy la red del entorno bloquea staging (HTTP 000) y Railway no reporta estado a GitHub, por eso Claude no podía confirmar el API. Solución acordada: abrir la red a staging.
+
+### 7. Tras mergear a `staging` — VERIFICAR el deploy de PRODUCCIÓN, no el preview
+
+El preview de un PR puede quedar **"Ready"** pero **NO** ser lo que sirve `staging.vercel.app`. El sitio lo sirve el **"Production Deployment"** del proyecto Vercel (rama `staging`). Tras cada merge, Claude DEBE confirmar que ese **Production Deployment apunta al commit nuevo** (Vercel → proyecto staging → Overview → "Production Deployment" → commit). Si quedó atrás, **promover** el deploy nuevo: Vercel → Deployments → fila del commit nuevo → "⋯" → **Promote to Production**.
+
+> **Origen (28 jun 2026):** Vercel (Hobby/gratis) topó 100 deploys/día. Los merges de #152/#153 a `staging` **no dispararon deploy a producción** (quedaron en cola/fallaron), pero los **previews sí aparecían "Ready"**, enmascarando el problema. `staging.vercel.app` siguió sirviendo `2cb7d1a` (viejo) por horas → "siempre lo mismo". Se resolvió **promoviendo manualmente** el deploy nuevo a Production. **Lección:** "preview Ready" ≠ "producción actualizada".
+
+### 8. Plan Vercel — decisión 28 jun 2026: seguir GRATIS con disciplina
+
+Usuario eligió **NO** pagar Vercel Pro por ahora. Para no volver a topar el límite de 100 deploys/día:
+- **Agrupar cambios:** menos PRs y más grandes (no docenas de PRs chicos por día). Cada PR consume varios deploys × 2 proyectos.
+- **Verificar producción tras merge** (regla #7) y promover si quedó atrás.
+- Si la fricción se vuelve insoportable, reconsiderar **Vercel Pro ($20/mes)** que elimina el problema de raíz.
+
+### 9. TODO va a la lista de pendientes — nada se olvida ni queda a medias
+
+Cada vez que surja **algo nuevo** (una tarea, idea, bug, mejora, observación del usuario, o algo que quedó a medias), Claude DEBE **integrarlo de inmediato** en la sección **"Backlog / Pendientes"** o **"Próximos pasos"** de este CLAUDE.md, con su estado claro: `pendiente` / `en progreso` / `a medias`. Reglas:
+
+1. **Nunca** dejar algo solo mencionado en el chat — si no está anotado en CLAUDE.md, se va a olvidar. Anotarlo es obligatorio.
+2. **Un paso a la vez** (refuerza regla #1): trabajar UNA cosa, terminarla o anotar dónde quedó, y recién entonces pasar a la siguiente. Si el usuario pide varias cosas, Claude las anota TODAS en pendientes y las ataca de a una, confirmando cada una.
+3. **Antes de cerrar cualquier turno** donde surgió algo nuevo o algo quedó incompleto, verificar que esté anotado en pendientes con su estado.
+4. Cuando una tarea se completa, marcarla como hecha (✅) en la lista — para que siempre se vea el avance real.
+
+> **Origen:** Usuario pidió que nada se quede "en el aire" ni a medias, y que se trabaje de a un paso para no perder el foco. La lista de pendientes en CLAUDE.md es la memoria del proyecto entre sesiones.
+
 ---
 
 ## 🔴 REGLA ESTRICTA: NO TOCAR LO QUE FUNCIONA
@@ -19,6 +100,26 @@ y pendientes. No hagas nada hasta que yo te confirme qué tarea seguiremos.
 Si una funcionalidad está funcionando correctamente, Claude **NO debe modificarla, reescribirla, ni "mejorarla"** sin instrucción explícita del usuario. Esto incluye pantallas, endpoints, botones, exports, y cualquier otro componente en uso. Antes de reescribir algo que funciona, **preguntar al usuario** si realmente lo quiere cambiar.
 
 > **Origen de esta regla:** Al reescribir `BackupScreen.jsx` para agregar funcionalidad nueva, se eliminaron los botones de export Excel/JSON que ya existían y funcionaban. Esto causó pérdida de funcionalidad sin que el usuario lo autorizara. Este error no debe repetirse.
+
+---
+
+## 🎭 Roles de Claude — AUTODETECCIÓN (el usuario NO elige)
+
+Claude **detecta por sí mismo** qué rol (o combinación de roles) aplicar según la tarea — **el usuario no tiene que elegirlo**. Antes de actuar, Claude evalúa la situación y adopta el/los rol(es) que correspondan, combinándolos cuando la tarea lo requiera (la mayoría de tareas combinan 2-3).
+
+| Rol | Cuándo se activa | Qué hace |
+|---|---|---|
+| 🏗️ **Arquitecto Full-Stack** | Implementar una feature o fix que toca UI y/o API | Diseña e implementa de punta a punta (React + Express) de forma coherente entre capas; sigue el workflow rama→staging→main |
+| 🛢️ **Guardián del Esquema (DBA)** | Antes de escribir/cambiar CUALQUIER query o tocar la BD | Verifica las columnas/tablas reales contra la BD (no asume) — ataca la causa #1 de bugs (desajuste de esquema, ver lección transversal) |
+| 🚀 **Release Manager / DevOps** | Mergear, desplegar, sacar a piloto o producción | Maneja el flujo de ramas, verifica el deploy de **producción** (no el preview, regla #7), promueve si quedó atrás, cuida la disciplina Vercel (regla #8) |
+| 🔍 **QA / Cazador de bugs** | Validar una brecha o antes de que el usuario pruebe | Audita código + esquema y prueba de antemano para cazar bugs antes que el usuario (como con seriales/cuentas el 28 jun) |
+| 📘 **Escritor Técnico** | Surge algo que documentar o un pendiente | Mantiene CLAUDE.md (estado, pendientes, lecciones) y construye el manual técnico; aplica la regla #9 (todo a la lista) |
+
+**Ejemplos de combinación automática:**
+- *"Implementá variantes de producto"* → 🛢️ DBA (verificar esquema) + 🏗️ Arquitecto (implementar) + 🔍 QA (auditar) + 🚀 Release (sacar a piloto) + 📘 Escritor (documentar).
+- *"El cobro falla"* → 🔍 QA (diagnosticar) + 🛢️ DBA (esquema) + 🏗️ Arquitecto (fix).
+
+> El usuario PUEDE nombrar un rol si quiere enfocar ("como QA, auditá X"), pero por defecto Claude lo detecta y lo aplica solo.
 
 ---
 
@@ -90,22 +191,91 @@ Estos valores ya están correctos y funcionando. **NUNCA cambiarlos** salvo que 
 > está PROHIBIDA. (El error histórico fue mergear PRs #104–#108 directo a `main`, por eso
 > el refactor llegó a producción sin pasar por piloto.)
 
+### Flujo rama de trabajo → staging (piloto)
+
+El flujo aplica **por separado a cada repo** (frontend y API). Si el cambio toca ambos, se sigue el flujo en los dos repos antes de probar en piloto.
+
+**Solo Frontend cambia:**
 ```
-1. Crear rama de trabajo PARTIENDO DE `staging`  (no de main)
-2. PR de esa rama → `staging`
-3. Vercel/Railway despliegan `staging` → el usuario valida en el PILOTO
-4. SOLO si el piloto funciona → PR `staging → main`
-5. Vercel/Railway despliegan `main` → producción actualizada
-6. Si hay cambios de base de datos → aplicar PRIMERO en Supabase staging, validar, luego en producción
+1. Rama claude/... en mundo-cel-diaz, DESDE staging
+2. Cambios, commit, push
+3. PR rama → staging (en mundo-cel-diaz)
+4. CI verde ✅ + Vercel Ready ✅ → mergear
+5. Probar en piloto
+```
+
+**Solo Backend/API cambia:**
+```
+1. Rama claude/... en mundo-cel-diaz-api, DESDE staging
+2. Cambios, commit, push
+3. PR rama → staging (en mundo-cel-diaz-api)
+4. CI verde ✅ + Railway despliega ✅ → mergear
+5. Probar en piloto
+```
+
+**Ambos repos cambian (caso más común en brechas grandes):**
+```
+1. Ramas en AMBOS repos desde staging
+2. Cambios en API primero (el frontend depende del backend)
+3. PR rama → staging en mundo-cel-diaz-api → CI verde → mergear
+4. Railway despliega la API de staging
+5. PR rama → staging en mundo-cel-diaz → CI verde → mergear
+6. Vercel despliega el frontend de staging
+7. AHORA sí: probar en piloto con ambos deployed
+8. Si hay bugs → fix en el repo que corresponda → volver al paso 3 o 5
+```
+
+### Flujo staging → main (producción)
+
+Igual que arriba pero en dirección staging → main, y en AMBOS repos si aplica.
+
+> #### 👤 Release a producción — QUIÉN HACE QUÉ (para que el usuario vaya seguro)
+> Producción es el paso más delicado y **NUNCA es automático**. Solo se hace **después de validar TODO el piloto**.
+>
+> **Lo que hace EL USUARIO (Claude lo guía paso a paso):**
+> 1. **Validar el piloto** — probar que todo funciona antes de liberar.
+> 2. **Correr en la BD de PRODUCCIÓN** (`rhecnmfivygkayfvauxt`) el script SQL que Claude le pase (migraciones) — Claude da el script inline, el usuario lo ejecuta (regla #4).
+> 3. **Crear el bucket `repairs`** en el Supabase de producción — Claude lo guía en el panel.
+> 4. **Aprobar** los PR `staging → main` cuando Claude avise.
+>
+> **Lo que hace CLAUDE:** crear los PRs, verificar CI, mergear, confirmar el deploy de producción (regla #7). **NUNCA toca producción sin OK explícito del usuario.**
+>
+> **Invariante de seguridad:** mientras nada se mergee a `main`, `mundoceldiaz.com` sigue intacto. Imposible que algo llegue a producción por accidente.
+
+**Solo Frontend:**
+```
+1. Usuario confirmó que piloto funciona
+2. PR staging → main en mundo-cel-diaz
+3. CI verde ✅ + Vercel Ready ✅ → mergear
+4. Vercel despliega mundoceldiaz.com ✅
+```
+
+**Solo Backend:**
+```
+1. Usuario confirmó que piloto funciona
+2. PR staging → main en mundo-cel-diaz-api
+3. CI verde ✅ + Railway despliega ✅ → mergear
+```
+
+**Ambos repos:**
+```
+1. Usuario confirmó que piloto funciona
+2. PR staging → main en mundo-cel-diaz-api → CI verde → mergear
+3. PR staging → main en mundo-cel-diaz → CI verde → mergear
+4. Verificar mundoceldiaz.com funciona correctamente
 ```
 
 > ### 🔴 REGLA CRÍTICA: VERIFICAR CI ANTES DE MERGEAR — SIEMPRE.
 > Antes de hacer merge de CUALQUIER PR (tanto rama→staging como staging→main),
 > Claude DEBE revisar que todos los checks de CI estén en verde usando las herramientas
-> de GitHub (`mcp__github__actions_list` → jobs del PR). Si algún check está en
-> `failure` o `pending`, NO mergear — diagnosticar y corregir primero.
+> de GitHub (`mcp__github__pull_request_read` con `get_check_runs`). Si algún check está en
+> `failure` o `in_progress`, NO mergear — esperar o corregir primero.
 > Mergear con CI rojo rompe producción y genera deploys fallidos en Vercel/Railway.
 > Esta regla no tiene excepciones aunque el usuario pida ir rápido.
+>
+> **NUNCA decirle al usuario que pruebe en el piloto antes de que el PR esté mergeado a staging.**
+> El piloto (mundo-cel-diaz-staging.vercel.app) solo refleja lo que está en la rama `staging`.
+> Un PR pendiente o en preview NO afecta el piloto hasta que se mergea.
 
 **Por qué esto protege producción:** mientras los cambios estén en `staging`, `mundoceldiaz.com`
 sigue corriendo `main` sin tocarse. Producción solo cambia cuando el usuario aprueba el PR `staging → main`.
@@ -179,6 +349,8 @@ Siempre usar estos nombres exactos. NUNCA asumir nombres — verificar antes de 
 | `backups` | id, tenant_id, created_at, size_bytes, status, type, storage_path, error_msg, tables_included, record_counts (JSONB) | |
 
 > **LECCIÓN CRÍTICA (jun 2026):** Antes de escribir cualquier script SQL, consultar siempre `SELECT table_name FROM information_schema.tables WHERE table_schema = 'public' ORDER BY table_name` para verificar nombres reales. Tablas que NO existen: `repair_items`, `caja_movements`, `caja_sessions`, `supplier_purchase_items`, `product_price_history`.
+
+> 🛢️ **FUENTE DE VERDAD DEL ESQUEMA:** `docs/DB-SCHEMA-REAL.md` — volcado real de `information_schema` (staging, 28 jun 2026) con las 29 tablas, sus columnas reales y los **desajustes confirmados** (`sales.date`, `accounts.due_date`, `repairs.client/device` inexistentes; columnas duplicadas en `repairs`). El rol DBA lo consulta ANTES de tocar cualquier query. Regenerar con la consulta documentada en ese archivo cuando cambie el esquema.
 
 **FK importante:** `accounts.sale_id` referencia `sales.id`. Al borrar registros, siempre borrar en este orden: `account_items` → `account_payments` → `accounts` → `sale_items` → `sales`.
 
@@ -556,19 +728,78 @@ mundo-cel-diaz-api/
 | API #62–#63 | Backend | Tests cobertura push/reminders/auth-refresh (61/61 passing) |
 | #139–#140 | Frontend | BackupScreen enterprise — historial, health card, descarga, backup manual |
 | API #64–#66 | Backend | Backup enterprise (snapshots diarios 2 AM por tenant → Supabase Storage) + monitoreo almacenamiento + retención audit_logs 180d |
+| #145–#153 | Frontend | Ronda fixes reparaciones: fotos async, validación flash, cobro lleva monto (servicio sin producto), mapeo finalCost, anti-doble-cobro (marca entregado), repairId en venta |
+| API #69–#72 | Backend | `product_id` null en servicios (FK), `repairId` marca reparación entregada, fix seriales `sales(date)`, fix cuentas aging por antigüedad (`due_date` inexistente) |
 
 ---
 
 ## Estado actual del trabajo
 
 - **Versión en producción:** 2.5.0
-- **Último cambio (28 jun 2026):** CLAUDE.md actualizado con esquema completo de BD, estructura real de archivos, roles, endpoints y dependencias. Fix XLSX static import en BackupScreen, ProductsScreen y export.js. Staging limpiado (transacciones borradas, datos maestros conservados).
-- **Producción frontend:** ✅ Actualizada — mundoceldiaz.com
-- **Producción API:** ✅ Actualizada — mundo-cel-diaz-api-production.up.railway.app
-- **Staging:** ✅ Sincronizado con main en ambos repos. BD limpia (sin transacciones, solo usuarios/clientes/productos).
-- **2FA:** Implementado para superadmin, deshabilitado temporalmente (esperando verificación DNS Resend: DKIM ✓, SPF ✓, pendiente propagación). Descomentar en `routes/auth.js` líneas 82-99 cuando esté listo.
+- **Último cambio (28 jun 2026):** 7 brechas funcionales + ronda de fixes de cobro de reparaciones y auditoría de esquema. Migraciones 009-015 aplicadas en staging.
+- **Rama de trabajo activa:** `claude/gifted-heisenberg-r6n8jo` (en AMBOS repos)
+- **Producción frontend:** ✅ mundoceldiaz.com (NO tocar hasta validar piloto completo)
+- **Producción API:** ✅ mundo-cel-diaz-api-production.up.railway.app (NO tocar)
+- **Staging frontend:** ✅ mundo-cel-diaz-staging.vercel.app — al día (deploy `9897579` promovido manualmente a Production tras bloqueo Vercel; ver regla #7).
+- **Staging API:** ✅ mundo-cel-diaz-api-production-e546.up.railway.app — al día (Railway despliega sin límite)
+- **Staging BD:** Migraciones 009-015 aplicadas ✅. Bucket `repairs` creado ✅.
+- **2FA:** Implementado para superadmin, deshabilitado temporalmente (pendiente propagación DNS Resend). Descomentar en `routes/auth.js` líneas 82-99 cuando esté listo.
 - **Credenciales piloto:** `admin@demo.com` / `Admin2026!` (hash bcrypt en la BD de staging).
-- **Bucket Supabase Storage `backups`:** ✅ Creado en staging y producción — backups automáticos activos desde las 2 AM.
+- **Bucket Supabase Storage `backups`:** ✅ Creado en staging y producción.
+
+> ### ⛔ BLOQUEO VERCEL (28 jun 2026) — RESUELTO, pero leer la lección (regla #7 y #8)
+> Vercel (Hobby/gratis) topó **100 deploys/día**. Los merges #152/#153 a `staging` **no desplegaron a producción**
+> (los previews sí quedaban "Ready", enmascarando el problema), y `staging.vercel.app` sirvió código viejo (`2cb7d1a`)
+> por horas → "siempre lo mismo". **Resuelto** promoviendo manualmente el deploy `9897579` a Production
+> (Vercel → Deployments → ⋯ → Promote to Production). Decisión: seguir gratis con disciplina (reglas #7 y #8).
+> **Backend (Railway) NO tiene este límite.**
+
+### Validación en piloto — Estado (28 jun 2026)
+
+| Prueba | Brecha | Estado |
+|---|---|---|
+| IVA en boleta | #3 IVA configurable | ✅ PASADA |
+| Pago dividido POS | #4 Split payment | ✅ PASADA |
+| Reparaciones checklist+fotos (visible) | #2 Reparaciones | ✅ PASADA |
+| Guardar orden de reparación | #2 Reparaciones | ✅ PASADA (REP-000002 creada) |
+| Cobro de reparación (lleva monto, servicio sin producto) | #2/#5 | ✅ PASADA (boletas generadas) |
+| Anti-doble-cobro (marca entregado) | #2 | ✅ PASADA (deploy `9897579` vivo; REP-000003 cobrada) |
+| Fotos en reparaciones (guardar) | #2 Reparaciones | ⏳ PENDIENTE de probar (frontend ya vivo) |
+| Variantes de producto 🎨 | #7 Variantes | ⏳ Código auditado OK; falta probar |
+| Seriales en POS | #1 Seriales | ⏳ Bug API arreglado (#71); falta probar (frontend ya vivo) |
+| Costo final en reparaciones | #5 Costo | ✅ PASADA |
+| Cuentas x cobrar aging | #6 Cuentas | ⏳ Bug API arreglado (#72); falta probar (frontend ya vivo) |
+
+### Bugs encontrados y corregidos hoy (28 jun 2026)
+
+| # | Síntoma | Causa raíz | Fix |
+|---|---|---|---|
+| 1 | Orden de reparación "no guardaba / no aparecía" | `submitRepair` no esperaba la API (sin `await`) | PR #147 frontend |
+| 2 | Cobro de reparación: "Error al guardar ítems de venta" | `sale_items.product_id` con FK; línea de servicio mandaba UUID falso | PR #69 API (`product_id` null si `unit==='serv'`) |
+| 3 | Cobro no llevaba monto / obligaba a elegir producto | `cobrarReparacion` ignoraba `finalCost` y no cargaba servicio | PR #149 frontend |
+| 4 | "Costo final" no se guardaba ni mostraba | Los 3 mapeos de repairs no incluían `finalCost`; no recargaba | PR #149 frontend |
+| 5 | Reparación se podía cobrar infinitas veces | No se marcaba entregada al cobrar | PR #70 API (`repairId` en venta) + #152/#153 frontend |
+| 6 | Seriales: listado/búsqueda fallaban | embed `sales(id, date,...)` — `sales` no tiene `date` | PR #71 API (alias `date:created_at`) |
+| 7 | Cuentas aging nunca funcionó (500) | `accounts.due_date` no existe; repairs `client`/`device`/`en_proceso` inexistentes | PR #72 API (aging por `created_at`, columnas reales) |
+
+> **LECCIÓN TRANSVERSAL (la causa #1 de bugs en este proyecto): DESAJUSTE DE ESQUEMA.**
+> El código frecuentemente usa nombres de columna que NO existen en la BD real de staging
+> (`problem_desc` vs `issue`, `tech_name` vs `technician`, `estimated_cost` vs `price`, `due_date` inexistente,
+> `repairs.client`/`device` inexistentes, `sales.date` inexistente). **Antes de tocar cualquier query nueva,
+> verificar columnas reales** con `SELECT column_name FROM information_schema.columns WHERE table_name='X'`.
+> La BD de staging diverge del esquema versionado (columnas agregadas a mano en producción y no replicadas).
+
+### Próximos pasos (en orden)
+
+1. **Terminar validación piloto** (frontend ya vivo): seriales → cuentas aging → variantes → fotos en reparación. Anti-doble-cobro ✅.
+2. **IVA en boleta de reparación** (pendiente nuevo 28 jun): la boleta del cobro de reparación NO muestra el desglose "Subtotal sin IVA / IVA 12% / Total" que sí tiene la venta normal del POS. En GT los servicios también llevan IVA → hacer que la boleta de reparación muestre el desglose igual. Tocar `utils/receipt.js` (`buildReceiptHTML`) — verificar por qué la línea de servicio no dispara el bloque de IVA. **Agrupar con otros cambios de frontend (regla #8).**
+3. **Construir `docs/MANUAL-TECNICO.md`** — enciclopedia completa del software (ver "Manual técnico" en Backlog). Explorar ambos repos a fondo.
+4. **Aplicar migraciones 009-015 en Supabase PRODUCCIÓN** (`rhecnmfivygkayfvauxt`) — solo tras validar TODO el piloto.
+5. **Crear bucket `repairs` en Supabase PRODUCCIÓN**.
+6. **PR staging → main** en frontend y API (solo después de validar TODO el piloto).
+7. **(Opcional) Abrir red del entorno a staging** para que Claude confirme deploys por sí mismo (regla #6).
+
+> **Disciplina Vercel (reglas #7 y #8):** agrupar cambios en menos PRs; tras cada merge a staging, verificar que el Production Deployment tenga el commit nuevo y promover si quedó atrás.
 
 ---
 
@@ -626,6 +857,10 @@ mundo-cel-diaz-api/
 - [ ] **Disaster Recovery:** Plan documentado de recuperación ante fallos
 - [ ] **Importación masiva de clientes:** Excel con saldo inicial para migración desde papel
 - [ ] **Importación masiva de reparaciones/garantías:** Para clientes que migran desde otro sistema
+- [ ] **📘 Manual técnico completo (`docs/MANUAL-TECNICO.md`):** Enciclopedia del software para tener "el hilo completo" en cada sesión. Pedido por el usuario (28 jun 2026). Estructura acordada: (1) visión general + glosario, (2) arquitectura de sistemas + flujo frontend→API→BD, (3) inventario de las 25 pantallas, (4) inventario de los 21 endpoints, (5) modelo de datos completo + divergencias de esquema reales, (6) flujos de negocio end-to-end, (7) integraciones (Supabase/Railway/Vercel/Resend/WebPush/Sentry/Redis), (8) 🔦 funciones ocultas/subutilizadas, (9) runbook de operación, (10) roadmap + deuda técnica. Construir explorando ambos repos a fondo (no inventar). CLAUDE.md queda como "reglas + estado" y enlaza este manual.
+- [ ] **IVA en boleta de reparación:** mostrar desglose IVA igual que la venta normal del POS (ver Próximos pasos #2).
+- [ ] **Limpiar columnas duplicadas en `repairs`:** el ALTER del 28 jun dejó duplicados (`issue`+`problem_desc`, `price`+`estimated_cost`, `technician`+`tech_name`, `notes`+`internal_note`). Unificar a las canónicas y migrar datos/código. Ver `docs/DB-SCHEMA-REAL.md`. Baja prioridad (no rompe nada hoy).
+- [ ] **Mantener `docs/DB-SCHEMA-REAL.md` sincronizado** con producción cuando se apliquen migraciones allá (hoy refleja staging).
 
 ---
 
