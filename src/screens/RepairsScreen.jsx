@@ -243,6 +243,7 @@ export default function RepairsScreen({ repairs, clients, products, saveRepair, 
   // Las fotos se guardan como { base64, mimeType } localmente y se suben
   // al storage DESPUÉS de crear la orden (cuando ya existe el ID en la BD).
   var _fpendingPhotos = useState([]); var fPendingPhotos = _fpendingPhotos[0]; var setFPendingPhotos = _fpendingPhotos[1];
+  var _fsaving = useState(false);     var fSaving         = _fsaving[0];        var setFSaving         = _fsaving[1];
 
   async function handlePhotoSelect(e) {
     var files = Array.from(e.target.files || []);
@@ -285,15 +286,15 @@ export default function RepairsScreen({ repairs, clients, products, saveRepair, 
     setFBrand(''); setFModel(''); setFImei(''); setFProblem(''); setFDiag('');
     setFTech(''); setFCost(''); setFDate(''); setFNote(''); setFParts([]); setFErr('');
     setPartQ(''); setShowPartPicker(false);
-    setFRepId(gid()); setFChecklist({}); setFReceptionPhotos([]); setFPendingPhotos([]); setFPhotoUploading(false);
+    setFRepId(gid()); setFChecklist({}); setFReceptionPhotos([]); setFPendingPhotos([]); setFPhotoUploading(false); setFSaving(false);
   }
   function closeForm() { resetForm(); setShowForm(false); }
 
   // ── Registrar nueva orden ──────────────────────────────────────────────
-  function submitRepair() {
-    if (!fClientName.trim()) { showFlash('⚠ El nombre del cliente es obligatorio', 'error'); return; }
-    if (!fBrand.trim() || !fModel.trim()) { showFlash('⚠ Marca y modelo del dispositivo son obligatorios', 'error'); return; }
-    if (!fProblem.trim()) { showFlash('⚠ Describí el problema reportado', 'error'); return; }
+  async function submitRepair() {
+    if (!fClientName.trim()) { showFlash('⚠ El nombre del cliente es obligatorio', 'err'); return; }
+    if (!fBrand.trim() || !fModel.trim()) { showFlash('⚠ Marca y modelo del dispositivo son obligatorios', 'err'); return; }
+    if (!fProblem.trim()) { showFlash('⚠ Describí el problema reportado', 'err'); return; }
 
     var rep = {
       id: fRepId,
@@ -319,8 +320,9 @@ export default function RepairsScreen({ repairs, clients, products, saveRepair, 
       registradoPor: { userId: session.userId, name: session.name, role: session.role },
     };
 
-    saveRepair(rep);
-    showFlash('✓ Orden ' + rep.repCode + ' registrada', 'ok');
+    setFSaving(true);
+    var ok = await saveRepair(rep);
+    if (!ok) { setFSaving(false); return; }
 
     // Subir fotos pendientes al storage después de crear la orden
     if (fPendingPhotos.length > 0) {
@@ -331,6 +333,7 @@ export default function RepairsScreen({ repairs, clients, products, saveRepair, 
       })).catch(function() { /* silencioso — fotos opcionales */ });
     }
 
+    showFlash('✓ Orden ' + rep.repCode + ' registrada', 'ok');
     closeForm();
   }
 
@@ -792,7 +795,7 @@ export default function RepairsScreen({ repairs, clients, products, saveRepair, 
           </div>
 
           <div style={{ display: 'flex', gap: 10 }}>
-            <button style={Object.assign({}, mkBtn('teal'), { padding: '10px 24px' })} onClick={submitRepair}>✓ Registrar orden</button>
+            <button style={Object.assign({}, mkBtn('teal'), { padding: '10px 24px', opacity: fSaving ? 0.6 : 1 })} onClick={submitRepair} disabled={fSaving}>{fSaving ? '⏳ Guardando...' : '✓ Registrar orden'}</button>
             <button style={mkBtn('gray')} onClick={closeForm}>Cancelar</button>
           </div>
         </div>
