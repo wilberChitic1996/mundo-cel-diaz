@@ -291,9 +291,9 @@ export default function RepairsScreen({ repairs, clients, products, saveRepair, 
 
   // ── Registrar nueva orden ──────────────────────────────────────────────
   function submitRepair() {
-    if (!fClientName.trim()) { setFErr('El nombre del cliente es obligatorio'); return; }
-    if (!fBrand.trim() || !fModel.trim()) { setFErr('Marca y modelo del dispositivo son obligatorios'); return; }
-    if (!fProblem.trim()) { setFErr('Describí el problema reportado'); return; }
+    if (!fClientName.trim()) { showFlash('⚠ El nombre del cliente es obligatorio', 'error'); return; }
+    if (!fBrand.trim() || !fModel.trim()) { showFlash('⚠ Marca y modelo del dispositivo son obligatorios', 'error'); return; }
+    if (!fProblem.trim()) { showFlash('⚠ Describí el problema reportado', 'error'); return; }
 
     var rep = {
       id: fRepId,
@@ -313,7 +313,7 @@ export default function RepairsScreen({ repairs, clients, products, saveRepair, 
       internalNote: fNote.trim(),
       parts: fParts,
       receptionChecklist: Object.keys(fChecklist).length > 0 ? fChecklist : null,
-      receptionPhotos: fReceptionPhotos.length > 0 ? fReceptionPhotos : null,
+      receptionPhotos: null,
       status: 'recibido',
       createdAt: new Date().toISOString(),
       registradoPor: { userId: session.userId, name: session.name, role: session.role },
