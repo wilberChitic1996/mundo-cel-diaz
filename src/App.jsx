@@ -109,6 +109,10 @@ function buildReceiptHTML(sale, opts, si){
   opts=opts||{}; si=si||getStore();
   var sn=si.store_name||STORE_FALLBACK;
   var st=si.store_tagline||"Tecnología · Accesorios · Reparaciones · Guatemala";
+  var ivaPct=parseFloat(si.iva_percent||'0')||0;
+  var total=Number(sale.total)||0;
+  var ivaAmt=ivaPct>0?total-total/(1+ivaPct/100):0;
+  var subtot=total-ivaAmt;
   var items=(sale.items||[]).map(function(it){
     return '<tr>'+
       '<td style="padding:8px 10px;border-bottom:1px solid #eee;font-size:12px;font-weight:600;">'+it.name+'</td>'+
@@ -152,8 +156,9 @@ function buildReceiptHTML(sale, opts, si){
     '</table>'+
     '<div style="display:flex;justify-content:flex-end;margin-bottom:16px;">'+
       '<div style="border:1px solid #eee;border-radius:8px;overflow:hidden;min-width:220px;">'+
-        '<div style="display:flex;justify-content:space-between;padding:7px 12px;font-size:12px;border-bottom:1px solid #eee;"><span>Total</span><span>Q '+Number(sale.total).toFixed(2)+'</span></div>'+
-        '<div style="display:flex;justify-content:space-between;padding:7px 12px;background:#1D9E75;color:#fff;font-weight:700;font-size:14px;"><span>TOTAL</span><span>Q '+Number(sale.total).toFixed(2)+'</span></div>'+
+        (ivaPct>0?'<div style="display:flex;justify-content:space-between;padding:6px 12px;font-size:11px;border-bottom:1px solid #eee;color:#666;"><span>Subtotal (sin IVA)</span><span>Q '+subtot.toFixed(2)+'</span></div>'+
+        '<div style="display:flex;justify-content:space-between;padding:6px 12px;font-size:11px;border-bottom:1px solid #eee;color:#666;"><span>IVA ('+ivaPct+'%)</span><span>Q '+ivaAmt.toFixed(2)+'</span></div>':'')+
+        '<div style="display:flex;justify-content:space-between;padding:7px 12px;background:#1D9E75;color:#fff;font-weight:700;font-size:14px;"><span>TOTAL</span><span>Q '+total.toFixed(2)+'</span></div>'+
       '</div>'+
     '</div>'+
     '<div style="border-top:2px dashed #ccc;padding-top:12px;font-size:10px;color:#999;display:flex;justify-content:space-between;"><span>Generado por '+sn+' POS</span><span>'+fecha+' · '+hora+'</span></div>'+
