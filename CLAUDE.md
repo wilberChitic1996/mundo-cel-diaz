@@ -587,13 +587,38 @@ mundo-cel-diaz-api/
 ## Estado actual del trabajo
 
 - **Versión en producción:** 2.5.0
-- **Último cambio (28 jun 2026):** CLAUDE.md actualizado con esquema completo de BD, estructura real de archivos, roles, endpoints y dependencias. Fix XLSX static import en BackupScreen, ProductsScreen y export.js. Staging limpiado (transacciones borradas, datos maestros conservados).
-- **Producción frontend:** ✅ Actualizada — mundoceldiaz.com
-- **Producción API:** ✅ Actualizada — mundo-cel-diaz-api-production.up.railway.app
-- **Staging:** ✅ Sincronizado con main en ambos repos. BD limpia (sin transacciones, solo usuarios/clientes/productos).
-- **2FA:** Implementado para superadmin, deshabilitado temporalmente (esperando verificación DNS Resend: DKIM ✓, SPF ✓, pendiente propagación). Descomentar en `routes/auth.js` líneas 82-99 cuando esté listo.
+- **Último cambio (28 jun 2026):** Implementación de 7 brechas funcionales (IVA, reparaciones+fotos, costo reparaciones, pago dividido, seriales, cuentas x cobrar, variantes). Migraciones 009-015 aplicadas en staging. Bugs corregidos: serial picker, método de pago duplicado.
+- **Rama de trabajo activa:** `claude/gifted-heisenberg-r6n8jo` (en AMBOS repos)
+- **PR #145 (Frontend):** ✅ Abierto — bug fixes (serial picker + split method). Vercel: ambos Ready. **PENDIENTE MERGE A STAGING.**
+- **Producción frontend:** ✅ mundoceldiaz.com (NO tocar hasta validar piloto completo)
+- **Producción API:** ✅ mundo-cel-diaz-api-production.up.railway.app (NO tocar)
+- **Staging frontend:** ✅ mundo-cel-diaz-staging.vercel.app — con brechas implementadas
+- **Staging API:** ✅ mundo-cel-diaz-api-production-e546.up.railway.app — con brechas implementadas
+- **Staging BD:** Migraciones 009-015 aplicadas ✅. Bucket `repairs` creado ✅.
+- **2FA:** Implementado para superadmin, deshabilitado temporalmente (pendiente propagación DNS Resend). Descomentar en `routes/auth.js` líneas 82-99 cuando esté listo.
 - **Credenciales piloto:** `admin@demo.com` / `Admin2026!` (hash bcrypt en la BD de staging).
-- **Bucket Supabase Storage `backups`:** ✅ Creado en staging y producción — backups automáticos activos desde las 2 AM.
+- **Bucket Supabase Storage `backups`:** ✅ Creado en staging y producción.
+
+### Validación en piloto — Estado (28 jun 2026)
+
+| Prueba | Brecha | Estado |
+|---|---|---|
+| IVA en boleta | #3 IVA configurable | ✅ PASADA — "Subtotal Q26.79 / IVA Q3.21 / Total Q30.00" |
+| Pago dividido POS | #4 Split payment | ✅ PASADA — fix método duplicado aplicado |
+| Reparaciones checklist+fotos | #2 Reparaciones | ✅ PASADA — checklist 8 ítems + botón foto visibles |
+| Fotos en reparaciones (guardar) | #2 Reparaciones | ⏳ PENDIENTE — no probado aún |
+| Variantes de producto 🎨 | #7 Variantes | ⏳ PENDIENTE |
+| Seriales en POS | #1 Seriales | ⏳ PENDIENTE |
+| Costo final en reparaciones | #5 Costo | ⏳ PENDIENTE |
+| Cuentas x cobrar aging | #6 Cuentas | ⏳ PENDIENTE |
+
+### Próximos pasos (en orden)
+
+1. **Merge PR #145 a staging** (bug fixes serial picker + split method) — verificar CI verde primero
+2. **Continuar validación piloto**: fotos en reparación → variantes → seriales → costos → cuentas
+3. **Aplicar migraciones 009-015 en Supabase PRODUCCIÓN** (`rhecnmfivygkayfvauxt`)
+4. **Crear bucket `repairs` en Supabase PRODUCCIÓN**
+5. **PR staging → main** en frontend y API (solo después de validar TODO el piloto)
 
 ---
 
