@@ -117,28 +117,63 @@ Estos valores ya están correctos y funcionando. **NUNCA cambiarlos** salvo que 
 
 ### Flujo rama de trabajo → staging (piloto)
 
+El flujo aplica **por separado a cada repo** (frontend y API). Si el cambio toca ambos, se sigue el flujo en los dos repos antes de probar en piloto.
+
+**Solo Frontend cambia:**
 ```
-1. Crear rama de trabajo PARTIENDO DE `staging` (no de main)
-2. Hacer cambios, commit, push
-3. Crear PR: rama → staging
-4. Verificar CI verde (Lint & Build ✅) + Vercel Ready ✅
-5. Si hay falla → corregir, nuevo commit, esperar CI verde de nuevo
-6. Solo cuando todo verde → mergear PR
-7. Vercel despliega staging automáticamente
-8. PROBAR EN PILOTO (mundo-cel-diaz-staging.vercel.app)
-9. Si hay bugs → fix, commit, push → volver al paso 4
+1. Rama claude/... en mundo-cel-diaz, DESDE staging
+2. Cambios, commit, push
+3. PR rama → staging (en mundo-cel-diaz)
+4. CI verde ✅ + Vercel Ready ✅ → mergear
+5. Probar en piloto
+```
+
+**Solo Backend/API cambia:**
+```
+1. Rama claude/... en mundo-cel-diaz-api, DESDE staging
+2. Cambios, commit, push
+3. PR rama → staging (en mundo-cel-diaz-api)
+4. CI verde ✅ + Railway despliega ✅ → mergear
+5. Probar en piloto
+```
+
+**Ambos repos cambian (caso más común en brechas grandes):**
+```
+1. Ramas en AMBOS repos desde staging
+2. Cambios en API primero (el frontend depende del backend)
+3. PR rama → staging en mundo-cel-diaz-api → CI verde → mergear
+4. Railway despliega la API de staging
+5. PR rama → staging en mundo-cel-diaz → CI verde → mergear
+6. Vercel despliega el frontend de staging
+7. AHORA sí: probar en piloto con ambos deployed
+8. Si hay bugs → fix en el repo que corresponda → volver al paso 3 o 5
 ```
 
 ### Flujo staging → main (producción)
 
+Igual que arriba pero en dirección staging → main, y en AMBOS repos si aplica.
+
+**Solo Frontend:**
 ```
-1. Solo cuando el usuario confirmó que el piloto funciona correctamente
-2. Crear PR: staging → main
-3. Verificar CI verde (Lint & Build ✅) + Vercel Ready ✅
-4. Si hay falla → corregir en staging primero, luego repetir
-5. Solo cuando todo verde → mergear PR
-6. Vercel despliega producción automáticamente
-7. Verificar que mundoceldiaz.com funciona correctamente
+1. Usuario confirmó que piloto funciona
+2. PR staging → main en mundo-cel-diaz
+3. CI verde ✅ + Vercel Ready ✅ → mergear
+4. Vercel despliega mundoceldiaz.com ✅
+```
+
+**Solo Backend:**
+```
+1. Usuario confirmó que piloto funciona
+2. PR staging → main en mundo-cel-diaz-api
+3. CI verde ✅ + Railway despliega ✅ → mergear
+```
+
+**Ambos repos:**
+```
+1. Usuario confirmó que piloto funciona
+2. PR staging → main en mundo-cel-diaz-api → CI verde → mergear
+3. PR staging → main en mundo-cel-diaz → CI verde → mergear
+4. Verificar mundoceldiaz.com funciona correctamente
 ```
 
 > ### 🔴 REGLA CRÍTICA: VERIFICAR CI ANTES DE MERGEAR — SIEMPRE.
