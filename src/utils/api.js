@@ -126,6 +126,8 @@ export const repairsAPI = {
   updateStatus: function(id, status)  { return api.put('/repairs/' + id + '/status', { status }); },
   update:       function(id, data)    { return api.put('/repairs/' + id, data); },
   remove:       function(id)          { return api.delete('/repairs/' + id); },
+  uploadPhoto:  function(id, data)    { return api.post('/repairs/' + id + '/photos', data); },
+  deletePhoto:  function(id, data)    { return api.delete('/repairs/' + id + '/photos', { data }); },
 };
 
 export const warrantiesAPI = {
