@@ -444,15 +444,13 @@ export default function POSScreen({
             {payType === 'completo' && cart.length > 0 && (
               <div style={{ marginBottom: 10 }}>
                 <label style={{ ...sLabel, display: 'flex', alignItems: 'center', gap: 8, cursor: 'pointer' }}>
-                  <input type="checkbox" checked={!!secondMethod} onChange={function(e) { setSecondMethod(e.target.checked ? 'Tarjeta' : ''); setSecondAmount(''); }} />
+                  <input type="checkbox" checked={!!secondMethod} onChange={function(e) { var def = ['Efectivo','Tarjeta','Transferencia'].find(function(m){ return m !== payMethod; }); setSecondMethod(e.target.checked ? def : ''); setSecondAmount(''); }} />
                   Dividir pago en dos métodos
                 </label>
                 {!!secondMethod && (
                   <div style={{ display: 'flex', gap: 8, marginTop: 6 }}>
                     <select style={{ ...sInput, flex: 1 }} value={secondMethod} onChange={function(e) { setSecondMethod(e.target.value); }}>
-                      <option>Efectivo</option>
-                      <option>Tarjeta</option>
-                      <option>Transferencia</option>
+                      {['Efectivo','Tarjeta','Transferencia'].filter(function(m){ return m !== payMethod; }).map(function(m){ return <option key={m}>{m}</option>; })}
                     </select>
                     <input type="number" style={{ ...sInput, flex: 1 }} placeholder={'Monto 2do método'} value={secondAmount} onChange={function(e) { setSecondAmount(e.target.value); }} />
                   </div>
