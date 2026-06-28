@@ -150,8 +150,9 @@ function MetricBox({ label, value, color }) {
 }
 
 // ── Componente principal ───────────────────────────────────────────────────
-export default function RepairsScreen({ repairs, clients, products, saveRepair, updateRepairStatus, session, showFlash, onCobrar, initialRepairId, navTo }) {
+export default function RepairsScreen({ repairs, clients, products, saveRepair, updateRepairStatus, reloadRepairs, session, showFlash, onCobrar, initialRepairId, navTo }) {
   navTo = navTo || function() {};
+  reloadRepairs = reloadRepairs || function() {};
   repairs   = repairs   || [];
   clients   = clients   || [];
   products  = products  || [];
@@ -360,7 +361,7 @@ export default function RepairsScreen({ repairs, clients, products, saveRepair, 
             </button>
           )}
           {(rep.status === 'listo' || rep.status === 'entregado') && (
-            <button style={mkBtn('teal')} onClick={function() { onCobrar(rep); setSelRep(null); }}>💰 Cobrar reparación</button>
+            <button style={mkBtn('teal')} onClick={function() { if (onCobrar(rep) !== false) setSelRep(null); }}>💰 Cobrar reparación</button>
           )}
         </div>
 
@@ -417,7 +418,10 @@ export default function RepairsScreen({ repairs, clients, products, saveRepair, 
               <p style={{ fontWeight: 700, fontSize: 18, color: TEAL, margin: 0 }}>Q {Number(rep.estimatedCost || 0).toFixed(2)}</p>
             </div>
             <div style={{ background: rep.finalCost ? '#1a2535' : '#f9f8f5', borderRadius: 8, padding: 14, gridColumn: 'span 2' }}>
-              <p style={{ fontSize: 11, color: rep.finalCost ? '#aaa' : '#999', textTransform: 'uppercase', letterSpacing: '0.8px', margin: '0 0 6px' }}>Costo final cobrado</p>
+              <p style={{ fontSize: 11, color: rep.finalCost ? '#aaa' : '#999', textTransform: 'uppercase', letterSpacing: '0.8px', margin: '0 0 6px' }}>
+                Costo final cobrado
+                <HelpTip text="Monto real que le cobrás al cliente cuando ya diagnosticaste el equipo (puede diferir del estimado). Es el monto que se carga automáticamente en el POS al darle 'Cobrar reparación'." />
+              </p>
               {editFinalCost ? (
                 <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
                   <input type="number" style={Object.assign({}, sInput, { width: 120, padding: '5px 8px' })} value={finalCostInput} placeholder="0.00"
@@ -426,7 +430,9 @@ export default function RepairsScreen({ repairs, clients, products, saveRepair, 
                     var fc = parseFloat(finalCostInput) || 0;
                     repairsAPI.update(rep.id, { finalCost: fc }).then(function() {
                       setEditFinalCost(false);
-                    }).catch(function() { showFlash('Error al guardar costo final', 'error'); });
+                      showFlash('✓ Costo final guardado: Q' + fc.toFixed(2), 'ok');
+                      reloadRepairs();
+                    }).catch(function() { showFlash('⛔ Error al guardar el costo final', 'err'); });
                   }}>✓ Guardar</button>
                   <button style={Object.assign({}, mkBtn('gray'), { padding: '5px 10px', fontSize: 12 })} onClick={function() { setEditFinalCost(false); }}>✕</button>
                 </div>

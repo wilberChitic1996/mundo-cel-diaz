@@ -1066,7 +1066,7 @@ function App(props) {
         var normalRets  = (rets||[]).map(function(r){return Object.assign({},r,{items:r.return_items||[],refundAmount:Number(r.refund_amount),itemCondition:r.item_condition,refundMethod:r.refund_method,date:r.created_at,saleId:r.sale_id||null});});
         var normalDefs  = (defs||[]).map(function(d){return Object.assign({},d,{price:Number(d.price||0)});});
         var normalClis  = (clis||[]).map(function(c){return Object.assign({},c,{cliCode:c.cli_code,createdAt:c.created_at});});
-        var normalReps  = (reps||[]).map(function(r){return Object.assign({},r,{repCode:r.rep_code,clientId:r.client_id,clientName:r.client_name,clientPhone:r.client_phone,clientCli:r.client_cli,problemDesc:r.problem_desc,techName:r.tech_name,estimatedCost:Number(r.estimated_cost||0),promisedDate:r.promised_date,internalNote:r.internal_note,registradoPor:r.registrado_por||{},parts:r.parts||[],createdAt:r.created_at});});
+        var normalReps  = (reps||[]).map(function(r){return Object.assign({},r,{repCode:r.rep_code,clientId:r.client_id,clientName:r.client_name,clientPhone:r.client_phone,clientCli:r.client_cli,problemDesc:r.problem_desc,techName:r.tech_name,estimatedCost:Number(r.estimated_cost||0),promisedDate:r.promised_date,internalNote:r.internal_note,registradoPor:r.registrado_por||{},parts:r.parts||[],createdAt:r.created_at,finalCost:r.final_cost!=null?Number(r.final_cost):null});});
         setProducts(normalProds);
         setSales(normalSales);
         setAccounts(normalAccs);
@@ -1483,7 +1483,7 @@ function App(props) {
     try{
       await repairsAPI.create({id:rep.id,repCode:rep.repCode,clientId:rep.clientId||null,clientName:rep.clientName,clientPhone:rep.clientPhone||null,clientCli:rep.clientCli||null,brand:rep.brand,model:rep.model,imei:rep.imei||null,problemDesc:rep.problemDesc,diagnosis:rep.diagnosis||null,techName:rep.techName||null,estimatedCost:rep.estimatedCost||0,promisedDate:rep.promisedDate||null,internalNote:rep.internalNote||null,status:rep.status||'recibido',registradoPor:rep.registradoPor||{},parts:rep.parts||[],receptionChecklist:rep.receptionChecklist||null,receptionPhotos:null,createdAt:rep.createdAt});
       var fr=await repairsAPI.getAll();
-      setRepairs((fr||[]).map(function(r){return Object.assign({},r,{repCode:r.rep_code,clientId:r.client_id,clientName:r.client_name,clientPhone:r.client_phone,clientCli:r.client_cli,problemDesc:r.problem_desc,techName:r.tech_name,estimatedCost:Number(r.estimated_cost||0),promisedDate:r.promised_date,internalNote:r.internal_note,registradoPor:r.registrado_por||{},parts:r.parts||[],createdAt:r.created_at});}));
+      setRepairs((fr||[]).map(function(r){return Object.assign({},r,{repCode:r.rep_code,clientId:r.client_id,clientName:r.client_name,clientPhone:r.client_phone,clientCli:r.client_cli,problemDesc:r.problem_desc,techName:r.tech_name,estimatedCost:Number(r.estimated_cost||0),promisedDate:r.promised_date,internalNote:r.internal_note,registradoPor:r.registrado_por||{},parts:r.parts||[],createdAt:r.created_at,finalCost:r.final_cost!=null?Number(r.final_cost):null});}));
       return true;
     }catch(e){
       var emRep=e&&e.error?e.error:null;
@@ -1495,36 +1495,33 @@ function App(props) {
     try{
       await repairsAPI.updateStatus(id, status);
       var fr2=await repairsAPI.getAll();
-      setRepairs((fr2||[]).map(function(r){return Object.assign({},r,{repCode:r.rep_code,clientId:r.client_id,clientName:r.client_name,clientPhone:r.client_phone,clientCli:r.client_cli,problemDesc:r.problem_desc,techName:r.tech_name,estimatedCost:Number(r.estimated_cost||0),promisedDate:r.promised_date,internalNote:r.internal_note,registradoPor:r.registrado_por||{},parts:r.parts||[],createdAt:r.created_at});}));
+      setRepairs((fr2||[]).map(function(r){return Object.assign({},r,{repCode:r.rep_code,clientId:r.client_id,clientName:r.client_name,clientPhone:r.client_phone,clientCli:r.client_cli,problemDesc:r.problem_desc,techName:r.tech_name,estimatedCost:Number(r.estimated_cost||0),promisedDate:r.promised_date,internalNote:r.internal_note,registradoPor:r.registrado_por||{},parts:r.parts||[],createdAt:r.created_at,finalCost:r.final_cost!=null?Number(r.final_cost):null});}));
     }catch(e){
       var emRS=e&&e.error?e.error:null;
       showFlash("⛔ "+(emRS||"Error al actualizar la reparación. Verifica tu conexión."),"err");
     }
   }
   function cobrarReparacion(rep){
-    // Pre-carga el POS con los datos de la reparación
+    // Monto a cobrar: costo final si está definido, si no el estimado (Opción A)
+    var monto=parseFloat(rep.finalCost)||parseFloat(rep.estimatedCost)||0;
+    if(monto<=0){
+      showFlash("⚠ Esta reparación no tiene monto. Editá el 'Costo final cobrado' antes de cobrar.","warn");
+      return false;
+    }
+    // Carga una sola línea de servicio con el monto de la reparación (no obliga a elegir producto)
     setClientName(rep.clientName);
     setSelectedClientId(rep.clientId||null);
     setSaleNote("Reparación "+rep.repCode+" — "+rep.brand+" "+rep.model);
-    // Si tiene repuestos, los agrega como items del carrito
-    if(rep.parts&&rep.parts.length>0){
-      var cartItems=rep.parts.map(function(p){
-        var prod=products.find(function(x){return x.code===p.code;});
-        return {id:prod?prod.id:gid(),code:p.code,name:p.name,price:p.price,qty:p.qty,shelf:prod?prod.shelf:"",unit:"uni",maxStock:prod?prod.stock:999};
-      });
-      // Si hay costo estimado mayor a los repuestos, agrega mano de obra
-      var costoRepuestos=rep.parts.reduce(function(s,p){return s+p.price*p.qty;},0);
-      var costo=parseFloat(rep.estimatedCost)||0;
-      if(costo>costoRepuestos){
-        cartItems.push({id:gid(),code:"MO001",name:"Mano de obra — "+rep.brand+" "+rep.model,price:costo-costoRepuestos,qty:1,shelf:"",unit:"serv",maxStock:999});
-      }
-      setCart(cartItems);
-    } else if(rep.estimatedCost>0){
-      // Solo mano de obra
-      setCart([{id:gid(),code:"MO001",name:"Reparación — "+rep.brand+" "+rep.model,price:parseFloat(rep.estimatedCost),qty:1,shelf:"",unit:"serv",maxStock:999}]);
-    }
+    setCart([{id:gid(),code:rep.repCode||"REP",name:"Reparación — "+rep.brand+" "+rep.model,price:monto,qty:1,shelf:"",unit:"serv",maxStock:999}]);
     setView("pos");
-    showFlash("✓ Reparación "+rep.repCode+" cargada en el POS","ok");
+    showFlash("✓ Reparación "+rep.repCode+" cargada (Q"+monto.toFixed(2)+")","ok");
+    return true;
+  }
+  async function reloadRepairs(){
+    try{
+      var fr=await repairsAPI.getAll();
+      setRepairs((fr||[]).map(function(r){return Object.assign({},r,{repCode:r.rep_code,clientId:r.client_id,clientName:r.client_name,clientPhone:r.client_phone,clientCli:r.client_cli,problemDesc:r.problem_desc,techName:r.tech_name,estimatedCost:Number(r.estimated_cost||0),promisedDate:r.promised_date,internalNote:r.internal_note,registradoPor:r.registrado_por||{},parts:r.parts||[],createdAt:r.created_at,finalCost:r.final_cost!=null?Number(r.final_cost):null});}));
+    }catch(e){ /* silencioso */ }
   }
 
   async function saveClient(obj, isEdit){
@@ -2065,7 +2062,7 @@ function App(props) {
           {view==="backup"   &&canAccess(session.role,"backup")&&<BackupScreen products={products} sales={sales} accounts={accounts} returns={returns} defectives={defectives} clients={clients} repairs={repairs} warranties={warranties} onExportJSON={exportJSON} onExportExcel={exportExcel}/>}
           {view==="users"    &&canAccess(session.role,"users")&&<UsersScreen session={session} showFlash={showFlash}/>}
           {view==="clients"  &&canAccess(session.role,"clients")&&<ClientsScreen clients={clients} sales={sales} accounts={accounts} returns={returns} saveClient={saveClient} session={session} showFlash={showFlash} initialSearch={view==="clients"&&deepLink?deepLink.search||'':''} initialClientId={view==="clients"&&deepLink?deepLink.clientId||null:null}/>}
-          {view==="repairs"    &&canAccess(session.role,"repairs")&&<RepairsScreen repairs={repairs} clients={clients} products={products} saveRepair={saveRepair} updateRepairStatus={updateRepairStatus} onCobrar={cobrarReparacion} session={session} showFlash={showFlash} warranties={warranties} saveWarranty={saveWarranty} initialSearch={view==="repairs"&&deepLink?deepLink.search||'':''} initialRepairId={view==="repairs"&&deepLink?deepLink.repairId||null:null} navTo={navTo}/>}
+          {view==="repairs"    &&canAccess(session.role,"repairs")&&<RepairsScreen repairs={repairs} clients={clients} products={products} saveRepair={saveRepair} updateRepairStatus={updateRepairStatus} reloadRepairs={reloadRepairs} onCobrar={cobrarReparacion} session={session} showFlash={showFlash} warranties={warranties} saveWarranty={saveWarranty} initialSearch={view==="repairs"&&deepLink?deepLink.search||'':''} initialRepairId={view==="repairs"&&deepLink?deepLink.repairId||null:null} navTo={navTo}/>}
           {view==="warranties" &&canAccess(session.role,"warranties")&&<WarrantiesScreen warranties={warranties} sales={sales} repairs={repairs} updateWarranty={updateWarranty} saveWarranty={saveWarranty} session={session} clients={clients} navTo={navTo} initialSearch={view==="warranties"&&deepLink?deepLink.search||'':''} initialWarrantyId={view==="warranties"&&deepLink?deepLink.warrantyId||null:null}/>}
           {view==="audit"      &&canAccess(session.role,"audit")&&<AuditScreen session={session}/>}
           {view==="suppliers"  &&canAccess(session.role,"suppliers")&&<SuppliersScreen products={products} session={session} showFlash={showFlash} onStockUpdate={function(){ productsAPI.getAll().then(function(p){ setProducts((p||[]).map(function(x){return Object.assign({},x,{price:Number(x.price),cost:Number(x.cost),stock:Number(x.stock)});})); }); }}/>}
