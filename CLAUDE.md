@@ -48,6 +48,25 @@ Cuando Claude está esperando que termine CI, un deploy de Vercel/Railway, o cua
 
 > **Origen:** Usuario reportó que las esperas lo hacían desconfiar — se podía quedar esperando horas cuando el proceso ya había terminado. Claude debe cerrar el ciclo siempre: verificar → actuar → reportar.
 
+### 6. "Ya podés probar" — SOLO con confirmación real de que el deploy está vivo
+
+Claude **NUNCA** debe decir "ya podés probar" basándose en una estimación de tiempo ("~1-2 min"). Solo lo dice cuando tiene una **señal positiva** de que el código nuevo ya está desplegado:
+
+- **Frontend (Vercel):** confirmar con el estado **"Ready"** del deploy de staging (llega por webhook de Vercel). Recién ahí avisar.
+- **API (Railway):** confirmar abriendo el endpoint de salud del API de staging y verificando que responde:
+  ```
+  curl -s https://mundo-cel-diaz-api-production-e546.up.railway.app/api/health
+  ```
+  Si Claude no puede alcanzar ese endpoint (bloqueo de red del entorno), **debe decirlo con honestidad** — "no puedo confirmar el deploy del API desde aquí" — en vez de adivinar un tiempo.
+
+**Mecanismo elegido (28 jun 2026): abrir la red del entorno a staging.** Para que Claude confirme los deploys por sí mismo, la **política de red del entorno** (Claude Code on the web) debe permitir salida a:
+- `https://mundo-cel-diaz-staging.vercel.app` (frontend staging)
+- `https://mundo-cel-diaz-api-production-e546.up.railway.app` (API staging)
+
+El usuario lo configura en los ajustes del entorno (network access). Doc: https://code.claude.com/docs/en/claude-code-on-the-web. Una vez abierto, Claude hace `curl .../api/health` tras cada merge de API y recién entonces dice "ya podés probar".
+
+> **Origen:** Usuario pidió poder probar "con confianza" sabiendo que el deploy ya está, sin esperas a ciegas. Hoy la red del entorno bloquea staging (HTTP 000) y Railway no reporta estado a GitHub, por eso Claude no podía confirmar el API. Solución acordada: abrir la red a staging.
+
 ---
 
 ## 🔴 REGLA ESTRICTA: NO TOCAR LO QUE FUNCIONA
