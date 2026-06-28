@@ -43,6 +43,7 @@ import { usePaginator } from '../hooks/usePaginator.jsx';
 import { getStore } from '../utils/receipt.js';
 import { APP_NAME, STORE_FALLBACK } from '../constants/index.js';
 import HelpTip from '../components/ui/HelpTip.jsx';
+import { repairsAPI } from '../utils/api.js';
 
 // ── Constantes del módulo ──────────────────────────────────────────────────
 
@@ -181,6 +182,16 @@ export default function RepairsScreen({ repairs, clients, products, saveRepair, 
   var _fparts= useState([]);   var fParts      = _fparts[0];var setFParts      = _fparts[1];
   var _ferr  = useState('');   var fErr        = _ferr[0];  var setFErr        = _ferr[1];
 
+  // Brecha #2: checklist de recepción y fotos
+  var _frid  = useState(gid());  var fRepId          = _frid[0];  var setFRepId          = _frid[1];
+  var _fck   = useState({});     var fChecklist      = _fck[0];   var setFChecklist      = _fck[1];
+  var _frph  = useState([]);     var fReceptionPhotos= _frph[0];  var setFReceptionPhotos= _frph[1];
+  var _fpul  = useState(false);  var fPhotoUploading = _fpul[0];  var setFPhotoUploading = _fpul[1];
+
+  // Brecha #5: edición de costo final en vista detalle
+  var _efc   = useState(false);  var editFinalCost    = _efc[0];  var setEditFinalCost    = _efc[1];
+  var _efcv  = useState('');     var finalCostInput   = _efcv[0]; var setFinalCostInput   = _efcv[1];
+
   // Dropdown de clientes y buscador de repuestos
   var _cdrop = useState(false); var showCliDrop     = _cdrop[0]; var setShowCliDrop     = _cdrop[1];
   var _pq    = useState('');    var partQ           = _pq[0];    var setPartQ           = _pq[1];
@@ -228,6 +239,37 @@ export default function RepairsScreen({ repairs, clients, products, saveRepair, 
     setFParts(function(prev) { return prev.filter(function(x) { return x.code !== code; }); });
   }
 
+  // ── Fotos de recepción ───────────────────────────────────────────────────
+  async function handlePhotoSelect(e) {
+    var file = e.target.files && e.target.files[0];
+    if (!file) return;
+    e.target.value = '';
+    setFPhotoUploading(true);
+    try {
+      var reader = new FileReader();
+      reader.onload = async function(ev) {
+        try {
+          var base64 = ev.target.result;
+          var result = await repairsAPI.uploadPhoto(fRepId, { base64, mimeType: file.type || 'image/jpeg', photoType: 'reception' });
+          setFReceptionPhotos(function(prev) { return prev.concat([result.url]); });
+        } catch (_) {
+          showFlash('Error al subir foto', 'error');
+        }
+        setFPhotoUploading(false);
+      };
+      reader.readAsDataURL(file);
+    } catch (_) {
+      setFPhotoUploading(false);
+    }
+  }
+
+  async function deleteReceptionPhoto(url) {
+    try {
+      await repairsAPI.deletePhoto(fRepId, { url, photoType: 'reception' });
+    } catch (_) { /* no fatal */ }
+    setFReceptionPhotos(function(prev) { return prev.filter(function(u) { return u !== url; }); });
+  }
+
   var partResults = products.filter(function(p) {
     if (p.unit === 'serv') return false;
     if (!partQ.trim()) return true;
@@ -243,6 +285,7 @@ export default function RepairsScreen({ repairs, clients, products, saveRepair, 
     setFBrand(''); setFModel(''); setFImei(''); setFProblem(''); setFDiag('');
     setFTech(''); setFCost(''); setFDate(''); setFNote(''); setFParts([]); setFErr('');
     setPartQ(''); setShowPartPicker(false);
+    setFRepId(gid()); setFChecklist({}); setFReceptionPhotos([]); setFPhotoUploading(false);
   }
   function closeForm() { resetForm(); setShowForm(false); }
 
@@ -253,7 +296,7 @@ export default function RepairsScreen({ repairs, clients, products, saveRepair, 
     if (!fProblem.trim()) { setFErr('Describí el problema reportado'); return; }
 
     var rep = {
-      id: gid(),
+      id: fRepId,
       repCode: genRepCode(repairs),
       clientId: fClientId || null,
       clientName: fClientName.trim(),
@@ -269,6 +312,8 @@ export default function RepairsScreen({ repairs, clients, products, saveRepair, 
       promisedDate: fDate || null,
       internalNote: fNote.trim(),
       parts: fParts,
+      receptionChecklist: Object.keys(fChecklist).length > 0 ? fChecklist : null,
+      receptionPhotos: fReceptionPhotos.length > 0 ? fReceptionPhotos : null,
       status: 'recibido',
       createdAt: new Date().toISOString(),
       registradoPor: { userId: session.userId, name: session.name, role: session.role },
@@ -358,6 +403,34 @@ export default function RepairsScreen({ repairs, clients, products, saveRepair, 
               <p style={{ fontSize: 11, color: '#999', textTransform: 'uppercase', letterSpacing: '0.8px', margin: '0 0 6px' }}>Costo estimado</p>
               <p style={{ fontWeight: 700, fontSize: 18, color: TEAL, margin: 0 }}>Q {Number(rep.estimatedCost || 0).toFixed(2)}</p>
             </div>
+            <div style={{ background: rep.finalCost ? '#1a2535' : '#f9f8f5', borderRadius: 8, padding: 14, gridColumn: 'span 2' }}>
+              <p style={{ fontSize: 11, color: rep.finalCost ? '#aaa' : '#999', textTransform: 'uppercase', letterSpacing: '0.8px', margin: '0 0 6px' }}>Costo final cobrado</p>
+              {editFinalCost ? (
+                <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+                  <input type="number" style={Object.assign({}, sInput, { width: 120, padding: '5px 8px' })} value={finalCostInput} placeholder="0.00"
+                    onChange={function(e) { setFinalCostInput(e.target.value); }} />
+                  <button style={Object.assign({}, mkBtn('teal'), { padding: '5px 12px', fontSize: 12 })} onClick={function() {
+                    var fc = parseFloat(finalCostInput) || 0;
+                    repairsAPI.update(rep.id, { finalCost: fc }).then(function() {
+                      setEditFinalCost(false);
+                    }).catch(function() { showFlash('Error al guardar costo final', 'error'); });
+                  }}>✓ Guardar</button>
+                  <button style={Object.assign({}, mkBtn('gray'), { padding: '5px 10px', fontSize: 12 })} onClick={function() { setEditFinalCost(false); }}>✕</button>
+                </div>
+              ) : (
+                <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                  <p style={{ fontWeight: 700, fontSize: 18, color: rep.finalCost ? '#fff' : '#bbb', margin: 0 }}>
+                    {rep.finalCost ? 'Q ' + Number(rep.finalCost).toFixed(2) : 'Sin definir'}
+                  </p>
+                  {rep.status !== 'entregado' && (
+                    <button style={Object.assign({}, mkBtn('gray'), { padding: '3px 10px', fontSize: 11 })}
+                      onClick={function() { setFinalCostInput(rep.finalCost ? String(rep.finalCost) : ''); setEditFinalCost(true); }}>
+                      ✏ Editar
+                    </button>
+                  )}
+                </div>
+              )}
+            </div>
           </div>
 
           {/* Problema y diagnóstico */}
@@ -398,9 +471,60 @@ export default function RepairsScreen({ repairs, clients, products, saveRepair, 
 
           {/* Nota interna */}
           {rep.internalNote && (
-            <div style={{ background: '#FFF8E1', borderRadius: 8, padding: '10px 14px', border: '1px solid #FFD54F' }}>
+            <div style={{ background: '#FFF8E1', borderRadius: 8, padding: '10px 14px', border: '1px solid #FFD54F', marginBottom: 12 }}>
               <p style={{ fontSize: 11, color: '#999', textTransform: 'uppercase', margin: '0 0 4px' }}>📝 Nota interna</p>
               <p style={{ fontSize: 13, color: '#666', margin: 0 }}>{rep.internalNote}</p>
+            </div>
+          )}
+
+          {/* Checklist de recepción */}
+          {rep.receptionChecklist && Object.keys(rep.receptionChecklist).filter(function(k) { return rep.receptionChecklist[k]; }).length > 0 && (
+            <div style={{ marginBottom: 12 }}>
+              <p style={{ fontWeight: 600, margin: '0 0 8px', fontSize: 13 }}>✅ Checklist de recepción</p>
+              <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
+                {[['pantalla','Pantalla'],['botones','Botones'],['cargador','Cargador'],['caja','Caja'],['funda','Funda'],['chips','SIM'],['bateria','Batería'],['camara','Cámara']].map(function(pair) {
+                  var v = rep.receptionChecklist[pair[0]];
+                  if (!v) return null;
+                  var color = (v === 'ok' || v === 'incluido' || v === 'incluida' || v === 'retiradas') ? '#1D9E75' : '#E24B4A';
+                  return (
+                    <span key={pair[0]} style={{ padding: '3px 10px', borderRadius: 20, fontSize: 12, background: color + '18', color: color, border: '1px solid ' + color + '44' }}>
+                      {pair[1]}: <b>{v}</b>
+                    </span>
+                  );
+                })}
+              </div>
+            </div>
+          )}
+
+          {/* Fotos de recepción */}
+          {rep.receptionPhotos && rep.receptionPhotos.length > 0 && (
+            <div style={{ marginBottom: 12 }}>
+              <p style={{ fontWeight: 600, margin: '0 0 8px', fontSize: 13 }}>📷 Fotos de recepción</p>
+              <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap' }}>
+                {rep.receptionPhotos.map(function(url, i) {
+                  return (
+                    <a key={i} href={url} target="_blank" rel="noreferrer">
+                      <img src={url} alt={'foto ' + (i+1)} style={{ width: 100, height: 100, objectFit: 'cover', borderRadius: 8, border: '1px solid #ddd', cursor: 'pointer' }} />
+                    </a>
+                  );
+                })}
+              </div>
+            </div>
+          )}
+
+          {/* Fotos de entrega */}
+          {rep.deliveryPhotos && rep.deliveryPhotos.length > 0 && (
+            <div>
+              <p style={{ fontWeight: 600, margin: '0 0 8px', fontSize: 13 }}>📷 Fotos de entrega</p>
+              <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap' }}>
+                {rep.deliveryPhotos.map(function(url, i) {
+                  return (
+                    <a key={i} href={url} target="_blank" rel="noreferrer">
+                      <img src={url} alt={'entrega ' + (i+1)} style={{ width: 100, height: 100, objectFit: 'cover', borderRadius: 8, border: '1px solid #ddd', cursor: 'pointer' }} />
+                    </a>
+                  );
+                })}
+              </div>
             </div>
           )}
         </div>
@@ -600,6 +724,54 @@ export default function RepairsScreen({ repairs, clients, products, saveRepair, 
               </table>
             )}
             {fParts.length === 0 && <p style={{ fontSize: 12, color: '#bbb', margin: '8px 0 0' }}>No se han agregado repuestos aún.</p>}
+          </div>
+
+          {/* Sección: checklist de recepción */}
+          <p style={{ fontWeight: 600, fontSize: 13, color: '#555', margin: '0 0 10px', borderBottom: '1px solid #eee', paddingBottom: 6 }}>✅ Checklist de recepción</p>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4,1fr)', gap: 10, marginBottom: 14 }}>
+            {[
+              ['pantalla',  'Pantalla',       ['ok','dañada','rota']],
+              ['botones',   'Botones',        ['ok','no funciona']],
+              ['cargador',  'Cargador',       ['incluido','no incluido']],
+              ['caja',      'Caja original',  ['incluida','no incluida']],
+              ['funda',     'Funda/case',     ['incluida','no incluida']],
+              ['chips',     'Chips/SIM',      ['retiradas','en el equipo']],
+              ['bateria',   'Batería',        ['ok','defectuosa','hinchada']],
+              ['camara',    'Cámara',         ['ok','dañada','no funciona']],
+            ].map(function(item) {
+              var key = item[0]; var label = item[1]; var opts = item[2];
+              return (
+                <div key={key}>
+                  <label style={Object.assign({}, sLabel, { fontSize: 11 })}>{label}</label>
+                  <select style={Object.assign({}, sInput, { fontSize: 12, padding: '6px 8px' })}
+                    value={fChecklist[key] || ''}
+                    onChange={function(e) { setFChecklist(function(prev) { return Object.assign({}, prev, { [key]: e.target.value }); }); }}>
+                    <option value="">—</option>
+                    {opts.map(function(o) { return <option key={o} value={o}>{o}</option>; })}
+                  </select>
+                </div>
+              );
+            })}
+          </div>
+
+          {/* Sección: fotos de recepción */}
+          <p style={{ fontWeight: 600, fontSize: 13, color: '#555', margin: '0 0 10px', borderBottom: '1px solid #eee', paddingBottom: 6 }}>📷 Fotos de recepción (opcional)</p>
+          <div style={{ marginBottom: 14 }}>
+            <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap', alignItems: 'flex-start' }}>
+              {fReceptionPhotos.map(function(url, i) {
+                return (
+                  <div key={i} style={{ position: 'relative' }}>
+                    <img src={url} alt={'foto ' + (i+1)} style={{ width: 80, height: 80, objectFit: 'cover', borderRadius: 8, border: '1px solid #ddd' }} />
+                    <button onClick={function() { deleteReceptionPhoto(url); }}
+                      style={{ position: 'absolute', top: -6, right: -6, width: 20, height: 20, borderRadius: '50%', background: '#E24B4A', color: '#fff', border: 'none', cursor: 'pointer', fontSize: 12, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 0 }}>×</button>
+                  </div>
+                );
+              })}
+              <label style={{ width: 80, height: 80, border: '2px dashed #ccc', borderRadius: 8, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', cursor: fPhotoUploading ? 'wait' : 'pointer', color: '#aaa', fontSize: 11, gap: 4, flexShrink: 0 }}>
+                {fPhotoUploading ? <span style={{ fontSize: 18 }}>⏳</span> : <><span style={{ fontSize: 24 }}>+</span><span>Foto</span></>}
+                <input type="file" accept="image/*" capture="environment" style={{ display: 'none' }} disabled={fPhotoUploading} onChange={handlePhotoSelect} />
+              </label>
+            </div>
           </div>
 
           {/* Nota interna */}

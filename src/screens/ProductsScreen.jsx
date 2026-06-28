@@ -27,7 +27,7 @@
 import React, { useState } from 'react';
 import { TEAL, NAVY, sCard, sInput, sLabel, sTH, sTD, mkBtn, mkBadge } from '../styles/theme.js';
 import { fmtD, fmtT, Q } from '../utils/formatters.js';
-import { productsAPI } from '../utils/api.js';
+import { productsAPI, serialsAPI, variantsAPI } from '../utils/api.js';
 import * as XLSX from 'xlsx';
 import { usePaginator } from '../hooks/usePaginator.jsx';
 import { ROLE_LABEL } from '../constants/index.js';
@@ -88,6 +88,93 @@ export default function ProductsScreen({ products, categories, locations, savePr
   var _shP = useState(null);     var stockHistProd    = _shP[0];  var setStockHistProd    = _shP[1];
   var _shD = useState([]);       var stockHistData    = _shD[0];  var setStockHistData    = _shD[1];
   var _shL = useState(false);    var stockHistLoading = _shL[0];  var setStockHistLoading = _shL[1];
+
+  // Modal gestión de variantes de producto
+  var _vp  = useState(null);  var variantProd    = _vp[0];  var setVariantProd    = _vp[1];
+  var _vd  = useState([]);    var variantData    = _vd[0];  var setVariantData    = _vd[1];
+  var _vl  = useState(false); var variantLoading = _vl[0];  var setVariantLoading = _vl[1];
+  var _vf  = useState({ color:'', capacity:'', sku:'', stock:'0', price:'', cost:'' });
+               var variantForm = _vf[0]; var setVariantForm = _vf[1];
+  var _vb  = useState(false); var variantBusy    = _vb[0];  var setVariantBusy    = _vb[1];
+  var _ve  = useState('');    var variantErr     = _ve[0];  var setVariantErr     = _ve[1];
+
+  function abrirVariantes(p) {
+    setVariantProd(p);
+    setVariantData([]);
+    setVariantForm({ color:'', capacity:'', sku:'', stock:'0', price:'', cost:'' });
+    setVariantErr('');
+    setVariantLoading(true);
+    variantsAPI.list(p.id)
+      .then(function(d) { setVariantData(d || []); setVariantLoading(false); })
+      .catch(function() { setVariantLoading(false); });
+  }
+
+  async function agregarVariante() {
+    if (!variantForm.color && !variantForm.capacity) { setVariantErr('Ingresa al menos color o capacidad'); return; }
+    setVariantBusy(true); setVariantErr('');
+    try {
+      await variantsAPI.add(variantProd.id, variantForm);
+      setVariantForm({ color:'', capacity:'', sku:'', stock:'0', price:'', cost:'' });
+      var d = await variantsAPI.list(variantProd.id);
+      setVariantData(d || []);
+    } catch(e) { setVariantErr((e && e.error) || 'Error al agregar variante'); }
+    setVariantBusy(false);
+  }
+
+  async function eliminarVariante(vid) {
+    if (!window.confirm('¿Eliminar esta variante?')) return;
+    try {
+      await variantsAPI.remove(variantProd.id, vid);
+      setVariantData(function(prev) { return prev.filter(function(v) { return v.id !== vid; }); });
+    } catch(e) { alert((e && e.error) || 'Error al eliminar'); }
+  }
+
+  // Modal gestión de seriales / IMEI
+  var _sp  = useState(null);  var serialProd    = _sp[0];  var setSerialProd    = _sp[1];
+  var _sd  = useState([]);    var serialData    = _sd[0];  var setSerialData    = _sd[1];
+  var _sl  = useState(false); var serialLoading = _sl[0];  var setSerialLoading = _sl[1];
+  var _si  = useState('');    var serialInput   = _si[0];  var setSerialInput   = _si[1];
+  var _sb  = useState(false); var serialBusy    = _sb[0];  var setSerialBusy    = _sb[1];
+  var _se  = useState('');    var serialErr     = _se[0];  var setSerialErr     = _se[1];
+
+  // ── Abre modal de seriales ────────────────────────────────────────────────
+  function abrirSeriales(p) {
+    setSerialProd(p);
+    setSerialData([]);
+    setSerialInput('');
+    setSerialErr('');
+    setSerialLoading(true);
+    serialsAPI.list(p.id)
+      .then(function(d) { setSerialData(d || []); setSerialLoading(false); })
+      .catch(function() { setSerialLoading(false); });
+  }
+
+  async function agregarSeriales() {
+    if (!serialInput.trim()) { setSerialErr('Ingresa al menos un IMEI/serial'); return; }
+    setSerialBusy(true);
+    setSerialErr('');
+    try {
+      var res = await serialsAPI.add(serialProd.id, { imeis: serialInput });
+      showFlash('✅ ' + (res.message || 'Seriales agregados'), 'ok');
+      setSerialInput('');
+      var d = await serialsAPI.list(serialProd.id);
+      setSerialData(d || []);
+    } catch (e) {
+      setSerialErr((e && e.error) || 'Error al agregar seriales');
+    }
+    setSerialBusy(false);
+  }
+
+  async function eliminarSerial(serialId, imei) {
+    if (!window.confirm('¿Eliminar serial ' + imei + '?')) return;
+    try {
+      await serialsAPI.remove(serialProd.id, serialId);
+      setSerialData(function(prev) { return prev.filter(function(s) { return s.id !== serialId; }); });
+      showFlash('Serial eliminado', 'ok');
+    } catch (e) {
+      showFlash((e && e.error) || 'No se pudo eliminar', 'err');
+    }
+  }
 
   // ── Abre modal de ajuste de stock ──────────────────────────────────────────
   function abrirAjusteStock(p) {
@@ -478,6 +565,22 @@ export default function ProductsScreen({ products, categories, locations, savePr
                           title="Historial de stock"
                           onClick={function() { abrirHistorialStock(p); }}
                         >📋</button>
+                        {/* Variantes */}
+                        {p.unit !== 'serv' && (
+                          <button
+                            style={Object.assign({}, mkBtn('purple'), { padding: '4px 10px', fontSize: 12 })}
+                            title="Gestionar variantes (color/capacidad)"
+                            onClick={function() { abrirVariantes(p); }}
+                          >🎨</button>
+                        )}
+                        {/* Seriales / IMEI */}
+                        {p.unit !== 'serv' && (
+                          <button
+                            style={Object.assign({}, mkBtn('teal'), { padding: '4px 10px', fontSize: 12 })}
+                            title="Gestionar seriales / IMEI"
+                            onClick={function() { abrirSeriales(p); }}
+                          >🔢</button>
+                        )}
                         {/* Eliminar */}
                         <button
                           style={Object.assign({}, mkBtn('red'), { padding: '4px 10px', fontSize: 12 })}
@@ -624,6 +727,145 @@ export default function ProductsScreen({ products, categories, locations, savePr
                 {adjBusy ? 'Guardando...' : 'Guardar ajuste'}
               </button>
               <button style={mkBtn('gray')} onClick={function() { setAdjProd(null); }}>Cancelar</button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ── Modal: Gestión de Seriales / IMEI ── */}
+      {serialProd && (
+        <div style={{ position: 'fixed', top: 0, left: 0, width: '100%', height: '100%', background: 'rgba(0,0,0,0.5)', zIndex: 1000, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 16, boxSizing: 'border-box' }}>
+          <div style={{ background: '#fff', borderRadius: 16, padding: '28px 24px', maxWidth: 620, width: '100%', maxHeight: '85vh', overflowY: 'auto', boxShadow: '0 20px 60px rgba(0,0,0,0.3)' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 20 }}>
+              <div>
+                <p style={{ fontWeight: 700, fontSize: 16, margin: '0 0 4px' }}>🔢 Seriales / IMEI</p>
+                <p style={{ fontSize: 13, color: '#666', margin: 0 }}>
+                  {serialProd.name} <span style={{ fontFamily: 'monospace', fontSize: 11, color: '#999' }}>({serialProd.code})</span>
+                </p>
+              </div>
+              <button style={mkBtn('gray')} onClick={function() { setSerialProd(null); }}>✕ Cerrar</button>
+            </div>
+
+            <div style={{ marginBottom: 16 }}>
+              <label style={sLabel}>Agregar IMEIs / seriales</label>
+              <textarea
+                style={Object.assign({}, sInput, { height: 80, resize: 'vertical', fontFamily: 'monospace', fontSize: 12 })}
+                placeholder={'Un serial por línea, o separados por coma\nEj: 355432102345678\n355432102345679'}
+                value={serialInput}
+                onChange={function(e) { setSerialInput(e.target.value); setSerialErr(''); }}
+              />
+              {serialErr && <p style={{ color: '#E24B4A', fontSize: 12, margin: '4px 0 0' }}>⚠ {serialErr}</p>}
+              <button
+                style={Object.assign({}, mkBtn('teal'), { marginTop: 8 })}
+                disabled={serialBusy}
+                onClick={agregarSeriales}
+              >
+                {serialBusy ? 'Agregando...' : '+ Agregar seriales'}
+              </button>
+            </div>
+
+            <div style={{ borderTop: '1px solid #eee', paddingTop: 16 }}>
+              <p style={{ fontWeight: 600, fontSize: 13, margin: '0 0 10px' }}>
+                Seriales registrados ({serialData.length})
+              </p>
+              {serialLoading ? (
+                <p style={{ color: '#999', textAlign: 'center', padding: 16 }}>Cargando...</p>
+              ) : serialData.length === 0 ? (
+                <p style={{ color: '#999', fontSize: 13, textAlign: 'center', padding: 16 }}>
+                  Sin seriales registrados. Agrégalos arriba.
+                </p>
+              ) : (
+                <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+                  <thead>
+                    <tr>
+                      {['IMEI / Serial', 'Estado', 'Notas', ''].map(function(h) {
+                        return <th key={h} style={sTH}>{h}</th>;
+                      })}
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {serialData.map(function(s) {
+                      var colorStatus = s.status === 'disponible' ? 'green' : s.status === 'vendido' ? 'red' : s.status === 'defectuoso' ? 'amber' : 'blue';
+                      return (
+                        <tr key={s.id}>
+                          <td style={Object.assign({}, sTD, { fontFamily: 'monospace', fontSize: 13 })}>{s.imei}</td>
+                          <td style={sTD}><span style={mkBadge(colorStatus)}>{s.status}</span></td>
+                          <td style={Object.assign({}, sTD, { fontSize: 12, color: '#666' })}>{s.notes || '—'}</td>
+                          <td style={sTD}>
+                            {s.status !== 'vendido' && (
+                              <button
+                                style={Object.assign({}, mkBtn('red'), { padding: '3px 8px', fontSize: 11 })}
+                                onClick={function() { eliminarSerial(s.id, s.imei); }}
+                              >🗑</button>
+                            )}
+                          </td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ── Modal: Gestión de Variantes ── */}
+      {variantProd && (
+        <div style={{ position: 'fixed', top: 0, left: 0, width: '100%', height: '100%', background: 'rgba(0,0,0,0.5)', zIndex: 1000, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 16, boxSizing: 'border-box' }}>
+          <div style={{ background: '#fff', borderRadius: 16, padding: '28px 24px', maxWidth: 680, width: '100%', maxHeight: '85vh', overflowY: 'auto', boxShadow: '0 20px 60px rgba(0,0,0,0.3)' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 20 }}>
+              <div>
+                <p style={{ fontWeight: 700, fontSize: 16, margin: '0 0 4px' }}>🎨 Variantes de producto</p>
+                <p style={{ fontSize: 13, color: '#666', margin: 0 }}>{variantProd.name} <span style={{ fontFamily: 'monospace', fontSize: 11, color: '#999' }}>({variantProd.code})</span></p>
+              </div>
+              <button style={mkBtn('gray')} onClick={function() { setVariantProd(null); }}>✕ Cerrar</button>
+            </div>
+
+            <div style={{ background: '#f8f9fa', borderRadius: 10, padding: 16, marginBottom: 16 }}>
+              <p style={{ fontWeight: 600, fontSize: 13, margin: '0 0 12px' }}>Nueva variante</p>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 8, marginBottom: 8 }}>
+                <div><label style={sLabel}>Color</label><input style={sInput} placeholder="Negro, Blanco..." value={variantForm.color} onChange={function(e) { setVariantForm(function(p) { return Object.assign({},p,{color:e.target.value}); }); }} /></div>
+                <div><label style={sLabel}>Capacidad</label><input style={sInput} placeholder="128GB, 256GB..." value={variantForm.capacity} onChange={function(e) { setVariantForm(function(p) { return Object.assign({},p,{capacity:e.target.value}); }); }} /></div>
+                <div><label style={sLabel}>SKU (opc.)</label><input style={sInput} placeholder="SKU-001" value={variantForm.sku} onChange={function(e) { setVariantForm(function(p) { return Object.assign({},p,{sku:e.target.value}); }); }} /></div>
+              </div>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 8, marginBottom: 8 }}>
+                <div><label style={sLabel}>Stock</label><input type="number" style={sInput} value={variantForm.stock} onChange={function(e) { setVariantForm(function(p) { return Object.assign({},p,{stock:e.target.value}); }); }} /></div>
+                <div><label style={sLabel}>Precio (Q)</label><input type="number" style={sInput} placeholder="Precio variante" value={variantForm.price} onChange={function(e) { setVariantForm(function(p) { return Object.assign({},p,{price:e.target.value}); }); }} /></div>
+                <div><label style={sLabel}>Costo (Q)</label><input type="number" style={sInput} placeholder="Costo variante" value={variantForm.cost} onChange={function(e) { setVariantForm(function(p) { return Object.assign({},p,{cost:e.target.value}); }); }} /></div>
+              </div>
+              {variantErr && <p style={{ color: '#E24B4A', fontSize: 12, margin: '0 0 8px' }}>⚠ {variantErr}</p>}
+              <button style={mkBtn('teal')} disabled={variantBusy} onClick={agregarVariante}>{variantBusy ? 'Agregando...' : '+ Agregar variante'}</button>
+            </div>
+
+            <div style={{ borderTop: '1px solid #eee', paddingTop: 16 }}>
+              <p style={{ fontWeight: 600, fontSize: 13, margin: '0 0 10px' }}>Variantes registradas ({variantData.length})</p>
+              {variantLoading ? (
+                <p style={{ color: '#999', textAlign: 'center', padding: 16 }}>Cargando...</p>
+              ) : variantData.length === 0 ? (
+                <p style={{ color: '#999', fontSize: 13, textAlign: 'center', padding: 16 }}>Sin variantes. Agrégalas arriba.</p>
+              ) : (
+                <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+                  <thead><tr>{['Color','Capacidad','SKU','Stock','Precio','Costo',''].map(function(h){return <th key={h} style={sTH}>{h}</th>;})}</tr></thead>
+                  <tbody>
+                    {variantData.map(function(v) {
+                      return (
+                        <tr key={v.id}>
+                          <td style={sTD}>{v.color || '—'}</td>
+                          <td style={sTD}>{v.capacity || '—'}</td>
+                          <td style={Object.assign({},sTD,{fontFamily:'monospace',fontSize:12})}>{v.sku || '—'}</td>
+                          <td style={sTD}>{v.stock}</td>
+                          <td style={sTD}>{v.price ? 'Q'+parseFloat(v.price).toFixed(2) : '—'}</td>
+                          <td style={sTD}>{v.cost ? 'Q'+parseFloat(v.cost).toFixed(2) : '—'}</td>
+                          <td style={sTD}>
+                            <button style={Object.assign({},mkBtn('red'),{padding:'3px 8px',fontSize:11})} onClick={function(){eliminarVariante(v.id);}}>🗑</button>
+                          </td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              )}
             </div>
           </div>
         </div>

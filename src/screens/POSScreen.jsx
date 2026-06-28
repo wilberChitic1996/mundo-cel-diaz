@@ -54,6 +54,7 @@ import React, { useState } from 'react';
 import { TEAL, sCard, sInput, sLabel, mkBtn, mkBadge } from '../styles/theme.js';
 import { Q } from '../utils/formatters.js';
 import { useIsMobile } from '../hooks/useIsMobile.js';
+import { serialsAPI } from '../utils/api.js';
 
 // Estilo de los botones +/- de cantidad en el carrito
 var sQB = {
@@ -71,6 +72,8 @@ export default function POSScreen({
   products, filteredPOS, cart,
   posQ, setPosQ,
   payMethod, setPayMethod,
+  secondMethod, setSecondMethod,
+  secondAmount, setSecondAmount,
   payType, setPayType,
   cashIn, setCashIn,
   initialPay, setInitialPay,
@@ -81,6 +84,7 @@ export default function POSScreen({
   addToCart, changeQty, removeFromCart, applyDiscount,
   checkout, resetPOS, flash,
   clients, accounts,
+  ivaPercent, ivaAmount, subtotalNeto,
 }) {
   clients  = clients  || [];
   accounts = accounts || [];
@@ -95,9 +99,35 @@ export default function POSScreen({
   var _di = useState(null); var discountItemId = _di[0]; var setDiscountItemId = _di[1];
   var _dv = useState('');   var discountVal    = _dv[0]; var setDiscountVal    = _dv[1];
 
+  // Selector de serial / IMEI al agregar producto
+  var _spk = useState(null);  var serialPickProd    = _spk[0]; var setSerialPickProd    = _spk[1];
+  var _spd = useState([]);    var serialPickList    = _spd[0]; var setSerialPickList    = _spd[1];
+  var _spl = useState(false); var serialPickLoading = _spl[0]; var setSerialPickLoading = _spl[1];
+
   // Tabs en móvil: "productos" o "carrito"
   var isMobile = useIsMobile();
   var _pt  = useState('productos'); var posTab = _pt[0]; var setPosTab = _pt[1];
+
+  // Maneja clic en producto: verifica si tiene seriales disponibles
+  async function handleProductClick(p) {
+    if (p.unit === 'serv' || p.stock === 0) { addToCart(p); return; }
+    setSerialPickLoading(true);
+    setSerialPickProd(p);
+    setSerialPickList([]);
+    try {
+      var seriales = await serialsAPI.list(p.id, 'disponible');
+      if (!seriales || seriales.length === 0) {
+        setSerialPickProd(null);
+        addToCart(p);
+      } else {
+        setSerialPickList(seriales);
+      }
+    } catch (_) {
+      setSerialPickProd(null);
+      addToCart(p);
+    }
+    setSerialPickLoading(false);
+  }
 
   // Aplica el descuento al ítem y cierra el editor
   function applyDiscountLocal(itemId) {
@@ -197,7 +227,7 @@ export default function POSScreen({
               return (
                 <div
                   key={p.id}
-                  onClick={function() { addToCart(p); }}
+                  onClick={function() { handleProductClick(p); }}
                   style={{
                     padding: 12, borderRadius: 10, cursor: agotado ? 'not-allowed' : 'pointer',
                     border: '1.5px solid ' + (inC ? TEAL : 'rgba(0,0,0,0.1)'),
@@ -244,6 +274,7 @@ export default function POSScreen({
                         <div style={{ flex: 1, marginRight: 8 }}>
                           <div style={{ fontSize: 13, fontWeight: 600, lineHeight: 1.3 }}>{item.name}</div>
                           <div style={{ fontSize: 10, color: '#999', fontFamily: 'monospace' }}>{item.code}</div>
+                          {item.imei && <div style={{ fontSize: 10, color: '#1D9E75', fontFamily: 'monospace', marginTop: 2 }}>IMEI: {item.imei}</div>}
                           {hasDiscount && <div style={{ fontSize: 10, color: '#E65100', marginTop: 2 }}>Desc. auto. por: {item.discountBy || 'usuario'}</div>}
                         </div>
                         <span style={{ cursor: 'pointer', color: '#E24B4A', fontSize: 18, lineHeight: 1, flexShrink: 0 }} onClick={function() { removeFromCart(item.id); }}>×</span>
@@ -303,6 +334,18 @@ export default function POSScreen({
 
           {/* ── Sección de cobro ── */}
           <div style={{ borderTop: '1px solid rgba(0,0,0,0.1)', paddingTop: 14 }}>
+            {ivaPercent > 0 && cart.length > 0 && (
+              <div style={{ marginBottom: 8 }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 12, color: '#888', marginBottom: 2 }}>
+                  <span>Subtotal (sin IVA)</span>
+                  <span>{Q(subtotalNeto || (cartTotal - ivaAmount))}</span>
+                </div>
+                <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 12, color: '#888', marginBottom: 4 }}>
+                  <span>IVA ({ivaPercent}%)</span>
+                  <span>{Q(ivaAmount)}</span>
+                </div>
+              </div>
+            )}
             <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 19, fontWeight: 700, marginBottom: 14 }}>
               <span>Total</span>
               <span style={{ color: TEAL }}>{Q(cartTotal)}</span>
@@ -400,8 +443,33 @@ export default function POSScreen({
               </div>
             )}
 
+            {/* Segundo método de pago (pago dividido) */}
+            {payType === 'completo' && cart.length > 0 && (
+              <div style={{ marginBottom: 10 }}>
+                <label style={{ ...sLabel, display: 'flex', alignItems: 'center', gap: 8, cursor: 'pointer' }}>
+                  <input type="checkbox" checked={!!secondMethod} onChange={function(e) { setSecondMethod(e.target.checked ? 'Tarjeta' : ''); setSecondAmount(''); }} />
+                  Dividir pago en dos métodos
+                </label>
+                {!!secondMethod && (
+                  <div style={{ display: 'flex', gap: 8, marginTop: 6 }}>
+                    <select style={{ ...sInput, flex: 1 }} value={secondMethod} onChange={function(e) { setSecondMethod(e.target.value); }}>
+                      <option>Efectivo</option>
+                      <option>Tarjeta</option>
+                      <option>Transferencia</option>
+                    </select>
+                    <input type="number" style={{ ...sInput, flex: 1 }} placeholder={'Monto 2do método'} value={secondAmount} onChange={function(e) { setSecondAmount(e.target.value); }} />
+                  </div>
+                )}
+                {!!secondMethod && secondAmount && (
+                  <div style={{ marginTop: 4, fontSize: 12, color: '#666' }}>
+                    {payMethod}: {Q(cartTotal - (parseFloat(secondAmount) || 0))} + {secondMethod}: {Q(parseFloat(secondAmount) || 0)}
+                  </div>
+                )}
+              </div>
+            )}
+
             {/* Campo de efectivo y cálculo de vuelto */}
-            {payMethod === 'Efectivo' && payType === 'completo' && cart.length > 0 && (
+            {payMethod === 'Efectivo' && payType === 'completo' && !secondMethod && cart.length > 0 && (
               <div style={{ marginBottom: 10 }}>
                 <label style={sLabel}>Efectivo recibido (Q)</label>
                 <input type="number" style={sInput} value={cashIn} placeholder="0.00" onChange={function(e) { setCashIn(e.target.value); }} />
@@ -435,6 +503,53 @@ export default function POSScreen({
           </div>
         </div>
       </div>
+      {/* ── Modal: Selector de Serial / IMEI ── */}
+      {serialPickProd && (
+        <div style={{ position: 'fixed', top: 0, left: 0, width: '100%', height: '100%', background: 'rgba(0,0,0,0.55)', zIndex: 1000, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 16, boxSizing: 'border-box' }}>
+          <div style={{ background: '#fff', borderRadius: 16, padding: '24px 20px', maxWidth: 440, width: '100%', maxHeight: '80vh', overflowY: 'auto', boxShadow: '0 20px 60px rgba(0,0,0,0.3)' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 16 }}>
+              <div>
+                <p style={{ fontWeight: 700, fontSize: 15, margin: '0 0 3px' }}>🔢 Seleccionar IMEI / Serial</p>
+                <p style={{ fontSize: 12, color: '#666', margin: 0 }}>{serialPickProd.name}</p>
+              </div>
+              <button style={mkBtn('gray')} onClick={function() { setSerialPickProd(null); setSerialPickList([]); }}>✕</button>
+            </div>
+            {serialPickLoading ? (
+              <p style={{ textAlign: 'center', color: '#999', padding: 20 }}>Cargando seriales...</p>
+            ) : (
+              <>
+                <div style={{ marginBottom: 12 }}>
+                  <button
+                    style={Object.assign({}, mkBtn('gray'), { width: '100%', fontSize: 13 })}
+                    onClick={function() { setSerialPickProd(null); setSerialPickList([]); addToCart(serialPickProd); }}
+                  >
+                    Agregar sin serial específico
+                  </button>
+                </div>
+                <div style={{ borderTop: '1px solid #eee', paddingTop: 12 }}>
+                  <p style={{ fontSize: 12, color: '#666', margin: '0 0 8px', fontWeight: 600 }}>Seriales disponibles ({serialPickList.length})</p>
+                  {serialPickList.map(function(s) {
+                    return (
+                      <div
+                        key={s.id}
+                        onClick={function() {
+                          addToCart(Object.assign({}, serialPickProd, { serial_id: s.id, imei: s.imei }));
+                          setSerialPickProd(null);
+                          setSerialPickList([]);
+                        }}
+                        style={{ padding: '10px 14px', border: '1.5px solid rgba(0,0,0,0.12)', borderRadius: 8, marginBottom: 6, cursor: 'pointer', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}
+                      >
+                        <span style={{ fontFamily: 'monospace', fontWeight: 600, fontSize: 14 }}>{s.imei}</span>
+                        <span style={{ fontSize: 11, color: '#999' }}>{s.notes || ''}</span>
+                      </div>
+                    );
+                  })}
+                </div>
+              </>
+            )}
+          </div>
+        </div>
+      )}
     </div>
   );
 }
