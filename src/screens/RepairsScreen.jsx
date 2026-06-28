@@ -360,8 +360,11 @@ export default function RepairsScreen({ repairs, clients, products, saveRepair, 
               {nextLabel[rep.status]}
             </button>
           )}
-          {(rep.status === 'listo' || rep.status === 'entregado') && (
+          {rep.status === 'listo' && (
             <button style={mkBtn('teal')} onClick={function() { if (onCobrar(rep) !== false) setSelRep(null); }}>💰 Cobrar reparación</button>
+          )}
+          {rep.status === 'entregado' && (
+            <span style={Object.assign({}, mkBadge('green'), { padding: '8px 14px', fontSize: 13 })}>✅ Reparación cobrada / entregada</span>
           )}
         </div>
 
