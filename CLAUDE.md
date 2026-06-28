@@ -667,44 +667,75 @@ mundo-cel-diaz-api/
 | API #62–#63 | Backend | Tests cobertura push/reminders/auth-refresh (61/61 passing) |
 | #139–#140 | Frontend | BackupScreen enterprise — historial, health card, descarga, backup manual |
 | API #64–#66 | Backend | Backup enterprise (snapshots diarios 2 AM por tenant → Supabase Storage) + monitoreo almacenamiento + retención audit_logs 180d |
+| #145–#153 | Frontend | Ronda fixes reparaciones: fotos async, validación flash, cobro lleva monto (servicio sin producto), mapeo finalCost, anti-doble-cobro (marca entregado), repairId en venta |
+| API #69–#72 | Backend | `product_id` null en servicios (FK), `repairId` marca reparación entregada, fix seriales `sales(date)`, fix cuentas aging por antigüedad (`due_date` inexistente) |
 
 ---
 
 ## Estado actual del trabajo
 
 - **Versión en producción:** 2.5.0
-- **Último cambio (28 jun 2026):** Implementación de 7 brechas funcionales (IVA, reparaciones+fotos, costo reparaciones, pago dividido, seriales, cuentas x cobrar, variantes). Migraciones 009-015 aplicadas en staging. Bugs corregidos: serial picker, método de pago duplicado.
+- **Último cambio (28 jun 2026):** 7 brechas funcionales + ronda de fixes de cobro de reparaciones y auditoría de esquema. Migraciones 009-015 aplicadas en staging.
 - **Rama de trabajo activa:** `claude/gifted-heisenberg-r6n8jo` (en AMBOS repos)
-- **PR #145 (Frontend):** ✅ Abierto — bug fixes (serial picker + split method). Vercel: ambos Ready. **PENDIENTE MERGE A STAGING.**
 - **Producción frontend:** ✅ mundoceldiaz.com (NO tocar hasta validar piloto completo)
 - **Producción API:** ✅ mundo-cel-diaz-api-production.up.railway.app (NO tocar)
-- **Staging frontend:** ✅ mundo-cel-diaz-staging.vercel.app — con brechas implementadas
-- **Staging API:** ✅ mundo-cel-diaz-api-production-e546.up.railway.app — con brechas implementadas
+- **Staging frontend:** ⚠️ mundo-cel-diaz-staging.vercel.app — **corre código viejo** (último deploy Vercel `2cb7d1a`). Ver "Bloqueo Vercel" abajo.
+- **Staging API:** ✅ mundo-cel-diaz-api-production-e546.up.railway.app — al día (Railway despliega sin límite)
 - **Staging BD:** Migraciones 009-015 aplicadas ✅. Bucket `repairs` creado ✅.
 - **2FA:** Implementado para superadmin, deshabilitado temporalmente (pendiente propagación DNS Resend). Descomentar en `routes/auth.js` líneas 82-99 cuando esté listo.
 - **Credenciales piloto:** `admin@demo.com` / `Admin2026!` (hash bcrypt en la BD de staging).
 - **Bucket Supabase Storage `backups`:** ✅ Creado en staging y producción.
 
+> ### ⛔ BLOQUEO VERCEL (28 jun 2026) — leer antes de prometer pruebas de frontend
+> Vercel (plan gratis) topó su límite de **100 deploys/día por cuenta** (`api-deployments-free-per-day`).
+> Por eso **varios fixes de frontend de hoy (#152, #153) nunca se desplegaron** y el piloto siguió mostrando
+> código viejo ("siempre lo mismo"). El límite **se resetea ~24h** o se quita subiendo a **Vercel Pro ($20/mes)**.
+> Usuario eligió **esperar el reset** (gratis). **Al volver Vercel:** mergear PR #153 → confirmar deploy "Ready" → recién ahí probar.
+> **Backend (Railway) NO tiene este límite** — por eso los fixes de API sí se pueden desplegar y validar el mismo día.
+
 ### Validación en piloto — Estado (28 jun 2026)
 
 | Prueba | Brecha | Estado |
 |---|---|---|
-| IVA en boleta | #3 IVA configurable | ✅ PASADA — "Subtotal Q26.79 / IVA Q3.21 / Total Q30.00" |
-| Pago dividido POS | #4 Split payment | ✅ PASADA — fix método duplicado aplicado |
-| Reparaciones checklist+fotos | #2 Reparaciones | ✅ PASADA — checklist 8 ítems + botón foto visibles |
-| Fotos en reparaciones (guardar) | #2 Reparaciones | ⏳ PENDIENTE — no probado aún |
-| Variantes de producto 🎨 | #7 Variantes | ⏳ PENDIENTE |
-| Seriales en POS | #1 Seriales | ⏳ PENDIENTE |
-| Costo final en reparaciones | #5 Costo | ⏳ PENDIENTE |
-| Cuentas x cobrar aging | #6 Cuentas | ⏳ PENDIENTE |
+| IVA en boleta | #3 IVA configurable | ✅ PASADA |
+| Pago dividido POS | #4 Split payment | ✅ PASADA |
+| Reparaciones checklist+fotos (visible) | #2 Reparaciones | ✅ PASADA |
+| Guardar orden de reparación | #2 Reparaciones | ✅ PASADA (REP-000002 creada) |
+| Cobro de reparación (lleva monto, servicio sin producto) | #2/#5 | ✅ PASADA (boletas generadas) |
+| Anti-doble-cobro (marca entregado) | #2 | ⏳ Backend listo (#70); falta deploy frontend #153 (Vercel) |
+| Fotos en reparaciones (guardar) | #2 Reparaciones | ⏳ PENDIENTE (necesita Vercel) |
+| Variantes de producto 🎨 | #7 Variantes | ⏳ Código auditado OK; falta probar (Vercel) |
+| Seriales en POS | #1 Seriales | ⏳ Bug API arreglado (#71); falta probar (Vercel) |
+| Costo final en reparaciones | #5 Costo | ✅ Arreglado (mapeo finalCost + edición) |
+| Cuentas x cobrar aging | #6 Cuentas | ⏳ Bug API arreglado (#72); falta probar (Vercel) |
+
+### Bugs encontrados y corregidos hoy (28 jun 2026)
+
+| # | Síntoma | Causa raíz | Fix |
+|---|---|---|---|
+| 1 | Orden de reparación "no guardaba / no aparecía" | `submitRepair` no esperaba la API (sin `await`) | PR #147 frontend |
+| 2 | Cobro de reparación: "Error al guardar ítems de venta" | `sale_items.product_id` con FK; línea de servicio mandaba UUID falso | PR #69 API (`product_id` null si `unit==='serv'`) |
+| 3 | Cobro no llevaba monto / obligaba a elegir producto | `cobrarReparacion` ignoraba `finalCost` y no cargaba servicio | PR #149 frontend |
+| 4 | "Costo final" no se guardaba ni mostraba | Los 3 mapeos de repairs no incluían `finalCost`; no recargaba | PR #149 frontend |
+| 5 | Reparación se podía cobrar infinitas veces | No se marcaba entregada al cobrar | PR #70 API (`repairId` en venta) + #152/#153 frontend |
+| 6 | Seriales: listado/búsqueda fallaban | embed `sales(id, date,...)` — `sales` no tiene `date` | PR #71 API (alias `date:created_at`) |
+| 7 | Cuentas aging nunca funcionó (500) | `accounts.due_date` no existe; repairs `client`/`device`/`en_proceso` inexistentes | PR #72 API (aging por `created_at`, columnas reales) |
+
+> **LECCIÓN TRANSVERSAL (la causa #1 de bugs en este proyecto): DESAJUSTE DE ESQUEMA.**
+> El código frecuentemente usa nombres de columna que NO existen en la BD real de staging
+> (`problem_desc` vs `issue`, `tech_name` vs `technician`, `estimated_cost` vs `price`, `due_date` inexistente,
+> `repairs.client`/`device` inexistentes, `sales.date` inexistente). **Antes de tocar cualquier query nueva,
+> verificar columnas reales** con `SELECT column_name FROM information_schema.columns WHERE table_name='X'`.
+> La BD de staging diverge del esquema versionado (columnas agregadas a mano en producción y no replicadas).
 
 ### Próximos pasos (en orden)
 
-1. **Merge PR #145 a staging** (bug fixes serial picker + split method) — verificar CI verde primero
-2. **Continuar validación piloto**: fotos en reparación → variantes → seriales → costos → cuentas
+1. **(Vercel reseteado) Merge PR #153 a staging** → confirmar deploy "Ready" → avisar al usuario
+2. **Validar en piloto**: anti-doble-cobro → seriales → cuentas aging → variantes → fotos en reparación
 3. **Aplicar migraciones 009-015 en Supabase PRODUCCIÓN** (`rhecnmfivygkayfvauxt`)
 4. **Crear bucket `repairs` en Supabase PRODUCCIÓN**
 5. **PR staging → main** en frontend y API (solo después de validar TODO el piloto)
+6. **(Opcional, decisión del usuario) Abrir red del entorno a staging** para que Claude confirme deploys del API por sí mismo (ver regla #6)
 
 ---
 
