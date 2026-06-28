@@ -72,6 +72,8 @@ export default function POSScreen({
   products, filteredPOS, cart,
   posQ, setPosQ,
   payMethod, setPayMethod,
+  secondMethod, setSecondMethod,
+  secondAmount, setSecondAmount,
   payType, setPayType,
   cashIn, setCashIn,
   initialPay, setInitialPay,
@@ -441,8 +443,33 @@ export default function POSScreen({
               </div>
             )}
 
+            {/* Segundo método de pago (pago dividido) */}
+            {payType === 'completo' && cart.length > 0 && (
+              <div style={{ marginBottom: 10 }}>
+                <label style={{ ...sLabel, display: 'flex', alignItems: 'center', gap: 8, cursor: 'pointer' }}>
+                  <input type="checkbox" checked={!!secondMethod} onChange={function(e) { setSecondMethod(e.target.checked ? 'Tarjeta' : ''); setSecondAmount(''); }} />
+                  Dividir pago en dos métodos
+                </label>
+                {!!secondMethod && (
+                  <div style={{ display: 'flex', gap: 8, marginTop: 6 }}>
+                    <select style={{ ...sInput, flex: 1 }} value={secondMethod} onChange={function(e) { setSecondMethod(e.target.value); }}>
+                      <option>Efectivo</option>
+                      <option>Tarjeta</option>
+                      <option>Transferencia</option>
+                    </select>
+                    <input type="number" style={{ ...sInput, flex: 1 }} placeholder={'Monto 2do método'} value={secondAmount} onChange={function(e) { setSecondAmount(e.target.value); }} />
+                  </div>
+                )}
+                {!!secondMethod && secondAmount && (
+                  <div style={{ marginTop: 4, fontSize: 12, color: '#666' }}>
+                    {payMethod}: {Q(cartTotal - (parseFloat(secondAmount) || 0))} + {secondMethod}: {Q(parseFloat(secondAmount) || 0)}
+                  </div>
+                )}
+              </div>
+            )}
+
             {/* Campo de efectivo y cálculo de vuelto */}
-            {payMethod === 'Efectivo' && payType === 'completo' && cart.length > 0 && (
+            {payMethod === 'Efectivo' && payType === 'completo' && !secondMethod && cart.length > 0 && (
               <div style={{ marginBottom: 10 }}>
                 <label style={sLabel}>Efectivo recibido (Q)</label>
                 <input type="number" style={sInput} value={cashIn} placeholder="0.00" onChange={function(e) { setCashIn(e.target.value); }} />

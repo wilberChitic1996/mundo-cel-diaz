@@ -1180,6 +1180,8 @@ function App(props) {
   var _ca=useState([]); var cart=_ca[0]; var setCart=_ca[1];
   var _pq=useState(""); var posQ=_pq[0]; var setPosQ=_pq[1];
   var _pm=useState("Efectivo"); var payMethod=_pm[0]; var setPayMethod=_pm[1];
+  var _sm=useState(""); var secondMethod=_sm[0]; var setSecondMethod=_sm[1];
+  var _sa=useState(""); var secondAmount=_sa[0]; var setSecondAmount=_sa[1];
   var _pt=useState("completo"); var payType=_pt[0]; var setPayType=_pt[1];
   var _ci=useState(""); var cashIn=_ci[0]; var setCashIn=_ci[1];
   var _ip=useState(""); var initialPay=_ip[0]; var setInitialPay=_ip[1];
@@ -1235,7 +1237,7 @@ function App(props) {
   var subtotalNeto=cartTotal-ivaAmount;
   var initPaidVal=parseFloat(initialPay)||0;
 
-  function resetPOS(){ setCart([]);setCashIn("");setClientName("");setInitialPay("");setPayType("completo");setPayMethod("Efectivo");setSelectedClientId(null);setSaleNote(""); }
+  function resetPOS(){ setCart([]);setCashIn("");setClientName("");setInitialPay("");setPayType("completo");setPayMethod("Efectivo");setSecondMethod("");setSecondAmount("");setSelectedClientId(null);setSaleNote(""); }
 
   var checkoutInProgress=useRef(false);
   async function checkout(){
@@ -1252,7 +1254,7 @@ function App(props) {
     if(payType==="completo"){
       var _createdSale=null;
       try {
-        _createdSale = await salesAPI.create({client:client,total:cartTotal,method:payMethod,items:cart,nota:nota,idempotencyKey:idempotencyKey,ivaPct:ivaPercent});
+        _createdSale = await salesAPI.create({client:client,total:cartTotal,method:payMethod,items:cart,nota:nota,idempotencyKey:idempotencyKey,ivaPct:ivaPercent,secondMethod:secondMethod||null,secondAmount:secondAmount?parseFloat(secondAmount):null});
         var freshSales = await salesAPI.getAll();
         var ns = (freshSales||[]).map(function(s){return Object.assign({},s,{items:s.sale_items||[],total:Number(s.total),date:s.created_at,registradoPor:s.registrado_por||null,payType:s.pay_type||'completo',status:s.status||'completado'});});
         setSales(ns);
@@ -1273,7 +1275,7 @@ function App(props) {
       var balance=cartTotal-paid;
       var _createdAcc=null;
       try{
-        _createdAcc = await salesAPI.create({client:client,total:cartTotal,method:payMethod,items:cart,payType:payType,initialPay:paid,nota:nota,idempotencyKey:idempotencyKey,ivaPct:ivaPercent});
+        _createdAcc = await salesAPI.create({client:client,total:cartTotal,method:payMethod,items:cart,payType:payType,initialPay:paid,nota:nota,idempotencyKey:idempotencyKey,ivaPct:ivaPercent,secondMethod:secondMethod||null,secondAmount:secondAmount?parseFloat(secondAmount):null});
         var freshAccs = await accountsAPI.getAll();
         var na=(freshAccs||[]).map(function(a){return Object.assign({},a,{items:a.account_items||[],payments:(a.account_payments||[]).map(function(_pp){return Object.assign({},_pp,{date:_pp.date||_pp.created_at,amount:Number(_pp.amount),registradoPor:_pp.registrado_por||_pp.registradoPor||null});}),total:Number(a.total),paid:Number(a.paid),balance:Number(a.balance),date:a.created_at,registradoPor:a.registrado_por||null});});
         setAccounts(na);
@@ -2048,7 +2050,7 @@ function App(props) {
         {gsOpen&&<GlobalSearch onClose={function(){setGsOpen(false);}} setView={setView} sales={sales} clients={clients} products={products} repairs={repairs} setSelectedSale={setSelSale}/>}
         <div key={view} style={{flex:1,padding:"clamp(12px,3vw,28px)",overflowY:"auto",minWidth:0}} className="main-content screen-enter">
           {view==="dashboard"&&canAccess(session.role,"dashboard")&&<DashboardScreen sales={sales} todaySales={todaySales} pendingAccs={pendingAccs} totalPend={totalPend} products={products} top5={top5} setSelectedSale={setSelSale} setView={setView} navTo={navTo} accounts={accounts} returns={returns} repairs={repairs} warranties={warranties}/>}
-          {view==="pos"      &&canAccess(session.role,"pos")&&<POSScreen products={products} filteredPOS={filteredPOS} cart={cart} posQ={posQ} setPosQ={setPosQ} payMethod={payMethod} setPayMethod={setPayMethod} payType={payType} setPayType={setPayType} cashIn={cashIn} setCashIn={setCashIn} initialPay={initialPay} setInitialPay={setInitialPay} clientName={clientName} setClientName={setClientName} selectedClientId={selectedClientId} setSelectedClientId={setSelectedClientId} saleNote={saleNote} setSaleNote={setSaleNote} cartTotal={cartTotal} vuelto={vuelto} initPaidVal={initPaidVal} addToCart={addToCart} changeQty={changeQty} removeFromCart={removeFromCart} applyDiscount={applyDiscount} checkout={checkout} resetPOS={resetPOS} flash={flash} clients={clients} accounts={accounts} ivaPercent={ivaPercent} ivaAmount={ivaAmount} subtotalNeto={subtotalNeto}/>}
+          {view==="pos"      &&canAccess(session.role,"pos")&&<POSScreen products={products} filteredPOS={filteredPOS} cart={cart} posQ={posQ} setPosQ={setPosQ} payMethod={payMethod} setPayMethod={setPayMethod} secondMethod={secondMethod} setSecondMethod={setSecondMethod} secondAmount={secondAmount} setSecondAmount={setSecondAmount} payType={payType} setPayType={setPayType} cashIn={cashIn} setCashIn={setCashIn} initialPay={initialPay} setInitialPay={setInitialPay} clientName={clientName} setClientName={setClientName} selectedClientId={selectedClientId} setSelectedClientId={setSelectedClientId} saleNote={saleNote} setSaleNote={setSaleNote} cartTotal={cartTotal} vuelto={vuelto} initPaidVal={initPaidVal} addToCart={addToCart} changeQty={changeQty} removeFromCart={removeFromCart} applyDiscount={applyDiscount} checkout={checkout} resetPOS={resetPOS} flash={flash} clients={clients} accounts={accounts} ivaPercent={ivaPercent} ivaAmount={ivaAmount} subtotalNeto={subtotalNeto}/>}
           {view==="caja"     &&canAccess(session.role,"caja")&&<CajaScreen sales={sales} accounts={accounts} returns={returns} session={session}/>}
           {view==="accounts" &&canAccess(session.role,"accounts")&&<AccountsScreen accounts={accounts} pendingAccs={pendingAccs} totalPend={totalPend} addPayment={addPayment} showFlash={showFlash} products={products} session={session} clients={clients} navTo={navTo} initialSearch={view==="accounts"&&deepLink?deepLink.search||'':''}/>}
           {view==="returns"  &&canAccess(session.role,"returns")&&<ReturnsScreen returns={returns} products={products} onProcess={processReturn} showFlash={showFlash} clients={clients} sales={sales}/>}
