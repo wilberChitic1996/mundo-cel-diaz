@@ -37,6 +37,17 @@ Ningún cambio de base de datos (CREATE TABLE, ALTER TABLE, INSERT, DELETE) pued
 
 > **Origen:** Usuario confirmó que se saltaron pasos de validación porque Claude asumió que los scripts se habían ejecutado cuando no era así.
 
+### 5. Esperas de CI/deploy — Claude monitorea y reporta, NUNCA deja esperando
+
+Cuando Claude está esperando que termine CI, un deploy de Vercel/Railway, o cualquier proceso externo, **NO debe quedarse pasivo dejando que el usuario espere sin saber**. Claude DEBE:
+
+1. **Sondear activamente** el estado (con `mcp__github__pull_request_read` → `get_check_runs`, no esperar a que llegue un webhook — los webhooks NO entregan "CI success").
+2. **En cuanto el estado cambie** (CI verde/rojo, deploy listo), **actuar de inmediato** (mergear si verde, corregir si rojo) y **reportar al usuario en una sola línea clara**: "✅ CI verde, mergeado" o "⛔ CI falló, corrigiendo".
+3. **Si la espera se alarga**, dar una señal de vida con el estado actual en vez de quedarse callado.
+4. **NUNCA** decir solo "esperando..." y terminar el turno sin un plan de re-verificación. Si no llega webhook, Claude vuelve a sondear por su cuenta.
+
+> **Origen:** Usuario reportó que las esperas lo hacían desconfiar — se podía quedar esperando horas cuando el proceso ya había terminado. Claude debe cerrar el ciclo siempre: verificar → actuar → reportar.
+
 ---
 
 ## 🔴 REGLA ESTRICTA: NO TOCAR LO QUE FUNCIONA
