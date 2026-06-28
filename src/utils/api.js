@@ -219,6 +219,13 @@ export const pushAPI = {
   unsubscribe:function(ep)  { return api.delete('/push/subscribe', { data: { endpoint: ep } }); },
 };
 
+export const variantsAPI = {
+  list:   function(productId)        { return api.get('/products/' + productId + '/variants'); },
+  add:    function(productId, data)  { return api.post('/products/' + productId + '/variants', data); },
+  update: function(productId, id, d) { return api.put('/products/' + productId + '/variants/' + id, d); },
+  remove: function(productId, id)    { return api.delete('/products/' + productId + '/variants/' + id); },
+};
+
 export const serialsAPI = {
   list:    function(productId, status) {
     var qs = status ? '?status=' + encodeURIComponent(status) : '';
