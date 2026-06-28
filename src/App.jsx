@@ -1066,7 +1066,7 @@ function App(props) {
         var normalRets  = (rets||[]).map(function(r){return Object.assign({},r,{items:r.return_items||[],refundAmount:Number(r.refund_amount),itemCondition:r.item_condition,refundMethod:r.refund_method,date:r.created_at,saleId:r.sale_id||null});});
         var normalDefs  = (defs||[]).map(function(d){return Object.assign({},d,{price:Number(d.price||0)});});
         var normalClis  = (clis||[]).map(function(c){return Object.assign({},c,{cliCode:c.cli_code,createdAt:c.created_at});});
-        var normalReps  = (reps||[]).map(function(r){return Object.assign({},r,{repCode:r.rep_code,clientId:r.client_id,clientName:r.client_name,clientPhone:r.client_phone,clientCli:r.client_cli,problemDesc:r.problem_desc,techName:r.tech_name,estimatedCost:Number(r.estimated_cost||0),promisedDate:r.promised_date,internalNote:r.internal_note,registradoPor:r.registrado_por||{},parts:r.parts||[],createdAt:r.created_at,finalCost:r.final_cost!=null?Number(r.final_cost):null});});
+        var normalReps  = (reps||[]).map(function(r){return Object.assign({},r,{repCode:r.rep_code,clientId:r.client_id,clientName:r.client_name,clientPhone:r.client_phone,clientCli:r.client_cli,problemDesc:r.problem_desc,techName:r.tech_name,estimatedCost:Number(r.estimated_cost||0),promisedDate:r.promised_date,internalNote:r.internal_note,registradoPor:r.registrado_por||{},parts:r.parts||[],createdAt:r.created_at,finalCost:r.final_cost!=null?Number(r.final_cost):null,receptionPhotos:r.reception_photos||[],deliveryPhotos:r.delivery_photos||[]});});
         setProducts(normalProds);
         setSales(normalSales);
         setAccounts(normalAccs);
@@ -1486,7 +1486,7 @@ function App(props) {
     try{
       await repairsAPI.create({id:rep.id,repCode:rep.repCode,clientId:rep.clientId||null,clientName:rep.clientName,clientPhone:rep.clientPhone||null,clientCli:rep.clientCli||null,brand:rep.brand,model:rep.model,imei:rep.imei||null,problemDesc:rep.problemDesc,diagnosis:rep.diagnosis||null,techName:rep.techName||null,estimatedCost:rep.estimatedCost||0,promisedDate:rep.promisedDate||null,internalNote:rep.internalNote||null,status:rep.status||'recibido',registradoPor:rep.registradoPor||{},parts:rep.parts||[],receptionChecklist:rep.receptionChecklist||null,receptionPhotos:null,createdAt:rep.createdAt});
       var fr=await repairsAPI.getAll();
-      setRepairs((fr||[]).map(function(r){return Object.assign({},r,{repCode:r.rep_code,clientId:r.client_id,clientName:r.client_name,clientPhone:r.client_phone,clientCli:r.client_cli,problemDesc:r.problem_desc,techName:r.tech_name,estimatedCost:Number(r.estimated_cost||0),promisedDate:r.promised_date,internalNote:r.internal_note,registradoPor:r.registrado_por||{},parts:r.parts||[],createdAt:r.created_at,finalCost:r.final_cost!=null?Number(r.final_cost):null});}));
+      setRepairs((fr||[]).map(function(r){return Object.assign({},r,{repCode:r.rep_code,clientId:r.client_id,clientName:r.client_name,clientPhone:r.client_phone,clientCli:r.client_cli,problemDesc:r.problem_desc,techName:r.tech_name,estimatedCost:Number(r.estimated_cost||0),promisedDate:r.promised_date,internalNote:r.internal_note,registradoPor:r.registrado_por||{},parts:r.parts||[],createdAt:r.created_at,finalCost:r.final_cost!=null?Number(r.final_cost):null,receptionPhotos:r.reception_photos||[],deliveryPhotos:r.delivery_photos||[]});}));
       return true;
     }catch(e){
       var emRep=e&&e.error?e.error:null;
@@ -1498,7 +1498,7 @@ function App(props) {
     try{
       await repairsAPI.updateStatus(id, status);
       var fr2=await repairsAPI.getAll();
-      setRepairs((fr2||[]).map(function(r){return Object.assign({},r,{repCode:r.rep_code,clientId:r.client_id,clientName:r.client_name,clientPhone:r.client_phone,clientCli:r.client_cli,problemDesc:r.problem_desc,techName:r.tech_name,estimatedCost:Number(r.estimated_cost||0),promisedDate:r.promised_date,internalNote:r.internal_note,registradoPor:r.registrado_por||{},parts:r.parts||[],createdAt:r.created_at,finalCost:r.final_cost!=null?Number(r.final_cost):null});}));
+      setRepairs((fr2||[]).map(function(r){return Object.assign({},r,{repCode:r.rep_code,clientId:r.client_id,clientName:r.client_name,clientPhone:r.client_phone,clientCli:r.client_cli,problemDesc:r.problem_desc,techName:r.tech_name,estimatedCost:Number(r.estimated_cost||0),promisedDate:r.promised_date,internalNote:r.internal_note,registradoPor:r.registrado_por||{},parts:r.parts||[],createdAt:r.created_at,finalCost:r.final_cost!=null?Number(r.final_cost):null,receptionPhotos:r.reception_photos||[],deliveryPhotos:r.delivery_photos||[]});}));
     }catch(e){
       var emRS=e&&e.error?e.error:null;
       showFlash("⛔ "+(emRS||"Error al actualizar la reparación. Verifica tu conexión."),"err");
@@ -1524,7 +1524,7 @@ function App(props) {
   async function reloadRepairs(){
     try{
       var fr=await repairsAPI.getAll();
-      setRepairs((fr||[]).map(function(r){return Object.assign({},r,{repCode:r.rep_code,clientId:r.client_id,clientName:r.client_name,clientPhone:r.client_phone,clientCli:r.client_cli,problemDesc:r.problem_desc,techName:r.tech_name,estimatedCost:Number(r.estimated_cost||0),promisedDate:r.promised_date,internalNote:r.internal_note,registradoPor:r.registrado_por||{},parts:r.parts||[],createdAt:r.created_at,finalCost:r.final_cost!=null?Number(r.final_cost):null});}));
+      setRepairs((fr||[]).map(function(r){return Object.assign({},r,{repCode:r.rep_code,clientId:r.client_id,clientName:r.client_name,clientPhone:r.client_phone,clientCli:r.client_cli,problemDesc:r.problem_desc,techName:r.tech_name,estimatedCost:Number(r.estimated_cost||0),promisedDate:r.promised_date,internalNote:r.internal_note,registradoPor:r.registrado_por||{},parts:r.parts||[],createdAt:r.created_at,finalCost:r.final_cost!=null?Number(r.final_cost):null,receptionPhotos:r.reception_photos||[],deliveryPhotos:r.delivery_photos||[]});}));
     }catch(e){ /* silencioso */ }
   }
 
