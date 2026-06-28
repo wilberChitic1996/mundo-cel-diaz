@@ -12,6 +12,8 @@ y dame un resumen de: arquitectura actual, último estado del trabajo,
 y pendientes. No hagas nada hasta que yo te confirme qué tarea seguiremos.
 ```
 
+> **Cómo funciona la memoria (para el usuario):** Claude **no recuerda entre sesiones distintas** — cada sesión NUEVA arranca en blanco y se pone al día leyendo este CLAUDE.md (se carga solo; el prompt de arriba es para que resuma y se alinee). **Dentro de una misma sesión recuerda todo** — no hay que repetir nada. Reconectarse a la MISMA sesión conserva el historial. Por eso CLAUDE.md (estado + pendientes + lecciones) es la memoria del proyecto entre sesiones: **todo lo importante se anota acá (regla #9)**.
+
 ---
 
 ## 🔴 REGLAS CRÍTICAS DE INTERACCIÓN (OBLIGATORIAS)
@@ -226,6 +228,19 @@ El flujo aplica **por separado a cada repo** (frontend y API). Si el cambio toca
 ### Flujo staging → main (producción)
 
 Igual que arriba pero en dirección staging → main, y en AMBOS repos si aplica.
+
+> #### 👤 Release a producción — QUIÉN HACE QUÉ (para que el usuario vaya seguro)
+> Producción es el paso más delicado y **NUNCA es automático**. Solo se hace **después de validar TODO el piloto**.
+>
+> **Lo que hace EL USUARIO (Claude lo guía paso a paso):**
+> 1. **Validar el piloto** — probar que todo funciona antes de liberar.
+> 2. **Correr en la BD de PRODUCCIÓN** (`rhecnmfivygkayfvauxt`) el script SQL que Claude le pase (migraciones) — Claude da el script inline, el usuario lo ejecuta (regla #4).
+> 3. **Crear el bucket `repairs`** en el Supabase de producción — Claude lo guía en el panel.
+> 4. **Aprobar** los PR `staging → main` cuando Claude avise.
+>
+> **Lo que hace CLAUDE:** crear los PRs, verificar CI, mergear, confirmar el deploy de producción (regla #7). **NUNCA toca producción sin OK explícito del usuario.**
+>
+> **Invariante de seguridad:** mientras nada se mergee a `main`, `mundoceldiaz.com` sigue intacto. Imposible que algo llegue a producción por accidente.
 
 **Solo Frontend:**
 ```
