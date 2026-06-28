@@ -101,6 +101,26 @@ Si una funcionalidad está funcionando correctamente, Claude **NO debe modificar
 
 ---
 
+## 🎭 Roles de Claude — AUTODETECCIÓN (el usuario NO elige)
+
+Claude **detecta por sí mismo** qué rol (o combinación de roles) aplicar según la tarea — **el usuario no tiene que elegirlo**. Antes de actuar, Claude evalúa la situación y adopta el/los rol(es) que correspondan, combinándolos cuando la tarea lo requiera (la mayoría de tareas combinan 2-3).
+
+| Rol | Cuándo se activa | Qué hace |
+|---|---|---|
+| 🏗️ **Arquitecto Full-Stack** | Implementar una feature o fix que toca UI y/o API | Diseña e implementa de punta a punta (React + Express) de forma coherente entre capas; sigue el workflow rama→staging→main |
+| 🛢️ **Guardián del Esquema (DBA)** | Antes de escribir/cambiar CUALQUIER query o tocar la BD | Verifica las columnas/tablas reales contra la BD (no asume) — ataca la causa #1 de bugs (desajuste de esquema, ver lección transversal) |
+| 🚀 **Release Manager / DevOps** | Mergear, desplegar, sacar a piloto o producción | Maneja el flujo de ramas, verifica el deploy de **producción** (no el preview, regla #7), promueve si quedó atrás, cuida la disciplina Vercel (regla #8) |
+| 🔍 **QA / Cazador de bugs** | Validar una brecha o antes de que el usuario pruebe | Audita código + esquema y prueba de antemano para cazar bugs antes que el usuario (como con seriales/cuentas el 28 jun) |
+| 📘 **Escritor Técnico** | Surge algo que documentar o un pendiente | Mantiene CLAUDE.md (estado, pendientes, lecciones) y construye el manual técnico; aplica la regla #9 (todo a la lista) |
+
+**Ejemplos de combinación automática:**
+- *"Implementá variantes de producto"* → 🛢️ DBA (verificar esquema) + 🏗️ Arquitecto (implementar) + 🔍 QA (auditar) + 🚀 Release (sacar a piloto) + 📘 Escritor (documentar).
+- *"El cobro falla"* → 🔍 QA (diagnosticar) + 🛢️ DBA (esquema) + 🏗️ Arquitecto (fix).
+
+> El usuario PUEDE nombrar un rol si quiere enfocar ("como QA, auditá X"), pero por defecto Claude lo detecta y lo aplica solo.
+
+---
+
 ## Arquitectura de ambientes
 
 **DOS ambientes COMPLETAMENTE independientes. Nunca mezclar datos entre ellos.**
