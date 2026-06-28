@@ -1188,6 +1188,7 @@ function App(props) {
   var _cn=useState(""); var clientName=_cn[0]; var setClientName=_cn[1];
   var _sci=useState(null); var selectedClientId=_sci[0]; var setSelectedClientId=_sci[1];
   var _sn=useState(""); var saleNote=_sn[0]; var setSaleNote=_sn[1];
+  var _crep=useState(null); var cobrandoRepId=_crep[0]; var setCobrandoRepId=_crep[1];
 
   function showFlash(msg,type){
     setFlash({msg:msg,type:type||"ok"});
@@ -1237,7 +1238,7 @@ function App(props) {
   var subtotalNeto=cartTotal-ivaAmount;
   var initPaidVal=parseFloat(initialPay)||0;
 
-  function resetPOS(){ setCart([]);setCashIn("");setClientName("");setInitialPay("");setPayType("completo");setPayMethod("Efectivo");setSecondMethod("");setSecondAmount("");setSelectedClientId(null);setSaleNote(""); }
+  function resetPOS(){ setCart([]);setCashIn("");setClientName("");setInitialPay("");setPayType("completo");setPayMethod("Efectivo");setSecondMethod("");setSecondAmount("");setSelectedClientId(null);setSaleNote("");setCobrandoRepId(null); }
 
   var checkoutInProgress=useRef(false);
   async function checkout(){
@@ -1293,6 +1294,8 @@ function App(props) {
         setPostSale({sale:_rsale2,opts:{usuario:session.name,usuarioRole:session.role,estado:_estado,abonoHoy:payType==="parcial"?paid:null,pagado:paid,saldo:balance}});
       }
     }
+    // Si la venta provino de una reparación, marcarla como entregada para que no se cobre de nuevo
+    if(cobrandoRepId){ try{ await updateRepairStatus(cobrandoRepId,'entregado'); }catch(_e){ /* no bloquear el cierre de venta */ } }
     resetPOS();
     checkoutInProgress.current=false;
   }
@@ -1512,6 +1515,7 @@ function App(props) {
     setClientName(rep.clientName);
     setSelectedClientId(rep.clientId||null);
     setSaleNote("Reparación "+rep.repCode+" — "+rep.brand+" "+rep.model);
+    setCobrandoRepId(rep.id);
     setCart([{id:gid(),code:rep.repCode||"REP",name:"Reparación — "+rep.brand+" "+rep.model,price:monto,qty:1,shelf:"",unit:"serv",maxStock:999}]);
     setView("pos");
     showFlash("✓ Reparación "+rep.repCode+" cargada (Q"+monto.toFixed(2)+")","ok");
