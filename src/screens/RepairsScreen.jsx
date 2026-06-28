@@ -188,6 +188,10 @@ export default function RepairsScreen({ repairs, clients, products, saveRepair, 
   var _frph  = useState([]);     var fReceptionPhotos= _frph[0];  var setFReceptionPhotos= _frph[1];
   var _fpul  = useState(false);  var fPhotoUploading = _fpul[0];  var setFPhotoUploading = _fpul[1];
 
+  // Brecha #5: edición de costo final en vista detalle
+  var _efc   = useState(false);  var editFinalCost    = _efc[0];  var setEditFinalCost    = _efc[1];
+  var _efcv  = useState('');     var finalCostInput   = _efcv[0]; var setFinalCostInput   = _efcv[1];
+
   // Dropdown de clientes y buscador de repuestos
   var _cdrop = useState(false); var showCliDrop     = _cdrop[0]; var setShowCliDrop     = _cdrop[1];
   var _pq    = useState('');    var partQ           = _pq[0];    var setPartQ           = _pq[1];
@@ -398,6 +402,34 @@ export default function RepairsScreen({ repairs, clients, products, saveRepair, 
             <div style={{ background: '#EAF3DE', borderRadius: 8, padding: 14 }}>
               <p style={{ fontSize: 11, color: '#999', textTransform: 'uppercase', letterSpacing: '0.8px', margin: '0 0 6px' }}>Costo estimado</p>
               <p style={{ fontWeight: 700, fontSize: 18, color: TEAL, margin: 0 }}>Q {Number(rep.estimatedCost || 0).toFixed(2)}</p>
+            </div>
+            <div style={{ background: rep.finalCost ? '#1a2535' : '#f9f8f5', borderRadius: 8, padding: 14, gridColumn: 'span 2' }}>
+              <p style={{ fontSize: 11, color: rep.finalCost ? '#aaa' : '#999', textTransform: 'uppercase', letterSpacing: '0.8px', margin: '0 0 6px' }}>Costo final cobrado</p>
+              {editFinalCost ? (
+                <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+                  <input type="number" style={Object.assign({}, sInput, { width: 120, padding: '5px 8px' })} value={finalCostInput} placeholder="0.00"
+                    onChange={function(e) { setFinalCostInput(e.target.value); }} />
+                  <button style={Object.assign({}, mkBtn('teal'), { padding: '5px 12px', fontSize: 12 })} onClick={function() {
+                    var fc = parseFloat(finalCostInput) || 0;
+                    repairsAPI.update(rep.id, { finalCost: fc }).then(function() {
+                      setEditFinalCost(false);
+                    }).catch(function() { showFlash('Error al guardar costo final', 'error'); });
+                  }}>✓ Guardar</button>
+                  <button style={Object.assign({}, mkBtn('gray'), { padding: '5px 10px', fontSize: 12 })} onClick={function() { setEditFinalCost(false); }}>✕</button>
+                </div>
+              ) : (
+                <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                  <p style={{ fontWeight: 700, fontSize: 18, color: rep.finalCost ? '#fff' : '#bbb', margin: 0 }}>
+                    {rep.finalCost ? 'Q ' + Number(rep.finalCost).toFixed(2) : 'Sin definir'}
+                  </p>
+                  {rep.status !== 'entregado' && (
+                    <button style={Object.assign({}, mkBtn('gray'), { padding: '3px 10px', fontSize: 11 })}
+                      onClick={function() { setFinalCostInput(rep.finalCost ? String(rep.finalCost) : ''); setEditFinalCost(true); }}>
+                      ✏ Editar
+                    </button>
+                  )}
+                </div>
+              )}
             </div>
           </div>
 
