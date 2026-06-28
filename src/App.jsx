@@ -1199,7 +1199,7 @@ function App(props) {
   });
 
   function addToCart(p){
-    if(p.stock<=0&&p.unit!=="serv")return;
+    if(p.stock<=0&&p.unit!=="serv"){showFlash('⚠️ Sin stock: '+p.name,'warn');return;}
     setCart(function(c){
       var ex=c.find(function(i){return i.id===p.id;});
       if(ex) return ex.qty>=p.stock?c:c.map(function(i){return i.id===p.id?Object.assign({},i,{qty:i.qty+1}):i;});
@@ -2050,7 +2050,7 @@ function App(props) {
           {view==="catalogos"&&canAccess(session.role,"catalogos")&&<CatalogosScreen categories={categories} locations={locations} products={products} reloadCatalogos={reloadCatalogos} showFlash={showFlash}/>}
           {view==="inventory"&&canAccess(session.role,"inventory")&&<InventoryScreen products={products}/>}
           {view==="history"  &&canAccess(session.role,"history")&&<HistoryScreen sales={sales} selectedSale={selSale} setSelectedSale={setSelSale} accounts={accounts} returns={returns} products={products} session={session} clients={clients} navTo={navTo}/>}
-          {view==="cuadres"  &&canAccess(session.role,"cuadres")&&<CuadresScreen sales={sales} accounts={accounts} returns={returns} products={products} repairs={repairs} session={session}/>}
+          {view==="cuadres"  &&canAccess(session.role,"cuadres")&&<CuadresScreen sales={sales} accounts={accounts} returns={returns} products={products} repairs={repairs} session={session} showFlash={showFlash}/>}
           {view==="backup"   &&canAccess(session.role,"backup")&&<BackupScreen products={products} sales={sales} accounts={accounts} returns={returns} defectives={defectives} clients={clients} repairs={repairs} warranties={warranties} onExportJSON={exportJSON} onExportExcel={exportExcel}/>}
           {view==="users"    &&canAccess(session.role,"users")&&<UsersScreen session={session} showFlash={showFlash}/>}
           {view==="clients"  &&canAccess(session.role,"clients")&&<ClientsScreen clients={clients} sales={sales} accounts={accounts} returns={returns} saveClient={saveClient} session={session} showFlash={showFlash} initialSearch={view==="clients"&&deepLink?deepLink.search||'':''} initialClientId={view==="clients"&&deepLink?deepLink.clientId||null:null}/>}

@@ -34,6 +34,7 @@ import { fmtD, fmtT } from '../utils/formatters.js';
 import { getStore } from '../utils/receipt.js';
 import { APP_NAME, APP_VERSION, STORE_FALLBACK, ROLE_LABEL } from '../constants/index.js';
 import HelpTip from '../components/ui/HelpTip.jsx';
+import { exportExcel } from '../utils/export.js';
 
 // Formatea un número como "Q 1,234.56"
 var Q = function(n) { return 'Q ' + Number(n).toFixed(2); };
@@ -337,6 +338,37 @@ export default function CuadresScreen({ sales, accounts, returns, products, repa
     w.document.close();
   }
 
+  function exportCuadreExcel() {
+    var label = getRangeLabel();
+    var allPeriodSales = periodSales.concat(periodSalesCredito).slice().sort(function(a, b) { return new Date(b.date) - new Date(a.date); });
+    var cols = ['Fecha', 'Hora', 'Cliente', 'Artículos', 'Método', 'Total Q', 'Estado'];
+    var rows = allPeriodSales.map(function(s) {
+      return [
+        new Date(s.date).toLocaleDateString('es-GT'),
+        new Date(s.date).toLocaleTimeString('es-GT', { hour: '2-digit', minute: '2-digit' }),
+        s.client,
+        (s.items || []).length,
+        s.status === 'cuenta' ? 'Crédito' : s.method,
+        Number(s.total).toFixed(2),
+        s.status,
+      ];
+    });
+    // Append summary rows below
+    rows.push([]);
+    rows.push(['RESUMEN DEL PERÍODO', label]);
+    rows.push(['Ventas cobradas', totalVentas.toFixed(2)]);
+    rows.push(['Ventas a crédito', totalVentasCredito.toFixed(2)]);
+    rows.push(['Abonos recibidos', abonosPeriod.toFixed(2)]);
+    rows.push(['Reembolsos (caja)', reembolsosCaja.toFixed(2)]);
+    rows.push(['Ingresos netos', totalIngresos.toFixed(2)]);
+    rows.push(['Efectivo (neto)', totalEfectivo.toFixed(2)]);
+    rows.push(['Tarjeta (neto)', totalTarjeta.toFixed(2)]);
+    rows.push(['Transferencia (neto)', totalTransferencia.toFixed(2)]);
+    rows.push(['Ganancia bruta estimada', gananciaBruta.toFixed(2)]);
+    exportExcel(rows, cols, 'Cuadre_' + label.replace(/[\s/]/g, '_'));
+    showFlash('✅ Excel exportado', 'ok');
+  }
+
   var rangos = [
     ['hoy',      'Hoy'],
     ['semana',   'Esta semana'],
@@ -357,7 +389,10 @@ export default function CuadresScreen({ sales, accounts, returns, products, repa
           📈 Cuadres y Reportes
           <HelpTip text={'Resumen financiero del negocio por período.\n\n• Ventas brutas: total cobrado en el período\n• Ingresos netos: ventas + abonos recibidos − reembolsos\n• Ganancia bruta: ingresos − costo de productos (solo si cargaste costos al inventario)\n• Antigüedad de cuentas: cuánto tiempo llevan pendientes los créditos\n\nPodés imprimir el cuadre o exportarlo a Excel desde aquí.'} />
         </p>
-        <button style={Object.assign({}, mkBtn('teal'), { padding: '10px 20px' })} onClick={printCuadre}>🖨 Imprimir / PDF</button>
+        <div style={{ display: 'flex', gap: 8 }}>
+          <button style={Object.assign({}, mkBtn('green'), { padding: '10px 20px' })} onClick={exportCuadreExcel}>📊 Excel</button>
+          <button style={Object.assign({}, mkBtn('teal'), { padding: '10px 20px' })} onClick={printCuadre}>🖨 Imprimir / PDF</button>
+        </div>
       </div>
 
       {/* Selector de período */}
