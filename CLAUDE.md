@@ -36,11 +36,18 @@ Si una funcionalidad está funcionando correctamente, Claude **NO debe modificar
 | **Base de datos** | Supabase `mundo-cel-diaz` (`rhecnmfivygkayfvauxt`, AWS us-west-2) | Supabase `mundo-cel-diaz-staging` (`aawjhttlaydwsipsifre`, AWS us-east-1) |
 | **FRONTEND_URL (Railway)** | `https://mundoceldiaz.com` | `https://mundo-cel-diaz-staging.vercel.app` |
 
-Detección automática de ambiente (`src/utils/api.js`):
-- `localhost` → API local `http://localhost:4000/api`
-- hostname contiene `staging` → API staging
+Detección automática de ambiente (`src/utils/api.js` → función `resolveApiUrl()`):
+- `localhost:3000` → API local `http://localhost:4000/api`
+- hostname contiene `staging` → API staging (e546)
 - `mundoceldiaz.com` → API producción
 - cualquier otro → API producción (fallback)
+
+### Credenciales piloto
+
+- **URL:** `mundo-cel-diaz-staging.vercel.app`
+- **Email:** `admin@demo.com`
+- **Contraseña:** `Admin2026!`
+- **tenant_id staging:** `aaaaaaaa-0000-0000-0000-000000000001` (nombre: "Mundo Cel Diaz Demo")
 
 ---
 
@@ -127,85 +134,311 @@ Este sistema maneja MÚLTIPLES negocios en la misma base de datos. Cada negocio 
 - Al agregar índices, SIEMPRE incluir `tenant_id` como primera columna del índice
 - Nunca hacer queries sin filtro de tenant — expone datos de otros negocios
 
-### Tenant de producción — PROTEGIDO
+### Tenants conocidos
 
-- **Negocio:** MUNDO CEL DIAZ
-- **tenant_id:** `00000000-0000-0000-0000-000000000001`
-- **NUNCA** modificar datos de este tenant sin aprobación explícita del usuario
+| Ambiente | Nombre | tenant_id |
+|---|---|---|
+| Producción | MUNDO CEL DIAZ | `00000000-0000-0000-0000-000000000001` |
+| Staging | Mundo Cel Diaz Demo | `aaaaaaaa-0000-0000-0000-000000000001` |
+
+- **NUNCA** modificar datos del tenant de producción sin aprobación explícita del usuario
 - Todo cambio de DB debe mostrarse al usuario para aprobación antes de ejecutar
+
+### Tablas reales de la BD (22 tablas confirmadas)
+
+Siempre usar estos nombres exactos. NUNCA asumir nombres — verificar antes de escribir scripts.
+
+| Tabla | Columnas principales | Notas |
+|---|---|---|
+| `tenants` | id, name, plan, email, phone, owner_name, active, expires_at | Base de negocios |
+| `users` | id, tenant_id, name, email, password_hash, role, active, sec_question, sec_answer_hash, last_login | Roles: superadmin/admin/cajero/auditor |
+| `store_settings` | id, tenant_id, key, value, updated_at | Config por tenant (iva_percent, etc.) |
+| `clients` | id, tenant_id, cli_code, name, dpi, phone, address, active | Clientes |
+| `products` | id, tenant_id, code (NOT NULL), name, category, brand, unit, stock, min_stock, price, cost, shelf, active | `code` es NOT NULL |
+| `categories` | id, tenant_id, name | Categorías de productos |
+| `locations` | id, tenant_id, name | Ubicaciones/estanterías |
+| `suppliers` | id, tenant_id, name, phone, email, address, notes, active | Proveedores |
+| `sales` | id, tenant_id, client, total, method, status, pay_type, user_id, registrado_por (JSONB), idempotency_key | Con idempotencia |
+| `sale_items` | id, tenant_id, sale_id, product_id, code, name, price, qty, subtotal | |
+| `accounts` | id, tenant_id, sale_id, client, total, paid, balance, status, method, user_id, idempotency_key | Cuentas por cobrar — tiene FK a sales |
+| `account_items` | id, tenant_id, account_id, code, name, price, qty | |
+| `account_payments` | id, tenant_id, account_id, amount, method, note, registrado_por (JSONB) | Abonos |
+| `purchases` | id, tenant_id, supplier_id, supplier_name, total, notes, registered_by | Compras a proveedores |
+| `purchase_items` | id, tenant_id, purchase_id, product_id, product_name, product_code, qty, cost, subtotal | |
+| `returns` | id, tenant_id, sale_id, client, reason, refund_method, refund_amount, item_condition, total | |
+| `return_items` | id, tenant_id, return_id, code, name, price, qty | |
+| `defectives` | id, tenant_id, return_id, code, name, qty, price, reason, status | |
+| `repairs` | id, tenant_id, rep_code, client_name, client_phone, brand, model, issue, diagnosis, status, price, advance, technician, notes | NO tiene tabla `repair_items` |
+| `warranties` | id, tenant_id, entity_type, entity_id, client, description, start_date, end_date, status | |
+| `caja_sesiones` | id, tenant_id, fondo_inicial, nota_apertura, opened_by, opened_role, closed_at, closed_by, total_ventas, total_gastos, total_abonos, total_efectivo, diferencia, nota_cierre | Ojo: `sesiones` no `sessions` |
+| `caja_gastos` | id, tenant_id, sesion_id, concepto, monto, categoria, registrado_por, registrado_role | |
+| `stock_movements` | id, tenant_id, product_id, ... | Movimientos de inventario |
+| `refresh_tokens` | id, tenant_id, user_id, token_hash, expires_at, created_at, revoked_at | |
+| `push_subscriptions` | id, tenant_id, user_id, endpoint, p256dh, auth_key, created_at, updated_at | |
+| `audit_logs` | id, tenant_id, user_id, user_name, user_role, action, entity_type, entity_id, details (JSONB) | |
+| `backups` | id, tenant_id, created_at, size_bytes, status, type, storage_path, error_msg, tables_included, record_counts (JSONB) | |
+
+> **LECCIÓN CRÍTICA (jun 2026):** Antes de escribir cualquier script SQL, consultar siempre `SELECT table_name FROM information_schema.tables WHERE table_schema = 'public' ORDER BY table_name` para verificar nombres reales. Tablas que NO existen: `repair_items`, `caja_movements`, `caja_sessions`, `supplier_purchase_items`, `product_price_history`.
+
+**FK importante:** `accounts.sale_id` referencia `sales.id`. Al borrar registros, siempre borrar en este orden: `account_items` → `account_payments` → `accounts` → `sale_items` → `sales`.
+
+**RLS:** Habilitado en todas las tablas. El API usa `service_role` key que bypassa RLS.
+
+**RPC especial:** `decrement_stock(p_product_id, p_qty, p_tenant_id)` — actualización atómica de stock con `SELECT FOR UPDATE`.
 
 ### Aplicar cambios de BD en ambos ambientes
 
-1. Aplicar primero en **Supabase staging** (`mundo-cel-diaz-staging`)
+1. Aplicar primero en **Supabase staging** (`mundo-cel-diaz-staging`, `aawjhttlaydwsipsifre`)
 2. Validar en piloto que funciona
-3. Aplicar en **Supabase producción** (`mundo-cel-diaz`)
+3. Aplicar en **Supabase producción** (`mundo-cel-diaz`, `rhecnmfivygkayfvauxt`)
 
 ---
 
 ## Estructura del frontend
 
+**Stack:** React 18.3.1 + Vite 5.4.1 + PWA  
+**Versión:** 2.2.0  
+**Node requerido:** >=18  
+**Puerto dev:** 3000 (`npm run dev`)
+
+### Scripts disponibles
+```
+npm run dev            — Servidor de desarrollo (puerto 3000)
+npm run build          — Build de producción
+npm run preview        — Preview del build
+npm run lint           — ESLint
+npm run lint:fix       — ESLint con autofix
+npm run format         — Prettier
+npm run electron:dev   — Electron en modo desarrollo
+npm run package        — Build Electron (.exe para Windows)
+```
+
+### Árbol de archivos
+
 ```
 src/
-  App.jsx              — Componente raíz, sidebar, routing entre pantallas
-  screens/             — 24 módulos independientes
-    LandingPage.jsx, LoginScreen.jsx, DashboardScreen.jsx, POSScreen.jsx,
-    CajaScreen.jsx, AccountsScreen.jsx, ReturnsScreen.jsx, DefectiveScreen.jsx,
-    ProductsScreen.jsx, CatalogosScreen.jsx, InventoryScreen.jsx, HistoryScreen.jsx,
-    ClientsScreen.jsx, RepairsScreen.jsx, WarrantiesScreen.jsx, SuppliersScreen.jsx,
-    UsersScreen.jsx, AuditScreen.jsx, CuadresScreen.jsx, StoreConfigScreen.jsx,
-    BackupScreen.jsx, AyudaScreen.jsx, SuperAdminPanel.jsx, OnboardingWizard.jsx
+  main.jsx             — Entry point, monta <App />, inicia Sentry
+  App.jsx              — Componente raíz, sidebar, routing entre pantallas, auto-refresh JWT
+
+  screens/             — 25 módulos independientes
+    AccountsScreen.jsx      (505 líneas) — Cuentas por cobrar, aging 30/60/90d
+    AuditScreen.jsx         (262 líneas) — Auditoría de acciones
+    AyudaScreen.jsx         (221 líneas) — Ayuda y soporte
+    BackupScreen.jsx        (333 líneas) — Backups: historial, health card, descarga, manual
+    CajaScreen.jsx          (559 líneas) — Caja chica y sesiones
+    CatalogosScreen.jsx     (294 líneas) — Categorías y ubicaciones
+    ClientsScreen.jsx       (409 líneas) — Clientes
+    CuadresScreen.jsx       (541 líneas) — Cuadres y reportes
+    DashboardScreen.jsx     (473 líneas) — Dashboard + RemindersWidget
+    DefectiveScreen.jsx     (154 líneas) — Productos defectuosos
+    HistoryScreen.jsx       (439 líneas) — Historial de movimientos con artículos
+    InventoryScreen.jsx     (273 líneas) — Inventario
+    LandingPage.jsx         (756 líneas) — Página pública con animaciones
+    LoginScreen.jsx         (386 líneas) — Autenticación + PushPermissionBanner
+    OnboardingWizard.jsx    (239 líneas) — Setup inicial de tienda nueva
+    POSScreen.jsx           (440 líneas) — Punto de venta con boletas
+    ProductsScreen.jsx      (695 líneas) — Gestión de productos + import Excel
+    RepairsScreen.jsx       (702 líneas) — Taller de reparaciones
+    ReturnsScreen.jsx       (518 líneas) — Devoluciones
+    StoreConfigScreen.jsx   (213 líneas) — Configuración de tienda (IVA, etc.)
+    SuperAdminPanel.jsx     (597 líneas) — Panel super admin (tenants, stats)
+    SuppliersScreen.jsx     (488 líneas) — Proveedores y compras
+    UsersScreen.jsx         (291 líneas) — Gestión de usuarios
+    VerifyReceipt.jsx        (84 líneas) — Página pública verificación QR (sin login)
+    WarrantiesScreen.jsx    (332 líneas) — Garantías
+
   hooks/
+    useIsMobile.js          — Detección de dispositivo móvil
     usePaginator.jsx        — Hook de paginación (DEBE ser .jsx no .js — contiene JSX)
     usePushNotifications.js — Web Push: estados idle/requesting/granted/denied/unsupported
-  components/ui/
-    PushPermissionBanner.jsx — Banner inferior de solicitud de permiso push
+
+  components/
+    MetricBox.jsx           — Componente de métricas del Dashboard
+    ProductForm.jsx         — Formulario reutilizable de productos
+    Sidebar.jsx             — Barra lateral de navegación
+    ui/
+      HelpTip.jsx           — Tooltips de ayuda contextual
+      PagTable.jsx          — Tabla con paginación integrada
+      PushPermissionBanner.jsx — Banner inferior de solicitud de permiso push
+      RemindersWidget.jsx   — Widget de recordatorios en Dashboard
+
   utils/
-    api.js             — Instancia axios + todos los endpoints por módulo (incluye pushAPI)
-    formatters.js      — Q(), fmtD(), fmtT(), gid()
-    receipt.js         — getStore(), setStore(), buildReceiptHTML(), printVoucher(), compartirWhatsApp()
-    whatsapp.js        — pedirTelYEnviar(), waBoletaVenta(), waRecordatorio()
-    export.js          — exportExcel(), exportPDF()
-    session.js         — Auto-refresh JWT 7 min antes de expirar, refresh token 30d
-    sentry.js          — Sentry init para frontend
+    api.js        (229 líneas) — Instancia axios + 21 módulos de API (ver sección Endpoints)
+    export.js               — exportExcel() con XLSX estático, exportPDF() con jsPDF dinámico
+    formatters.js           — Q() (moneda GTQ), fmtD() (fecha), fmtT() (hora), gid() (UUID)
+    receipt.js    (27KB)    — getStore(), setStore(), buildReceiptHTML(), printVoucher(), compartirWhatsApp()
+    sentry.js               — Sentry init para frontend
+    session.js              — Auto-refresh JWT 7 min antes de expirar, refresh token 30d
+    whatsapp.js             — pedirTelYEnviar(), waBoletaVenta(), waRecordatorio()
+    db.js                   — DEPRECATED (no usar)
+    excel.js                — DEPRECATED — usar export.js
+
   styles/
-    theme.js           — TEAL, NAVY, sCard, sInput, sLabel, sTH, sTD, sQtyBtn, mkBtn(), mkBadge()
+    global.css              — Estilos globales + CSS custom properties para dark mode
+    theme.js                — Sistema de diseño:
+                              TEAL=#1D9E75 (brand), NAVY=#1a2535 (sidebar)
+                              sCard, sInput, sLabel, sTH, sTD, sQtyBtn, H1
+                              mkBtn(color) → genera botones (teal/red/blue/purple/gray/green/amber)
+                              mkBadge(color) → genera badges
+
   constants/
-    index.js           — APP_NAME, PERMS, ROLE_LABEL, SESS_KEY, etc.
+    index.js                — APP_NAME, PERMS, ROLE_LABEL, ROLE_COLOR, PLATFORM_FEATURES, SESS_KEY
+
+  data/
+    demo.js                 — Datos de demostración
 ```
+
+### XLSX / SheetJS — regla de importación
+
+```js
+// ✅ CORRECTO — import estático en cada archivo que lo use
+import * as XLSX from 'xlsx';
+
+// ❌ INCORRECTO — no usar dynamic import ni window.XLSX
+var XLSX = await import('xlsx');   // MAL
+window.XLSX                        // MAL (no hay global en Vite)
+```
+
+Cada archivo tiene su propio scope en Vite. Si un archivo usa XLSX, DEBE importarlo él mismo. Archivos que ya tienen el import: `BackupScreen.jsx`, `ProductsScreen.jsx`, `export.js`.
+
+---
+
+## Roles RBAC
+
+4 roles con permisos diferenciados:
+
+| Rol | Color | Acceso a módulos |
+|---|---|---|
+| `superadmin` | `#9B59B6` | Todo + panel de admin de tenants |
+| `admin` | `#1D9E75` | dashboard, pos, caja, accounts, returns, defective, products, catalogos, inventory, history, backup, users, clients, repairs, cuadres, audit, warranties, storeconfig, suppliers, ayuda |
+| `cajero` | `#378ADD` | dashboard, pos, caja, accounts, returns, history, clients, repairs, warranties, ayuda |
+| `auditor` | `#7F77DD` | dashboard, caja, history, inventory, cuadres, ayuda |
+
+---
+
+## Endpoints del API — 21 módulos
+
+Definidos en `src/utils/api.js`. Disponibles en `/api/*` y `/api/v1/*` (retrocompatibles).
+
+| Módulo | Métodos disponibles |
+|---|---|
+| `authAPI` | login, logout, refresh, verify2fa, findUser, resetPassword |
+| `publicAPI` | verify (QR sin autenticación) |
+| `productsAPI` | getAll, create, update, remove, priceHistory, adjustStock, stockHistory |
+| `salesAPI` | getAll, create |
+| `accountsAPI` | getAll, create, addPayment |
+| `returnsAPI` | getAll, create |
+| `defectivesAPI` | getAll, update (status) |
+| `usersAPI` | getAll, create, update |
+| `clientsAPI` | getAll, create, update, remove |
+| `repairsAPI` | getAll, create, updateStatus, update, remove |
+| `warrantiesAPI` | getAll, create, update |
+| `auditAPI` | getAll |
+| `suppliersAPI` | getAll, create, update, getPurchases, createPurchase |
+| `categoriesAPI` | getAll, create, update, remove |
+| `locationsAPI` | getAll, create, update, remove, moveProduct |
+| `settingsAPI` | getAll, update |
+| `cajaAPI` | getSesiones, getSesionActiva, abrir, cerrar, getGastos, crearGasto, eliminarGasto |
+| `adminAPI` | getTenants, createTenant, updateTenant, getStats, getSubscription, init, resetUserPassword |
+| `remindersAPI` | summary, accounts |
+| `backupAPI` | list, create, download, data, health |
+| `pushAPI` | vapidKey, subscribe, unsubscribe |
+| `checkAPI` | función async para verificar health del API |
 
 ---
 
 ## Estructura del backend
 
+**Stack:** Express 5.2.1 + Node.js >=18  
+**Versión:** 2.2.0  
+**Puerto:** 4000
+
+### Scripts disponibles
+```
+npm start              — Producción (node index.js)
+npm test               — Vitest (run once)
+npm run test:watch     — Vitest watch mode
+npm run lint           — ESLint
+npm run migrate:up     — Aplicar migraciones pendientes
+npm run migrate:down   — Revertir última migración
+npm run migrate:create — Crear nueva migración
+```
+
+### Árbol de archivos
+
 ```
 mundo-cel-diaz-api/
-  app.js              — Express + CORS + Helmet + Rate Limiting
-  index.js            — Punto de entrada, startCronJobs()
-  routes/             — 20 archivos, uno por módulo
-    auth.js, products.js, sales.js, accounts.js, returns.js, defectives.js,
-    users.js, clients.js, repairs.js, audit.js, warranties.js, caja.js,
-    settings.js, suppliers.js, categories.js, locations.js, admin.js, public.js,
-    reminders.js, push.js
-  middleware/
-    auth.js           — Validación JWT
-    rateLimit.js      — Límite de peticiones por IP
-  utils/
-    tenant.js         — withTenant(), tid() — filtrado multi-tenant
-    audit.js          — logAudit() — registro de acciones
-    logger.js         — Pino logger estructurado
-    cache.js          — Redis o Map en memoria (fallback)
-    reminders.js      — Cron jobs: cuentas, garantías, reparaciones + push
-    sentry.js         — Sentry error tracking
-  services/
-    clientService.js, productService.js, saleService.js
+  app.js              — Express + CORS (*.vercel.app + FRONTEND_URL) + Helmet + Rate Limiting
+  index.js            — Entry point, startCronJobs(), Sentry init
+  supabase.js         — Cliente Supabase (service_role key, bypassa RLS)
   swagger.js          — OpenAPI docs en /api-docs
-  supabase.js         — Cliente Supabase (service_role key)
-  Dockerfile          — node:20-alpine, USER node, puerto 4000
-  docker-compose.yml  — api + redis:7-alpine para desarrollo local
+
+  routes/             — 21 archivos, uno por módulo
+    auth.js           — Login, logout, refresh, 2FA (deshabilitado), recuperación password
+    products.js       — CRUD productos, historial precio, ajuste stock
+    sales.js          — Crear/listar ventas, idempotencia
+    accounts.js       — Cuentas por cobrar, abonos
+    returns.js        — Devoluciones de ventas
+    defectives.js     — Productos defectuosos
+    users.js          — Gestión usuarios, RBAC
+    clients.js        — CRUD clientes
+    repairs.js        — Órdenes de reparación
+    audit.js          — Logs de auditoría
+    warranties.js     — Garantías
+    caja.js           — Sesiones de caja y gastos
+    settings.js       — Configuración por tenant (con cache Redis 5min)
+    suppliers.js      — Proveedores y compras
+    categories.js     — Categorías de productos
+    locations.js      — Ubicaciones/estanterías
+    admin.js          — Super admin: tenants, stats, subscriptions, storage
+    public.js         — Verificación QR sin autenticación
+    reminders.js      — Resumen de recordatorios por tenant
+    push.js           — Web Push VAPID: vapid-public-key, subscribe, unsubscribe, send
+    backup.js         — Snapshots, listado, descarga con URL firmada, health
+
+  middleware/
+    auth.js           — Validación JWT, inyecta req.user
+    rateLimit.js      — Límite de peticiones por IP
+
+  utils/
+    tenant.js         — withTenant(), tid() — filtrado multi-tenant automático
+    audit.js          — logAudit() — registro de acciones en audit_logs
+    logger.js         — Pino logger estructurado
+    cache.js          — Redis (REDIS_URL env) o Map en memoria (fallback) — settings cacheados 5min
+    reminders.js      — Cron jobs: checkOverdueAccounts, checkExpiringWarranties, checkRepairsDelivery + push
+    backup.js         — createTenantBackup() — snapshots JSON a Supabase Storage bucket `backups`
+    sentry.js         — Sentry error tracking init
+
+  services/
+    clientService.js  — Lógica de negocio para clientes
+    productService.js — Lógica de negocio para productos
+    saleService.js    — Lógica de negocio para ventas
+
+  migrations/         — SQL versionadas
+    000_full_schema.sql          — Schema inicial completo (22 tablas, RLS, RPC)
+    001_add_tenant_id_to_child_tables.sql — tenant_id en tablas hijo + índices
+    002_data_migration.sql       — Datos iniciales tenant producción
+    002_sat_guatemala_fields.sql — Campos SAT Guatemala
+    003_catalogos.sql            — Tablas categories, locations
+    003_data_migration.sql       — Datos de catálogos iniciales
+    004_stock_movements.sql      — Tabla stock_movements
+    005_iva_configurable.sql     — store_settings con iva_percent=12
+    006_refresh_tokens.sql       — Tabla refresh_tokens
+    007_push_subscriptions.sql   — Tabla push_subscriptions
+    008_backups.sql              — Tabla backups
+    (nuevas desde 009 con node-pg-migrate: up/down blocks)
+
+  tests/              — Vitest + Supertest (61/61 passing)
+    setup.js, auth.test.js, auth-refresh.test.js, refresh.test.js,
+    push.test.js, reminders.test.js, accounts.test.js, settings.test.js,
+    products.test.js, tenant.test.js
+
+  Dockerfile          — node:20-alpine, USER node, EXPOSE 4000
+  docker-compose.yml  — api (puerto 4000) + redis:7-alpine (puerto 6379)
   database.json       — node-pg-migrate config (usa DATABASE_URL)
-  .node-pg-migraterc  — ignora migrations 001-007 (ya aplicadas)
-  migrations/         — 001-007 SQL manuales + README para nuevas desde 008
-  tests/              — Supertest: push, reminders, auth/refresh, accounts, settings
+  .node-pg-migraterc  — ignora migrations 001-007 (ya aplicadas), nuevas desde 008
+  docs/
+    STORAGE_GUIDE.md  — Guía de monitoreo de almacenamiento
 ```
 
 ---
@@ -217,8 +450,7 @@ mundo-cel-diaz-api/
 - **Legacy:** SHA-256 + salt `mnpos_salt_2026` — auto-migra a bcrypt en login exitoso
 
 ### Sesión de usuario
-- JWT con duración 8 horas
-- Guardado en `sessionStorage` (clave `mnpos-session-v1`)
+- JWT con duración 8 horas → guardado en `sessionStorage` (clave `mnpos-session-v1`)
 - Refresh token en `localStorage` (`mnpos-refresh-token`), válido 30 días, rotación automática
 - Auto-refresh silencioso 7 minutos antes de expirar el JWT (`App.jsx` + `utils/session.js`)
 
@@ -234,6 +466,57 @@ mundo-cel-diaz-api/
 ### Idempotency keys
 - Cada venta lleva `idempotency_key` único
 - Evita duplicados por doble click o reintento de red
+
+### PWA y Service Worker
+- Manifest: nombre `PraxisGT — Sistema de Gestión`
+- Service Worker con estrategia NetworkOnly para `/api/`
+- Instalable en móvil y desktop
+- Push notifications con VAPID
+
+### Vercel — Headers de seguridad (vercel.json)
+- **CSP:** `default-src 'self'` con excepciones Railway/Supabase/Sentry
+- **X-Frame-Options:** `DENY`
+- **X-Content-Type-Options:** `nosniff`
+- **Referrer-Policy:** `strict-origin-when-cross-origin`
+- **Permissions-Policy:** niega cámara, micrófono, geolocalización, payments
+- **HSTS:** `max-age=63072000; includeSubDomains; preload`
+
+---
+
+## Dependencias clave
+
+### Frontend
+| Paquete | Versión | Uso |
+|---|---|---|
+| react / react-dom | 18.3.1 | UI |
+| vite | 5.4.1 | Build tool |
+| axios | 1.17.0 | HTTP client |
+| xlsx | 0.18.5 | Exportación Excel (SheetJS) |
+| jspdf | 4.2.1 | Generación PDF |
+| jspdf-autotable | 5.0.8 | Tablas en PDF |
+| html2canvas | 1.4.1 | Captura de pantalla para WhatsApp |
+| recharts | 3.8.1 | Gráficos en Dashboard |
+| @sentry/react | 10.62.0 | Error tracking |
+| electron | 28.3.3 | Build Windows .exe |
+| vite-plugin-pwa | 1.3.0 | PWA support |
+
+### Backend
+| Paquete | Versión | Uso |
+|---|---|---|
+| express | 5.2.1 | Framework HTTP |
+| @supabase/supabase-js | 2.107.0 | Cliente DB |
+| jsonwebtoken | 9.0.3 | JWT |
+| bcryptjs | 3.0.3 | Hash contraseñas |
+| ioredis | 5.11.1 | Redis cache |
+| web-push | 3.6.7 | Web Push VAPID |
+| node-cron | 4.5.0 | Cron jobs |
+| pino | 10.3.1 | Logging estructurado |
+| resend | 6.14.0 | Email API (2FA) |
+| helmet | 8.2.0 | Headers de seguridad |
+| express-rate-limit | 8.5.2 | Rate limiting |
+| swagger-jsdoc | 6.3.0 | OpenAPI docs |
+| node-pg-migrate | 7.9.1 | Migraciones DB |
+| vitest | 4.1.9 | Testing |
 
 ---
 
@@ -279,11 +562,11 @@ mundo-cel-diaz-api/
 ## Estado actual del trabajo
 
 - **Versión en producción:** 2.5.0
-- **Último cambio (27 jun 2026):** Backup enterprise, monitoreo de almacenamiento con alertas push, retención audit_logs automática, STORAGE_GUIDE.md (PRs #139–#140, API #64–#66)
+- **Último cambio (28 jun 2026):** CLAUDE.md actualizado con esquema completo de BD, estructura real de archivos, roles, endpoints y dependencias. Fix XLSX static import en BackupScreen, ProductsScreen y export.js. Staging limpiado (transacciones borradas, datos maestros conservados).
 - **Producción frontend:** ✅ Actualizada — mundoceldiaz.com
 - **Producción API:** ✅ Actualizada — mundo-cel-diaz-api-production.up.railway.app
-- **Staging:** ✅ Sincronizado con main en ambos repos
-- **2FA:** Implementado para superadmin, deshabilitado temporalmente (esperando verificación DNS Resend: DKIM ✓, SPF ✓, pendiente propagación)
+- **Staging:** ✅ Sincronizado con main en ambos repos. BD limpia (sin transacciones, solo usuarios/clientes/productos).
+- **2FA:** Implementado para superadmin, deshabilitado temporalmente (esperando verificación DNS Resend: DKIM ✓, SPF ✓, pendiente propagación). Descomentar en `routes/auth.js` líneas 82-99 cuando esté listo.
 - **Credenciales piloto:** `admin@demo.com` / `Admin2026!` (hash bcrypt en la BD de staging).
 - **Bucket Supabase Storage `backups`:** ✅ Creado en staging y producción — backups automáticos activos desde las 2 AM.
 
@@ -294,85 +577,86 @@ mundo-cel-diaz-api/
 ### 🔴 Alta prioridad — Funcional
 
 - [ ] **2FA reactivar:** Cuando Resend termine de verificar dominio, descomentar código en `auth.js` líneas 82-99
-- [x] **Refresh token:** ✅ Implementado — rotación JWT/Refresh Token 30 días (`routes/auth.js`, `utils/session.js`, migration `006_refresh_tokens.sql`)
-- [x] **IVA configurable:** ✅ Implementado — campo `iva_percent` en `store_settings` (migration `005_iva_configurable.sql`), configurable en Configuración de Tienda, aplicado en boletas
-- [x] **Cuentas aging:** ✅ Implementado — RemindersWidget en Dashboard, aging 30/60/90 días clickeable en Cuentas
+- [x] **Refresh token:** ✅ Implementado
+- [x] **IVA configurable:** ✅ Implementado
+- [x] **Cuentas aging:** ✅ Implementado
 
 ### 🟡 Media prioridad — Calidad y seguridad
 
-- [x] **ESLint + Prettier:** ✅ Implementado — `eslint.config.js` en ambos repos
-- [x] **Logs estructurados:** ✅ Implementado — Pino logger en API (`utils/logger.js`)
-- [x] **Monitoreo de errores:** ✅ Implementado — Sentry en frontend (`utils/sentry.js`) e iniciado en `main.jsx`
-- [x] **Uptime monitoring:** ✅ Implementado — GitHub Actions `uptime.yml`
-- [x] **CSP estricta:** ✅ Implementado — `vercel.json` headers CSP + HSTS + X-Frame-Options (frontend) y Helmet CSP (backend)
-- [x] **Swagger/OpenAPI:** ✅ Implementado — `swagger.js` en API, rutas documentadas con `@openapi`
-- [x] **Cobertura de tests:** ✅ 61/61 tests passing — Supertest para push, reminders, auth/refresh (`tests/push.test.js`, `tests/reminders.test.js`, `tests/auth-refresh.test.js`)
+- [x] **ESLint + Prettier:** ✅ Implementado
+- [x] **Logs estructurados:** ✅ Pino en API
+- [x] **Monitoreo de errores:** ✅ Sentry frontend + API
+- [x] **Uptime monitoring:** ✅ GitHub Actions `uptime.yml`
+- [x] **CSP estricta:** ✅ vercel.json + Helmet
+- [x] **Swagger/OpenAPI:** ✅ `/api-docs`
+- [x] **Cobertura de tests:** ✅ 61/61 passing
 
 ### 🟢 Media prioridad — Funcional
 
-- [ ] **WhatsApp automático:** Integrar UltraMsg o Twilio para envíos programados (requiere API de pago)
-- [x] **Recordatorios automáticos:** ✅ Implementado — cron jobs diarios en `utils/reminders.js` (cuentas, garantías, reparaciones) + push real a dispositivos
-- [x] **Notificaciones push:** ✅ Implementado — PWA Web Push con VAPID, banner de suscripción en login, `routes/push.js`, tabla `push_subscriptions` (migration 007)
+- [ ] **WhatsApp automático:** Integrar UltraMsg o Twilio (requiere API de pago)
+- [x] **Recordatorios automáticos:** ✅ Cron jobs diarios + push real
+- [x] **Notificaciones push:** ✅ PWA Web Push VAPID
 - [ ] **Cobros automáticos SaaS:** Stripe/Wompi para suscripciones de tenants
 
 ### 🔵 Baja prioridad — Arquitectura y escala
 
-- [x] **Separar capas backend:** ✅ Parcial — `services/` con clientService, productService, saleService
-- [x] **Versionado de API:** ✅ Implementado — prefijo `/api/v1/` disponible junto a `/api/` (retrocompatible)
-- [x] **Redis caché:** ✅ Implementado — `utils/cache.js` usa Redis si `REDIS_URL` está en env, Map en memoria como fallback
-- [ ] **Colas de procesamiento:** BullMQ para tareas pesadas (exports grandes, emails masivos)
-- [x] **Backup enterprise:** ✅ Snapshots JSON diarios a Supabase Storage (bucket `backups`), historial en app, descarga con URL firmada, retención 30 días, alerta push si almacenamiento crítico
-- [ ] **Supabase Storage (media):** Fotos de productos, imágenes de reparaciones, logos de negocios
-- [x] **Docker + Docker Compose:** ✅ Implementado — `Dockerfile` (node:20-alpine, USER node) + `docker-compose.yml` (api + redis:7-alpine)
-- [x] **GitHub Actions CI:** ✅ Implementado — `ci.yml` y `test.yml` en ambos repos
-- [x] **Migraciones versionadas:** ✅ node-pg-migrate configurado — ignorar 001-007 (aplicados manualmente), nuevas migraciones desde 008 con up/down
+- [x] **Separar capas backend:** ✅ Parcial — services/
+- [x] **Versionado de API:** ✅ `/api/v1/` retrocompatible
+- [x] **Redis caché:** ✅ Con fallback a Map en memoria
+- [ ] **Colas de procesamiento:** BullMQ para tareas pesadas
+- [x] **Backup enterprise:** ✅ Snapshots JSON diarios a Supabase Storage
+- [ ] **Supabase Storage (media):** Fotos de productos, imágenes de reparaciones, logos
+- [x] **Docker + Docker Compose:** ✅ node:20-alpine + redis:7-alpine
+- [x] **GitHub Actions CI:** ✅ ci.yml, test.yml, uptime.yml
+- [x] **Migraciones versionadas:** ✅ node-pg-migrate desde 008
 - [ ] **Cifrado de datos sensibles:** DPI y datos personales cifrados en reposo
 
-### ⬜ Roadmap futuro — Nuevas funcionalidades
+### ⬜ Roadmap futuro
 
-- [ ] **Facturación electrónica SAT Guatemala (FEL):** Requiere proveedor certificado (ej. INFILE, G4S)
-- [ ] **Multi-moneda:** Soporte USD además de Quetzal
-- [ ] **Multi-idioma:** i18n para inglés (base guatemalteca es español)
-- [ ] **Multisucursal:** `branch_id` en tablas para negocios con varias sedes
+- [ ] **Facturación electrónica SAT Guatemala (FEL):** Requiere proveedor (INFILE, G4S)
+- [ ] **Multi-moneda:** USD además de Quetzal
+- [ ] **Multi-idioma:** i18n para inglés
+- [ ] **Multisucursal:** `branch_id` para negocios con varias sedes
 - [ ] **Comisiones por técnico:** Módulo de comisiones en reparaciones
 - [ ] **Portal del cliente:** App/web donde el cliente ve sus compras y garantías
-- [ ] **Métricas por tenant:** Dashboard de negocio para Super Admin con KPIs por cliente
+- [ ] **Métricas por tenant:** Dashboard Super Admin con KPIs por cliente
 - [ ] **Feature Flags:** Control de funcionalidades por tenant/plan
 - [ ] **Blue/Green Deploy:** Deploy sin downtime
-- [ ] **OpenTelemetry:** Trazabilidad completa de requests entre frontend → API → BD
+- [ ] **OpenTelemetry:** Trazabilidad frontend → API → BD
 - [ ] **Disaster Recovery:** Plan documentado de recuperación ante fallos
+- [ ] **Importación masiva de clientes:** Excel con saldo inicial para migración desde papel
+- [ ] **Importación masiva de reparaciones/garantías:** Para clientes que migran desde otro sistema
 
 ---
 
 ## Lo que YA ESTÁ implementado (NO duplicar)
 
-Esta lista evita re-implementar cosas que ya existen:
-
 | Categoría | Ya implementado |
 |---|---|
 | **Auth** | JWT 8h, bcrypt 10 rounds, auto-migración SHA-256→bcrypt, RBAC 4 roles, 2FA código (deshabilitado), Refresh token 30d con rotación |
-| **Seguridad** | Helmet, rate limiting por IP, CORS estricto, idempotency keys, SELECT FOR UPDATE en stock |
+| **Seguridad** | Helmet, rate limiting por IP, CORS estricto (*.vercel.app), idempotency keys, SELECT FOR UPDATE en stock, CSP estricta |
 | **Multi-tenant** | tenant_id en todas las tablas, withTenant() en API, RLS en Supabase |
-| **BD** | audit_logs completo, índices en tenant_id+created_at, migraciones en /migrations (SQL manual) |
-| **Tests** | Vitest + Supertest — 61/61 passing (push, reminders, auth/refresh, accounts, settings) |
-| **Backup** | Snapshots JSON diarios por tenant → Supabase Storage bucket `backups`; retención 30d; alerta push si límite cercano; limpieza mensual audit_logs >180d |
-| **Storage monitoring** | `/admin/storage-stats` superadmin, `docs/STORAGE_GUIDE.md`, cron alerta push lunes si >100k audit_logs |
-| **Monitoring** | GET /health en API, Sentry frontend, Pino logs backend, GitHub Actions uptime |
-| **Push PWA** | Web Push VAPID, banner suscripción, `push_subscriptions` por tenant, cron jobs con push real |
-| **Docker** | Dockerfile node:20-alpine (USER node) + docker-compose con redis para desarrollo local |
+| **BD** | 22 tablas, audit_logs completo, índices en tenant_id+created_at, migraciones versionadas |
+| **Tests** | Vitest + Supertest — 61/61 passing (push, reminders, auth/refresh, accounts, settings, products, tenant) |
+| **Backup** | Snapshots JSON diarios → Supabase Storage bucket `backups`; retención 30d; alerta push si límite cercano; limpieza audit_logs >180d |
+| **Storage monitoring** | `/admin/storage-stats` superadmin, docs/STORAGE_GUIDE.md, cron alerta push lunes si >100k audit_logs |
+| **Monitoring** | GET /health en API, Sentry frontend+backend, Pino logs, GitHub Actions uptime |
+| **Push PWA** | Web Push VAPID, banner suscripción en login, push_subscriptions por tenant, cron jobs con push real |
+| **Docker** | Dockerfile node:20-alpine (USER node) + docker-compose con redis |
 | **Migraciones** | node-pg-migrate configurado — 001-007 manuales aplicados, nuevas desde 008 con up/down |
-| **Cache** | Redis (si REDIS_URL configurado) o Map en memoria como fallback — settings cacheados 5 min |
-| **API** | Prefijo `/api/v1/` disponible retrocompatiblemente con `/api/` |
+| **Cache** | Redis (REDIS_URL) o Map en memoria — settings cacheados 5 min |
+| **API versionada** | Prefijo `/api/v1/` retrocompatible con `/api/` |
 | **Servicios** | services/ con clientService, productService, saleService |
-| **Backup** | Supabase auto-backups diarios + exportación manual Excel/JSON desde la app |
 | **WhatsApp** | wa.me con mensaje pre-formateado, imagen PNG (html2canvas), números GT auto-format |
-| **PDF/Excel** | jsPDF + SheetJS, exportación desde Historial, Cuadres y Backup |
-| **PWA** | Service worker, manifest, instalable en móvil |
+| **PDF/Excel** | jsPDF + SheetJS (XLSX import estático), exportación desde Historial, Cuadres y Backup |
+| **PWA** | Service worker (NetworkOnly para /api/), manifest, instalable en móvil |
 | **Electron** | Build .exe para Windows con NSIS |
 | **Dark mode** | CSS custom properties completas, toggle por usuario |
 | **Responsive** | 100% mobile/tablet/desktop |
-| **QR boletas** | QR en comprobantes → página pública de verificación sin login |
+| **QR boletas** | QR en comprobantes → VerifyReceipt.jsx página pública sin login |
 | **Auditoría** | Log completo de acciones en audit_logs (quién, qué, cuándo, IP) |
+| **Navto** | Sistema de hipervínculos entre módulos (Dashboard→Cuentas, Reparaciones, etc.) |
+| **RemindersWidget** | Widget en Dashboard con aging 30/60/90 días clickeable |
 
 ---
 
@@ -380,14 +664,17 @@ Esta lista evita re-implementar cosas que ya existen:
 
 ```
 # Backend Railway (producción)
-SUPABASE_URL       = URL de Supabase producción
+SUPABASE_URL       = URL de Supabase producción (rhecnmfivygkayfvauxt)
 SUPABASE_KEY       = service_role key (NO la anon key)
 FRONTEND_URL       = https://mundoceldiaz.com
 JWT_SECRET         = secret largo y aleatorio
 RESEND_API_KEY     = API key de Resend
+REDIS_URL          = URL de Redis (opcional, Map en memoria si no está)
+VAPID_PUBLIC_KEY   = Clave pública VAPID para Web Push
+VAPID_PRIVATE_KEY  = Clave privada VAPID para Web Push
 
 # Backend Railway (staging)
-SUPABASE_URL       = URL de Supabase STAGING (distinta de producción)
+SUPABASE_URL       = URL de Supabase STAGING (aawjhttlaydwsipsifre)
 SUPABASE_KEY       = service_role key de Supabase STAGING
 FRONTEND_URL       = https://mundo-cel-diaz-staging.vercel.app
 ```
