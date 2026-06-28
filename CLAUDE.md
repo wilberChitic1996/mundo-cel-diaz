@@ -115,22 +115,78 @@ Estos valores ya están correctos y funcionando. **NUNCA cambiarlos** salvo que 
 > está PROHIBIDA. (El error histórico fue mergear PRs #104–#108 directo a `main`, por eso
 > el refactor llegó a producción sin pasar por piloto.)
 
+### Flujo rama de trabajo → staging (piloto)
+
+El flujo aplica **por separado a cada repo** (frontend y API). Si el cambio toca ambos, se sigue el flujo en los dos repos antes de probar en piloto.
+
+**Solo Frontend cambia:**
 ```
-1. Crear rama de trabajo PARTIENDO DE `staging`  (no de main)
-2. PR de esa rama → `staging`
-3. Vercel/Railway despliegan `staging` → el usuario valida en el PILOTO
-4. SOLO si el piloto funciona → PR `staging → main`
-5. Vercel/Railway despliegan `main` → producción actualizada
-6. Si hay cambios de base de datos → aplicar PRIMERO en Supabase staging, validar, luego en producción
+1. Rama claude/... en mundo-cel-diaz, DESDE staging
+2. Cambios, commit, push
+3. PR rama → staging (en mundo-cel-diaz)
+4. CI verde ✅ + Vercel Ready ✅ → mergear
+5. Probar en piloto
+```
+
+**Solo Backend/API cambia:**
+```
+1. Rama claude/... en mundo-cel-diaz-api, DESDE staging
+2. Cambios, commit, push
+3. PR rama → staging (en mundo-cel-diaz-api)
+4. CI verde ✅ + Railway despliega ✅ → mergear
+5. Probar en piloto
+```
+
+**Ambos repos cambian (caso más común en brechas grandes):**
+```
+1. Ramas en AMBOS repos desde staging
+2. Cambios en API primero (el frontend depende del backend)
+3. PR rama → staging en mundo-cel-diaz-api → CI verde → mergear
+4. Railway despliega la API de staging
+5. PR rama → staging en mundo-cel-diaz → CI verde → mergear
+6. Vercel despliega el frontend de staging
+7. AHORA sí: probar en piloto con ambos deployed
+8. Si hay bugs → fix en el repo que corresponda → volver al paso 3 o 5
+```
+
+### Flujo staging → main (producción)
+
+Igual que arriba pero en dirección staging → main, y en AMBOS repos si aplica.
+
+**Solo Frontend:**
+```
+1. Usuario confirmó que piloto funciona
+2. PR staging → main en mundo-cel-diaz
+3. CI verde ✅ + Vercel Ready ✅ → mergear
+4. Vercel despliega mundoceldiaz.com ✅
+```
+
+**Solo Backend:**
+```
+1. Usuario confirmó que piloto funciona
+2. PR staging → main en mundo-cel-diaz-api
+3. CI verde ✅ + Railway despliega ✅ → mergear
+```
+
+**Ambos repos:**
+```
+1. Usuario confirmó que piloto funciona
+2. PR staging → main en mundo-cel-diaz-api → CI verde → mergear
+3. PR staging → main en mundo-cel-diaz → CI verde → mergear
+4. Verificar mundoceldiaz.com funciona correctamente
 ```
 
 > ### 🔴 REGLA CRÍTICA: VERIFICAR CI ANTES DE MERGEAR — SIEMPRE.
 > Antes de hacer merge de CUALQUIER PR (tanto rama→staging como staging→main),
 > Claude DEBE revisar que todos los checks de CI estén en verde usando las herramientas
-> de GitHub (`mcp__github__actions_list` → jobs del PR). Si algún check está en
-> `failure` o `pending`, NO mergear — diagnosticar y corregir primero.
+> de GitHub (`mcp__github__pull_request_read` con `get_check_runs`). Si algún check está en
+> `failure` o `in_progress`, NO mergear — esperar o corregir primero.
 > Mergear con CI rojo rompe producción y genera deploys fallidos en Vercel/Railway.
 > Esta regla no tiene excepciones aunque el usuario pida ir rápido.
+>
+> **NUNCA decirle al usuario que pruebe en el piloto antes de que el PR esté mergeado a staging.**
+> El piloto (mundo-cel-diaz-staging.vercel.app) solo refleja lo que está en la rama `staging`.
+> Un PR pendiente o en preview NO afecta el piloto hasta que se mergea.
 
 **Por qué esto protege producción:** mientras los cambios estén en `staging`, `mundoceldiaz.com`
 sigue corriendo `main` sin tocarse. Producción solo cambia cuando el usuario aprueba el PR `staging → main`.
