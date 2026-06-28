@@ -38,6 +38,7 @@ import { suppliersAPI } from '../utils/api.js';
 import { getStore } from '../utils/receipt.js';
 import { STORE_FALLBACK, APP_NAME } from '../constants/index.js';
 import { usePaginator } from '../hooks/usePaginator.jsx';
+import { exportExcel } from '../utils/export.js';
 
 // Comprobante INTERNO de compra a proveedor (control del negocio, no se entrega al cliente).
 function printCompra(p) {
@@ -249,6 +250,20 @@ export default function SuppliersScreen({ products, session, showFlash, onStockU
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16, flexWrap: 'wrap', gap: 8 }}>
         <p style={H1}>🏭 Proveedores y Compras</p>
         <div style={{ display: 'flex', gap: 8 }}>
+          {tab === 'proveedores' && (
+            <button style={mkBtn('green')} onClick={function() {
+              var rows = suppliers.map(function(s) { return [s.name, s.phone || '', s.email || '', s.address || '', s.active ? 'Activo' : 'Inactivo']; });
+              exportExcel(rows, ['Nombre', 'Teléfono', 'Email', 'Dirección', 'Estado'], 'Proveedores');
+              showFlash('✅ Excel exportado', 'ok');
+            }}>📊 Excel</button>
+          )}
+          {tab === 'compras' && (
+            <button style={mkBtn('green')} onClick={function() {
+              var rows = purchases.map(function(p) { return [fmtD(p.date), p.supplier_name, (p.items || []).length, Q(p.total), p.notes || '']; });
+              exportExcel(rows, ['Fecha', 'Proveedor', 'Artículos', 'Total', 'Notas'], 'Compras');
+              showFlash('✅ Excel exportado', 'ok');
+            }}>📊 Excel</button>
+          )}
           {tab === 'proveedores' && <button style={mkBtn('teal')} onClick={openNewSup}>+ Nuevo proveedor</button>}
           {tab === 'compras'     && <button style={mkBtn('teal')} onClick={openNewPurch}>+ Registrar compra</button>}
         </div>
