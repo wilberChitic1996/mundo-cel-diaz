@@ -245,24 +245,24 @@ export default function RepairsScreen({ repairs, clients, products, saveRepair, 
   var _fpendingPhotos = useState([]); var fPendingPhotos = _fpendingPhotos[0]; var setFPendingPhotos = _fpendingPhotos[1];
 
   async function handlePhotoSelect(e) {
-    var file = e.target.files && e.target.files[0];
-    if (!file) return;
+    var files = Array.from(e.target.files || []);
+    if (!files.length) return;
     e.target.value = '';
     setFPhotoUploading(true);
-    try {
-      var reader = new FileReader();
-      reader.onload = function(ev) {
-        var base64 = ev.target.result;
-        var mimeType = file.type || 'image/jpeg';
-        // Guardar localmente para previsualizar
-        setFPendingPhotos(function(prev) { return prev.concat([{ base64, mimeType }]); });
-        setFReceptionPhotos(function(prev) { return prev.concat([base64]); });
-        setFPhotoUploading(false);
-      };
-      reader.readAsDataURL(file);
-    } catch (_) {
+    var promises = files.map(function(file) {
+      return new Promise(function(resolve) {
+        var reader = new FileReader();
+        reader.onload = function(ev) {
+          resolve({ base64: ev.target.result, mimeType: file.type || 'image/jpeg' });
+        };
+        reader.readAsDataURL(file);
+      });
+    });
+    Promise.all(promises).then(function(results) {
+      setFPendingPhotos(function(prev) { return prev.concat(results); });
+      setFReceptionPhotos(function(prev) { return prev.concat(results.map(function(r) { return r.base64; })); });
       setFPhotoUploading(false);
-    }
+    });
   }
 
   function deleteReceptionPhoto(preview) {
@@ -765,21 +765,22 @@ export default function RepairsScreen({ repairs, clients, products, saveRepair, 
           </div>
 
           {/* Sección: fotos de recepción */}
-          <p style={{ fontWeight: 600, fontSize: 13, color: '#555', margin: '0 0 10px', borderBottom: '1px solid #eee', paddingBottom: 6 }}>📷 Fotos de recepción (opcional)</p>
+          <p style={{ fontWeight: 600, fontSize: 13, color: '#555', margin: '0 0 6px', borderBottom: '1px solid #eee', paddingBottom: 6 }}>📷 Fotos de recepción (opcional)</p>
+          <p style={{ fontSize: 11, color: '#999', margin: '0 0 10px' }}>Desde PC: seleccioná archivos. Desde móvil: cámara o galería.</p>
           <div style={{ marginBottom: 14 }}>
             <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap', alignItems: 'flex-start' }}>
-              {fReceptionPhotos.map(function(url, i) {
+              {fReceptionPhotos.map(function(preview, i) {
                 return (
                   <div key={i} style={{ position: 'relative' }}>
-                    <img src={url} alt={'foto ' + (i+1)} style={{ width: 80, height: 80, objectFit: 'cover', borderRadius: 8, border: '1px solid #ddd' }} />
-                    <button onClick={function() { deleteReceptionPhoto(url); }}
+                    <img src={preview} alt={'foto ' + (i+1)} style={{ width: 80, height: 80, objectFit: 'cover', borderRadius: 8, border: '1px solid #ddd' }} />
+                    <button onClick={function() { deleteReceptionPhoto(preview); }}
                       style={{ position: 'absolute', top: -6, right: -6, width: 20, height: 20, borderRadius: '50%', background: '#E24B4A', color: '#fff', border: 'none', cursor: 'pointer', fontSize: 12, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 0 }}>×</button>
                   </div>
                 );
               })}
               <label style={{ width: 80, height: 80, border: '2px dashed #ccc', borderRadius: 8, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', cursor: fPhotoUploading ? 'wait' : 'pointer', color: '#aaa', fontSize: 11, gap: 4, flexShrink: 0 }}>
-                {fPhotoUploading ? <span style={{ fontSize: 18 }}>⏳</span> : <><span style={{ fontSize: 24 }}>+</span><span>Foto</span></>}
-                <input type="file" accept="image/*" capture="environment" style={{ display: 'none' }} disabled={fPhotoUploading} onChange={handlePhotoSelect} />
+                {fPhotoUploading ? <span style={{ fontSize: 18 }}>⏳</span> : <><span style={{ fontSize: 24 }}>+</span><span>Adjuntar</span></>}
+                <input type="file" accept="image/*" multiple style={{ display: 'none' }} disabled={fPhotoUploading} onChange={handlePhotoSelect} />
               </label>
             </div>
           </div>
