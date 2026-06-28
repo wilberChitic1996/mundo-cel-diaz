@@ -789,6 +789,12 @@ mundo-cel-diaz-api/
 > verificar columnas reales** con `SELECT column_name FROM information_schema.columns WHERE table_name='X'`.
 > La BD de staging diverge del esquema versionado (columnas agregadas a mano en producción y no replicadas).
 
+> **LECCIÓN (28 jun 2026) — UBICACIÓN DE PRODUCTOS: columnas invertidas entre ambientes.**
+> `products` guarda ubicación en 3 columnas: `location_id` (FK a `locations` = el mueble), `position` (texto = la fila) y `shelf` (texto legacy combinado "Mueble N · X", **lo que muestran las pantallas** Productos/Inventario).
+> ⚠️ La columna-verdad **DIFIERE por ambiente**: **producción usa `shelf`** (convención "Mueble N"); **staging usa `position`** (alfanumérico B5-1/V-34, y `shelf` casi vacío). NUNCA correr el mismo script de datos en ambos sin ajustar la columna.
+> **Limpieza hecha en PRODUCCIÓN (28 jun):** 104 productos tenían `shelf` sucio "n-n" (ej "2-5") aunque `location_id`+`position` YA eran correctos. Se normalizó `shelf` → "Mueble N · X" reconstruyéndolo desde location_id+position (UPDATE reversible, respaldo `products_backup_20260628`, solo tenant prod `00000000-...-0001`, solo columna `shelf`; stock/precio/código intactos). Los 3 sin mueble se acoplaron (Pantallas→Mueble 1, P095→Mueble 2). Resultado: 260/260 con ubicación limpia.
+> **Endurecimiento (PR frontend):** `ProductForm` ahora valida `position` (no permite posición sin estante elegido, ni el carácter `·`, ni >12 chars, ni símbolos raros) para que no vuelva a ensuciarse. Multi-tenant-safe: acepta tanto numérico ("5") como alfanumérico ("B5-1").
+
 ### Próximos pasos (en orden)
 
 1. **Terminar validación piloto** (frontend ya vivo): seriales → cuentas aging → variantes → fotos en reparación. Anti-doble-cobro ✅.
