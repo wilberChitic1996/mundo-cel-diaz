@@ -80,6 +80,17 @@ Usuario eligió **NO** pagar Vercel Pro por ahora. Para no volver a topar el lí
 - **Verificar producción tras merge** (regla #7) y promover si quedó atrás.
 - Si la fricción se vuelve insoportable, reconsiderar **Vercel Pro ($20/mes)** que elimina el problema de raíz.
 
+### 9. TODO va a la lista de pendientes — nada se olvida ni queda a medias
+
+Cada vez que surja **algo nuevo** (una tarea, idea, bug, mejora, observación del usuario, o algo que quedó a medias), Claude DEBE **integrarlo de inmediato** en la sección **"Backlog / Pendientes"** o **"Próximos pasos"** de este CLAUDE.md, con su estado claro: `pendiente` / `en progreso` / `a medias`. Reglas:
+
+1. **Nunca** dejar algo solo mencionado en el chat — si no está anotado en CLAUDE.md, se va a olvidar. Anotarlo es obligatorio.
+2. **Un paso a la vez** (refuerza regla #1): trabajar UNA cosa, terminarla o anotar dónde quedó, y recién entonces pasar a la siguiente. Si el usuario pide varias cosas, Claude las anota TODAS en pendientes y las ataca de a una, confirmando cada una.
+3. **Antes de cerrar cualquier turno** donde surgió algo nuevo o algo quedó incompleto, verificar que esté anotado en pendientes con su estado.
+4. Cuando una tarea se completa, marcarla como hecha (✅) en la lista — para que siempre se vea el avance real.
+
+> **Origen:** Usuario pidió que nada se quede "en el aire" ni a medias, y que se trabaje de a un paso para no perder el foco. La lista de pendientes en CLAUDE.md es la memoria del proyecto entre sesiones.
+
 ---
 
 ## 🔴 REGLA ESTRICTA: NO TOCAR LO QUE FUNCIONA
