@@ -240,6 +240,10 @@ export default function RepairsScreen({ repairs, clients, products, saveRepair, 
   }
 
   // ── Fotos de recepción ───────────────────────────────────────────────────
+  // Las fotos se guardan como { base64, mimeType } localmente y se suben
+  // al storage DESPUÉS de crear la orden (cuando ya existe el ID en la BD).
+  var _fpendingPhotos = useState([]); var fPendingPhotos = _fpendingPhotos[0]; var setFPendingPhotos = _fpendingPhotos[1];
+
   async function handlePhotoSelect(e) {
     var file = e.target.files && e.target.files[0];
     if (!file) return;
@@ -247,14 +251,12 @@ export default function RepairsScreen({ repairs, clients, products, saveRepair, 
     setFPhotoUploading(true);
     try {
       var reader = new FileReader();
-      reader.onload = async function(ev) {
-        try {
-          var base64 = ev.target.result;
-          var result = await repairsAPI.uploadPhoto(fRepId, { base64, mimeType: file.type || 'image/jpeg', photoType: 'reception' });
-          setFReceptionPhotos(function(prev) { return prev.concat([result.url]); });
-        } catch (_) {
-          showFlash('Error al subir foto', 'error');
-        }
+      reader.onload = function(ev) {
+        var base64 = ev.target.result;
+        var mimeType = file.type || 'image/jpeg';
+        // Guardar localmente para previsualizar
+        setFPendingPhotos(function(prev) { return prev.concat([{ base64, mimeType }]); });
+        setFReceptionPhotos(function(prev) { return prev.concat([base64]); });
         setFPhotoUploading(false);
       };
       reader.readAsDataURL(file);
@@ -263,11 +265,9 @@ export default function RepairsScreen({ repairs, clients, products, saveRepair, 
     }
   }
 
-  async function deleteReceptionPhoto(url) {
-    try {
-      await repairsAPI.deletePhoto(fRepId, { url, photoType: 'reception' });
-    } catch (_) { /* no fatal */ }
-    setFReceptionPhotos(function(prev) { return prev.filter(function(u) { return u !== url; }); });
+  function deleteReceptionPhoto(preview) {
+    setFReceptionPhotos(function(prev) { return prev.filter(function(u) { return u !== preview; }); });
+    setFPendingPhotos(function(prev) { return prev.filter(function(p) { return p.base64 !== preview; }); });
   }
 
   var partResults = products.filter(function(p) {
@@ -285,7 +285,7 @@ export default function RepairsScreen({ repairs, clients, products, saveRepair, 
     setFBrand(''); setFModel(''); setFImei(''); setFProblem(''); setFDiag('');
     setFTech(''); setFCost(''); setFDate(''); setFNote(''); setFParts([]); setFErr('');
     setPartQ(''); setShowPartPicker(false);
-    setFRepId(gid()); setFChecklist({}); setFReceptionPhotos([]); setFPhotoUploading(false);
+    setFRepId(gid()); setFChecklist({}); setFReceptionPhotos([]); setFPendingPhotos([]); setFPhotoUploading(false);
   }
   function closeForm() { resetForm(); setShowForm(false); }
 
@@ -321,6 +321,16 @@ export default function RepairsScreen({ repairs, clients, products, saveRepair, 
 
     saveRepair(rep);
     showFlash('✓ Orden ' + rep.repCode + ' registrada', 'ok');
+
+    // Subir fotos pendientes al storage después de crear la orden
+    if (fPendingPhotos.length > 0) {
+      var repId = rep.id;
+      var pending = fPendingPhotos.slice();
+      Promise.all(pending.map(function(p) {
+        return repairsAPI.uploadPhoto(repId, { base64: p.base64, mimeType: p.mimeType, photoType: 'reception' });
+      })).catch(function() { /* silencioso — fotos opcionales */ });
+    }
+
     closeForm();
   }
 
