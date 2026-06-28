@@ -112,18 +112,15 @@ export default function POSScreen({
   async function handleProductClick(p) {
     if (p.unit === 'serv' || p.stock === 0) { addToCart(p); return; }
     setSerialPickLoading(true);
-    setSerialPickProd(p);
-    setSerialPickList([]);
     try {
       var seriales = await serialsAPI.list(p.id, 'disponible');
       if (!seriales || seriales.length === 0) {
-        setSerialPickProd(null);
         addToCart(p);
       } else {
+        setSerialPickProd(p);
         setSerialPickList(seriales);
       }
     } catch (_) {
-      setSerialPickProd(null);
       addToCart(p);
     }
     setSerialPickLoading(false);
