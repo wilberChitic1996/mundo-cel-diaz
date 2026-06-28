@@ -115,22 +115,43 @@ Estos valores ya están correctos y funcionando. **NUNCA cambiarlos** salvo que 
 > está PROHIBIDA. (El error histórico fue mergear PRs #104–#108 directo a `main`, por eso
 > el refactor llegó a producción sin pasar por piloto.)
 
+### Flujo rama de trabajo → staging (piloto)
+
 ```
-1. Crear rama de trabajo PARTIENDO DE `staging`  (no de main)
-2. PR de esa rama → `staging`
-3. Vercel/Railway despliegan `staging` → el usuario valida en el PILOTO
-4. SOLO si el piloto funciona → PR `staging → main`
-5. Vercel/Railway despliegan `main` → producción actualizada
-6. Si hay cambios de base de datos → aplicar PRIMERO en Supabase staging, validar, luego en producción
+1. Crear rama de trabajo PARTIENDO DE `staging` (no de main)
+2. Hacer cambios, commit, push
+3. Crear PR: rama → staging
+4. Verificar CI verde (Lint & Build ✅) + Vercel Ready ✅
+5. Si hay falla → corregir, nuevo commit, esperar CI verde de nuevo
+6. Solo cuando todo verde → mergear PR
+7. Vercel despliega staging automáticamente
+8. PROBAR EN PILOTO (mundo-cel-diaz-staging.vercel.app)
+9. Si hay bugs → fix, commit, push → volver al paso 4
+```
+
+### Flujo staging → main (producción)
+
+```
+1. Solo cuando el usuario confirmó que el piloto funciona correctamente
+2. Crear PR: staging → main
+3. Verificar CI verde (Lint & Build ✅) + Vercel Ready ✅
+4. Si hay falla → corregir en staging primero, luego repetir
+5. Solo cuando todo verde → mergear PR
+6. Vercel despliega producción automáticamente
+7. Verificar que mundoceldiaz.com funciona correctamente
 ```
 
 > ### 🔴 REGLA CRÍTICA: VERIFICAR CI ANTES DE MERGEAR — SIEMPRE.
 > Antes de hacer merge de CUALQUIER PR (tanto rama→staging como staging→main),
 > Claude DEBE revisar que todos los checks de CI estén en verde usando las herramientas
-> de GitHub (`mcp__github__actions_list` → jobs del PR). Si algún check está en
-> `failure` o `pending`, NO mergear — diagnosticar y corregir primero.
+> de GitHub (`mcp__github__pull_request_read` con `get_check_runs`). Si algún check está en
+> `failure` o `in_progress`, NO mergear — esperar o corregir primero.
 > Mergear con CI rojo rompe producción y genera deploys fallidos en Vercel/Railway.
 > Esta regla no tiene excepciones aunque el usuario pida ir rápido.
+>
+> **NUNCA decirle al usuario que pruebe en el piloto antes de que el PR esté mergeado a staging.**
+> El piloto (mundo-cel-diaz-staging.vercel.app) solo refleja lo que está en la rama `staging`.
+> Un PR pendiente o en preview NO afecta el piloto hasta que se mergea.
 
 **Por qué esto protege producción:** mientras los cambios estén en `staging`, `mundoceldiaz.com`
 sigue corriendo `main` sin tocarse. Producción solo cambia cuando el usuario aprueba el PR `staging → main`.
