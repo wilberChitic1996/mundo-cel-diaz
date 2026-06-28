@@ -82,6 +82,7 @@ export default function POSScreen({
   addToCart, changeQty, removeFromCart, applyDiscount,
   checkout, resetPOS, flash,
   clients, accounts,
+  ivaPercent, ivaAmount, subtotalNeto,
 }) {
   clients  = clients  || [];
   accounts = accounts || [];
@@ -331,6 +332,18 @@ export default function POSScreen({
 
           {/* ── Sección de cobro ── */}
           <div style={{ borderTop: '1px solid rgba(0,0,0,0.1)', paddingTop: 14 }}>
+            {ivaPercent > 0 && cart.length > 0 && (
+              <div style={{ marginBottom: 8 }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 12, color: '#888', marginBottom: 2 }}>
+                  <span>Subtotal (sin IVA)</span>
+                  <span>{Q(subtotalNeto || (cartTotal - ivaAmount))}</span>
+                </div>
+                <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 12, color: '#888', marginBottom: 4 }}>
+                  <span>IVA ({ivaPercent}%)</span>
+                  <span>{Q(ivaAmount)}</span>
+                </div>
+              </div>
+            )}
             <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 19, fontWeight: 700, marginBottom: 14 }}>
               <span>Total</span>
               <span style={{ color: TEAL }}>{Q(cartTotal)}</span>
