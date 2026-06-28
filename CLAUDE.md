@@ -335,6 +335,8 @@ Siempre usar estos nombres exactos. NUNCA asumir nombres — verificar antes de 
 
 > **LECCIÓN CRÍTICA (jun 2026):** Antes de escribir cualquier script SQL, consultar siempre `SELECT table_name FROM information_schema.tables WHERE table_schema = 'public' ORDER BY table_name` para verificar nombres reales. Tablas que NO existen: `repair_items`, `caja_movements`, `caja_sessions`, `supplier_purchase_items`, `product_price_history`.
 
+> 🛢️ **FUENTE DE VERDAD DEL ESQUEMA:** `docs/DB-SCHEMA-REAL.md` — volcado real de `information_schema` (staging, 28 jun 2026) con las 29 tablas, sus columnas reales y los **desajustes confirmados** (`sales.date`, `accounts.due_date`, `repairs.client/device` inexistentes; columnas duplicadas en `repairs`). El rol DBA lo consulta ANTES de tocar cualquier query. Regenerar con la consulta documentada en ese archivo cuando cambie el esquema.
+
 **FK importante:** `accounts.sale_id` referencia `sales.id`. Al borrar registros, siempre borrar en este orden: `account_items` → `account_payments` → `accounts` → `sale_items` → `sales`.
 
 **RLS:** Habilitado en todas las tablas. El API usa `service_role` key que bypassa RLS.
@@ -842,6 +844,8 @@ mundo-cel-diaz-api/
 - [ ] **Importación masiva de reparaciones/garantías:** Para clientes que migran desde otro sistema
 - [ ] **📘 Manual técnico completo (`docs/MANUAL-TECNICO.md`):** Enciclopedia del software para tener "el hilo completo" en cada sesión. Pedido por el usuario (28 jun 2026). Estructura acordada: (1) visión general + glosario, (2) arquitectura de sistemas + flujo frontend→API→BD, (3) inventario de las 25 pantallas, (4) inventario de los 21 endpoints, (5) modelo de datos completo + divergencias de esquema reales, (6) flujos de negocio end-to-end, (7) integraciones (Supabase/Railway/Vercel/Resend/WebPush/Sentry/Redis), (8) 🔦 funciones ocultas/subutilizadas, (9) runbook de operación, (10) roadmap + deuda técnica. Construir explorando ambos repos a fondo (no inventar). CLAUDE.md queda como "reglas + estado" y enlaza este manual.
 - [ ] **IVA en boleta de reparación:** mostrar desglose IVA igual que la venta normal del POS (ver Próximos pasos #2).
+- [ ] **Limpiar columnas duplicadas en `repairs`:** el ALTER del 28 jun dejó duplicados (`issue`+`problem_desc`, `price`+`estimated_cost`, `technician`+`tech_name`, `notes`+`internal_note`). Unificar a las canónicas y migrar datos/código. Ver `docs/DB-SCHEMA-REAL.md`. Baja prioridad (no rompe nada hoy).
+- [ ] **Mantener `docs/DB-SCHEMA-REAL.md` sincronizado** con producción cuando se apliquen migraciones allá (hoy refleja staging).
 
 ---
 
