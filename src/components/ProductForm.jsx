@@ -80,6 +80,26 @@ export default function ProductForm({ product, categories, locations, onSave, on
     var selCat = categories.find(function(c) { return String(c.id) === String(form.category_id); });
     var selLoc = locations.find(function(l)  { return String(l.id) === String(form.location_id); });
     var pos      = (form.position || '').trim();
+    // Endurecimiento de la posición — evita que vuelva a entrar basura en la ubicación.
+    // (El bug histórico: escribir "2-5" en Posición SIN elegir estante guardaba "2-5" como shelf.)
+    if (pos) {
+      if (!selLoc) {
+        setErr('Elegí un estante para la posición (no dejes "Sin ubicación" con una posición escrita).');
+        return;
+      }
+      if (pos.indexOf('·') !== -1) {
+        setErr('La posición no puede contener el carácter "·".');
+        return;
+      }
+      if (pos.length > 12) {
+        setErr('La posición es muy larga (máximo 12 caracteres).');
+        return;
+      }
+      if (!/^[A-Za-z0-9\- ]+$/.test(pos)) {
+        setErr('Posición inválida. Usá solo letras, números, guion o espacio (ej: B3, A2-2, 5).');
+        return;
+      }
+    }
     // Construir el campo shelf de texto (ej: "Vitrina 1 · B3")
     var shelfTxt = selLoc ? (selLoc.name + (pos ? ' · ' + pos : '')) : pos;
 
@@ -156,7 +176,7 @@ export default function ProductForm({ product, categories, locations, onSave, on
         <div>
           <label style={sLabel}>Posición</label>
           <input
-            type="text" style={sInput}
+            type="text" style={sInput} maxLength={12}
             value={form.position || ''} placeholder="Ej: B3, A2-2"
             onChange={function(e) { set('position', e.target.value); }}
             onBlur={function(e)   { set('position', (e.target.value || '').trim()); }}
