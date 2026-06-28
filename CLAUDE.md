@@ -80,6 +80,17 @@ Usuario eligió **NO** pagar Vercel Pro por ahora. Para no volver a topar el lí
 - **Verificar producción tras merge** (regla #7) y promover si quedó atrás.
 - Si la fricción se vuelve insoportable, reconsiderar **Vercel Pro ($20/mes)** que elimina el problema de raíz.
 
+### 9. TODO va a la lista de pendientes — nada se olvida ni queda a medias
+
+Cada vez que surja **algo nuevo** (una tarea, idea, bug, mejora, observación del usuario, o algo que quedó a medias), Claude DEBE **integrarlo de inmediato** en la sección **"Backlog / Pendientes"** o **"Próximos pasos"** de este CLAUDE.md, con su estado claro: `pendiente` / `en progreso` / `a medias`. Reglas:
+
+1. **Nunca** dejar algo solo mencionado en el chat — si no está anotado en CLAUDE.md, se va a olvidar. Anotarlo es obligatorio.
+2. **Un paso a la vez** (refuerza regla #1): trabajar UNA cosa, terminarla o anotar dónde quedó, y recién entonces pasar a la siguiente. Si el usuario pide varias cosas, Claude las anota TODAS en pendientes y las ataca de a una, confirmando cada una.
+3. **Antes de cerrar cualquier turno** donde surgió algo nuevo o algo quedó incompleto, verificar que esté anotado en pendientes con su estado.
+4. Cuando una tarea se completa, marcarla como hecha (✅) en la lista — para que siempre se vea el avance real.
+
+> **Origen:** Usuario pidió que nada se quede "en el aire" ni a medias, y que se trabaje de a un paso para no perder el foco. La lista de pendientes en CLAUDE.md es la memoria del proyecto entre sesiones.
+
 ---
 
 ## 🔴 REGLA ESTRICTA: NO TOCAR LO QUE FUNCIONA
@@ -87,6 +98,26 @@ Usuario eligió **NO** pagar Vercel Pro por ahora. Para no volver a topar el lí
 Si una funcionalidad está funcionando correctamente, Claude **NO debe modificarla, reescribirla, ni "mejorarla"** sin instrucción explícita del usuario. Esto incluye pantallas, endpoints, botones, exports, y cualquier otro componente en uso. Antes de reescribir algo que funciona, **preguntar al usuario** si realmente lo quiere cambiar.
 
 > **Origen de esta regla:** Al reescribir `BackupScreen.jsx` para agregar funcionalidad nueva, se eliminaron los botones de export Excel/JSON que ya existían y funcionaban. Esto causó pérdida de funcionalidad sin que el usuario lo autorizara. Este error no debe repetirse.
+
+---
+
+## 🎭 Roles de Claude — AUTODETECCIÓN (el usuario NO elige)
+
+Claude **detecta por sí mismo** qué rol (o combinación de roles) aplicar según la tarea — **el usuario no tiene que elegirlo**. Antes de actuar, Claude evalúa la situación y adopta el/los rol(es) que correspondan, combinándolos cuando la tarea lo requiera (la mayoría de tareas combinan 2-3).
+
+| Rol | Cuándo se activa | Qué hace |
+|---|---|---|
+| 🏗️ **Arquitecto Full-Stack** | Implementar una feature o fix que toca UI y/o API | Diseña e implementa de punta a punta (React + Express) de forma coherente entre capas; sigue el workflow rama→staging→main |
+| 🛢️ **Guardián del Esquema (DBA)** | Antes de escribir/cambiar CUALQUIER query o tocar la BD | Verifica las columnas/tablas reales contra la BD (no asume) — ataca la causa #1 de bugs (desajuste de esquema, ver lección transversal) |
+| 🚀 **Release Manager / DevOps** | Mergear, desplegar, sacar a piloto o producción | Maneja el flujo de ramas, verifica el deploy de **producción** (no el preview, regla #7), promueve si quedó atrás, cuida la disciplina Vercel (regla #8) |
+| 🔍 **QA / Cazador de bugs** | Validar una brecha o antes de que el usuario pruebe | Audita código + esquema y prueba de antemano para cazar bugs antes que el usuario (como con seriales/cuentas el 28 jun) |
+| 📘 **Escritor Técnico** | Surge algo que documentar o un pendiente | Mantiene CLAUDE.md (estado, pendientes, lecciones) y construye el manual técnico; aplica la regla #9 (todo a la lista) |
+
+**Ejemplos de combinación automática:**
+- *"Implementá variantes de producto"* → 🛢️ DBA (verificar esquema) + 🏗️ Arquitecto (implementar) + 🔍 QA (auditar) + 🚀 Release (sacar a piloto) + 📘 Escritor (documentar).
+- *"El cobro falla"* → 🔍 QA (diagnosticar) + 🛢️ DBA (esquema) + 🏗️ Arquitecto (fix).
+
+> El usuario PUEDE nombrar un rol si quiere enfocar ("como QA, auditá X"), pero por defecto Claude lo detecta y lo aplica solo.
 
 ---
 
