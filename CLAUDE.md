@@ -67,6 +67,19 @@ El usuario lo configura en los ajustes del entorno (network access). Doc: https:
 
 > **Origen:** Usuario pidió poder probar "con confianza" sabiendo que el deploy ya está, sin esperas a ciegas. Hoy la red del entorno bloquea staging (HTTP 000) y Railway no reporta estado a GitHub, por eso Claude no podía confirmar el API. Solución acordada: abrir la red a staging.
 
+### 7. Tras mergear a `staging` — VERIFICAR el deploy de PRODUCCIÓN, no el preview
+
+El preview de un PR puede quedar **"Ready"** pero **NO** ser lo que sirve `staging.vercel.app`. El sitio lo sirve el **"Production Deployment"** del proyecto Vercel (rama `staging`). Tras cada merge, Claude DEBE confirmar que ese **Production Deployment apunta al commit nuevo** (Vercel → proyecto staging → Overview → "Production Deployment" → commit). Si quedó atrás, **promover** el deploy nuevo: Vercel → Deployments → fila del commit nuevo → "⋯" → **Promote to Production**.
+
+> **Origen (28 jun 2026):** Vercel (Hobby/gratis) topó 100 deploys/día. Los merges de #152/#153 a `staging` **no dispararon deploy a producción** (quedaron en cola/fallaron), pero los **previews sí aparecían "Ready"**, enmascarando el problema. `staging.vercel.app` siguió sirviendo `2cb7d1a` (viejo) por horas → "siempre lo mismo". Se resolvió **promoviendo manualmente** el deploy nuevo a Production. **Lección:** "preview Ready" ≠ "producción actualizada".
+
+### 8. Plan Vercel — decisión 28 jun 2026: seguir GRATIS con disciplina
+
+Usuario eligió **NO** pagar Vercel Pro por ahora. Para no volver a topar el límite de 100 deploys/día:
+- **Agrupar cambios:** menos PRs y más grandes (no docenas de PRs chicos por día). Cada PR consume varios deploys × 2 proyectos.
+- **Verificar producción tras merge** (regla #7) y promover si quedó atrás.
+- Si la fricción se vuelve insoportable, reconsiderar **Vercel Pro ($20/mes)** que elimina el problema de raíz.
+
 ---
 
 ## 🔴 REGLA ESTRICTA: NO TOCAR LO QUE FUNCIONA
@@ -679,19 +692,19 @@ mundo-cel-diaz-api/
 - **Rama de trabajo activa:** `claude/gifted-heisenberg-r6n8jo` (en AMBOS repos)
 - **Producción frontend:** ✅ mundoceldiaz.com (NO tocar hasta validar piloto completo)
 - **Producción API:** ✅ mundo-cel-diaz-api-production.up.railway.app (NO tocar)
-- **Staging frontend:** ⚠️ mundo-cel-diaz-staging.vercel.app — **corre código viejo** (último deploy Vercel `2cb7d1a`). Ver "Bloqueo Vercel" abajo.
+- **Staging frontend:** ✅ mundo-cel-diaz-staging.vercel.app — al día (deploy `9897579` promovido manualmente a Production tras bloqueo Vercel; ver regla #7).
 - **Staging API:** ✅ mundo-cel-diaz-api-production-e546.up.railway.app — al día (Railway despliega sin límite)
 - **Staging BD:** Migraciones 009-015 aplicadas ✅. Bucket `repairs` creado ✅.
 - **2FA:** Implementado para superadmin, deshabilitado temporalmente (pendiente propagación DNS Resend). Descomentar en `routes/auth.js` líneas 82-99 cuando esté listo.
 - **Credenciales piloto:** `admin@demo.com` / `Admin2026!` (hash bcrypt en la BD de staging).
 - **Bucket Supabase Storage `backups`:** ✅ Creado en staging y producción.
 
-> ### ⛔ BLOQUEO VERCEL (28 jun 2026) — leer antes de prometer pruebas de frontend
-> Vercel (plan gratis) topó su límite de **100 deploys/día por cuenta** (`api-deployments-free-per-day`).
-> Por eso **varios fixes de frontend de hoy (#152, #153) nunca se desplegaron** y el piloto siguió mostrando
-> código viejo ("siempre lo mismo"). El límite **se resetea ~24h** o se quita subiendo a **Vercel Pro ($20/mes)**.
-> Usuario eligió **esperar el reset** (gratis). **Al volver Vercel:** mergear PR #153 → confirmar deploy "Ready" → recién ahí probar.
-> **Backend (Railway) NO tiene este límite** — por eso los fixes de API sí se pueden desplegar y validar el mismo día.
+> ### ⛔ BLOQUEO VERCEL (28 jun 2026) — RESUELTO, pero leer la lección (regla #7 y #8)
+> Vercel (Hobby/gratis) topó **100 deploys/día**. Los merges #152/#153 a `staging` **no desplegaron a producción**
+> (los previews sí quedaban "Ready", enmascarando el problema), y `staging.vercel.app` sirvió código viejo (`2cb7d1a`)
+> por horas → "siempre lo mismo". **Resuelto** promoviendo manualmente el deploy `9897579` a Production
+> (Vercel → Deployments → ⋯ → Promote to Production). Decisión: seguir gratis con disciplina (reglas #7 y #8).
+> **Backend (Railway) NO tiene este límite.**
 
 ### Validación en piloto — Estado (28 jun 2026)
 
@@ -702,12 +715,12 @@ mundo-cel-diaz-api/
 | Reparaciones checklist+fotos (visible) | #2 Reparaciones | ✅ PASADA |
 | Guardar orden de reparación | #2 Reparaciones | ✅ PASADA (REP-000002 creada) |
 | Cobro de reparación (lleva monto, servicio sin producto) | #2/#5 | ✅ PASADA (boletas generadas) |
-| Anti-doble-cobro (marca entregado) | #2 | ⏳ Backend listo (#70); falta deploy frontend #153 (Vercel) |
-| Fotos en reparaciones (guardar) | #2 Reparaciones | ⏳ PENDIENTE (necesita Vercel) |
-| Variantes de producto 🎨 | #7 Variantes | ⏳ Código auditado OK; falta probar (Vercel) |
-| Seriales en POS | #1 Seriales | ⏳ Bug API arreglado (#71); falta probar (Vercel) |
-| Costo final en reparaciones | #5 Costo | ✅ Arreglado (mapeo finalCost + edición) |
-| Cuentas x cobrar aging | #6 Cuentas | ⏳ Bug API arreglado (#72); falta probar (Vercel) |
+| Anti-doble-cobro (marca entregado) | #2 | ✅ PASADA (deploy `9897579` vivo; REP-000003 cobrada) |
+| Fotos en reparaciones (guardar) | #2 Reparaciones | ⏳ PENDIENTE de probar (frontend ya vivo) |
+| Variantes de producto 🎨 | #7 Variantes | ⏳ Código auditado OK; falta probar |
+| Seriales en POS | #1 Seriales | ⏳ Bug API arreglado (#71); falta probar (frontend ya vivo) |
+| Costo final en reparaciones | #5 Costo | ✅ PASADA |
+| Cuentas x cobrar aging | #6 Cuentas | ⏳ Bug API arreglado (#72); falta probar (frontend ya vivo) |
 
 ### Bugs encontrados y corregidos hoy (28 jun 2026)
 
@@ -730,12 +743,15 @@ mundo-cel-diaz-api/
 
 ### Próximos pasos (en orden)
 
-1. **(Vercel reseteado) Merge PR #153 a staging** → confirmar deploy "Ready" → avisar al usuario
-2. **Validar en piloto**: anti-doble-cobro → seriales → cuentas aging → variantes → fotos en reparación
-3. **Aplicar migraciones 009-015 en Supabase PRODUCCIÓN** (`rhecnmfivygkayfvauxt`)
-4. **Crear bucket `repairs` en Supabase PRODUCCIÓN**
-5. **PR staging → main** en frontend y API (solo después de validar TODO el piloto)
-6. **(Opcional, decisión del usuario) Abrir red del entorno a staging** para que Claude confirme deploys del API por sí mismo (ver regla #6)
+1. **Terminar validación piloto** (frontend ya vivo): seriales → cuentas aging → variantes → fotos en reparación. Anti-doble-cobro ✅.
+2. **IVA en boleta de reparación** (pendiente nuevo 28 jun): la boleta del cobro de reparación NO muestra el desglose "Subtotal sin IVA / IVA 12% / Total" que sí tiene la venta normal del POS. En GT los servicios también llevan IVA → hacer que la boleta de reparación muestre el desglose igual. Tocar `utils/receipt.js` (`buildReceiptHTML`) — verificar por qué la línea de servicio no dispara el bloque de IVA. **Agrupar con otros cambios de frontend (regla #8).**
+3. **Construir `docs/MANUAL-TECNICO.md`** — enciclopedia completa del software (ver "Manual técnico" en Backlog). Explorar ambos repos a fondo.
+4. **Aplicar migraciones 009-015 en Supabase PRODUCCIÓN** (`rhecnmfivygkayfvauxt`) — solo tras validar TODO el piloto.
+5. **Crear bucket `repairs` en Supabase PRODUCCIÓN**.
+6. **PR staging → main** en frontend y API (solo después de validar TODO el piloto).
+7. **(Opcional) Abrir red del entorno a staging** para que Claude confirme deploys por sí mismo (regla #6).
+
+> **Disciplina Vercel (reglas #7 y #8):** agrupar cambios en menos PRs; tras cada merge a staging, verificar que el Production Deployment tenga el commit nuevo y promover si quedó atrás.
 
 ---
 
@@ -793,6 +809,8 @@ mundo-cel-diaz-api/
 - [ ] **Disaster Recovery:** Plan documentado de recuperación ante fallos
 - [ ] **Importación masiva de clientes:** Excel con saldo inicial para migración desde papel
 - [ ] **Importación masiva de reparaciones/garantías:** Para clientes que migran desde otro sistema
+- [ ] **📘 Manual técnico completo (`docs/MANUAL-TECNICO.md`):** Enciclopedia del software para tener "el hilo completo" en cada sesión. Pedido por el usuario (28 jun 2026). Estructura acordada: (1) visión general + glosario, (2) arquitectura de sistemas + flujo frontend→API→BD, (3) inventario de las 25 pantallas, (4) inventario de los 21 endpoints, (5) modelo de datos completo + divergencias de esquema reales, (6) flujos de negocio end-to-end, (7) integraciones (Supabase/Railway/Vercel/Resend/WebPush/Sentry/Redis), (8) 🔦 funciones ocultas/subutilizadas, (9) runbook de operación, (10) roadmap + deuda técnica. Construir explorando ambos repos a fondo (no inventar). CLAUDE.md queda como "reglas + estado" y enlaza este manual.
+- [ ] **IVA en boleta de reparación:** mostrar desglose IVA igual que la venta normal del POS (ver Próximos pasos #2).
 
 ---
 
