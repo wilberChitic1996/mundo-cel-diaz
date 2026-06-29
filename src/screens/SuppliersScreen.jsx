@@ -83,9 +83,14 @@ function printCompra(p) {
     '<div class="aviso">📦 Documento interno de control de inventario. No es comprobante de venta ni documento tributario; no se entrega al cliente.</div>' +
     '</body></html>';
 
+  // Impresión desde la ventana padre (CSP-safe, sin script inline).
   var w = window.open('', '_blank', 'width=800,height=700');
-  w.document.write(html + '<scr' + 'ipt>window.onload=function(){setTimeout(function(){window.print();},400);};</scr' + 'ipt>');
-  w.document.close();
+  if (w) {
+    w.document.write(html);
+    w.document.close();
+    w.focus();
+    setTimeout(function() { try { w.print(); } catch (e) {} }, 400);
+  }
 }
 
 var H1 = { fontSize: 'clamp(17px,4vw,22px)', fontWeight: 600, margin: 0, color: 'var(--text-primary,#1a1a1a)' };

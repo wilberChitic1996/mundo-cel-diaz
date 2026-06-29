@@ -20,8 +20,9 @@ export default function RemindersWidget({ setView }) {
   var [loading, setLoading] = useState(true);
 
   useEffect(function() {
+    // remindersAPI.summary ya devuelve el cuerpo desempaquetado (interceptor en api.js).
     remindersAPI.summary()
-      .then(function(res) { setData(res.data); })
+      .then(function(data) { setData(data); })
       .catch(function() { setData(null); })
       .finally(function() { setLoading(false); });
   }, []);

@@ -380,6 +380,11 @@ export default function LoginScreen({ onLogin, onBack }) {
         <p style={{ color: 'rgba(255,255,255,0.2)', fontSize: 11, textAlign: 'center', marginTop: 16 }}>
           Sesión expira en 8 horas · Bloqueo tras 5 intentos fallidos
         </p>
+        <p style={{ textAlign: 'center', marginTop: 8 }}>
+          <a href="?legal=privacy" style={{ color: 'rgba(255,255,255,0.35)', fontSize: 11, textDecoration: 'none' }}>Privacidad</a>
+          <span style={{ color: 'rgba(255,255,255,0.2)', fontSize: 11 }}> · </span>
+          <a href="?legal=terms" style={{ color: 'rgba(255,255,255,0.35)', fontSize: 11, textDecoration: 'none' }}>Términos</a>
+        </p>
       </div>
     </div>
   );
