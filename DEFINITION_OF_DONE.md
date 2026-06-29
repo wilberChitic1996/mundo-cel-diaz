@@ -8,8 +8,8 @@
 
 > Cruce de hallazgos YA EXISTENTES (sesión + auditoría de abajo) contra los bloqueantes de v1.0. No se re-auditó; evidencia citada de la auditoría.
 
-**Conteo de bloqueantes: 6 CUMPLIDOS · 1 PARCIAL · 6 NO CUMPLIDOS (de 13).**
-**Faltan para v1.0: 7 bloqueantes.**
+**Conteo de bloqueantes: 7 CUMPLIDOS · 1 PARCIAL · 5 NO CUMPLIDOS (de 13).**
+**Faltan para v1.0: 6 bloqueantes.**
 
 ### Bloqueantes 🔴 — dictamen
 
@@ -21,7 +21,7 @@
 - [ ] **A11/A12 — CSP estricta + refresh token en cookie HttpOnly** · ❌ **NO CUMPLIDO** · `vercel.json:8` con `unsafe-inline`+`unsafe-eval`; refresh token (30d) en `localStorage` (`session.js:55-56`).
 - [ ] **A13 — Cifrado de DPI / no volcarlo a `audit_logs`** · ❌ **NO CUMPLIDO** · `clients.js:33` dpi en texto plano; `clients.js:36` lo vuelca a `audit_logs`.
 - [ ] **A14 — Paginación server-side `sales`/`accounts`** · ❌ **NO CUMPLIDO** · `sales.js:21`, `accounts.js:21` traen toda la tabla con anidados, sin `.range/.limit`.
-- [ ] **M23 — Términos de Servicio + Política de Privacidad** · ❌ **NO CUMPLIDO** · no existen en el repo.
+- [x] **M23 — Términos de Servicio + Política de Privacidad** · ✅ **CUMPLIDO (29 jun)** · nueva `src/screens/LegalPage.jsx` con ToS y Política de Privacidad (español, contexto SaaS GT: multi-tenant, encargados Supabase/Railway/Vercel/Resend/Sentry, transferencia internacional, rol del negocio sobre datos de sus clientes, aviso FEL). Públicas vía `?legal=privacy|terms` (standalone, sin sesión, como la verificación de boletas) y enlazadas en el footer del landing y en el login. PR frontend #164. ⚠️ Redacción base: el operador debe completar datos de la entidad legal/contacto y hacerla revisar por un abogado.
 - [ ] **A16 — Cobro recurrente + signup self-serve** · ❌ **NO CUMPLIDO** · alta de tenant es superadminOnly; renovación = editar `expires_at` a mano; sin pasarela (Recurrente/Stripe).
 - [ ] **B1 — Integración FEL (facturación SAT)** · ❌ **NO CUMPLIDO** · columnas `fel_*` nunca escritas (0 usos en `routes/`); `receipt.js:121,340` imprime "no válido como factura".
 
