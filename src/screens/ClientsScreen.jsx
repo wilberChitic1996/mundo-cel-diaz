@@ -228,13 +228,23 @@ export default function ClientsScreen({ clients, sales, accounts, returns, saveC
               </thead>
               <tbody>
                 {cliSales.slice(0, 10).map(function(s) {
+                  // Una venta a crédito (status 'cuenta') no es "Cobrada": su estado real lo da la cuenta por cobrar.
+                  var esCredito = s.payType === 'credito' || s.payType === 'parcial' || s.status === 'cuenta';
+                  var esParcial = s.payType === 'parcial';
+                  var metodoLabel = esParcial ? 'Crédito parcial' : (esCredito ? 'A crédito' : s.method);
+                  var acc = esCredito ? cliAccs.find(function(a) { return a.sale_id === s.id; }) : null;
+                  var estadoBadge = !esCredito
+                    ? <span style={mkBadge('green')}>✓ Cobrada</span>
+                    : (acc && acc.status === 'pagado'
+                        ? <span style={mkBadge('green')}>✓ Pagada</span>
+                        : <span style={mkBadge('amber')}>⏳ Pendiente</span>);
                   return (
                     <tr key={s.id}>
                       <td style={sTD}>{fmtD(s.date)}</td>
                       <td style={Object.assign({}, sTD, { color: '#666' })}>{(s.items || []).length} art.</td>
-                      <td style={sTD}><span style={mkBadge('teal')}>{s.method}</span></td>
+                      <td style={sTD}><span style={mkBadge(esCredito ? 'amber' : 'teal')}>{metodoLabel}</span></td>
                       <td style={Object.assign({}, sTD, { fontWeight: 700, color: TEAL })}>{Q(s.total)}</td>
-                      <td style={sTD}><span style={mkBadge('green')}>✓ Cobrada</span></td>
+                      <td style={sTD}>{estadoBadge}</td>
                     </tr>
                   );
                 })}
