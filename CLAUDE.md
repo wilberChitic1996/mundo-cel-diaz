@@ -736,6 +736,12 @@ mundo-cel-diaz-api/
 ## Estado actual del trabajo
 
 - **Versión en producción:** 2.5.0
+- **Último cambio (29 jun 2026):** Limpieza de ubicaciones de productos + paridad de esquema piloto/producción + endurecimiento de entrada. Detalle:
+  - **Ubicaciones (producción):** normalizados 104 `shelf` sucios `n-n` → `Mueble N · X` (reconstruido desde `location_id`+`position` ya correctos); 3 sin mueble acoplados. 260/260 limpios. Respaldo `products_backup_20260628`.
+  - **Función faltante:** `generate_product_code()` no existía en staging (rompía crear productos en piloto) → creada (copia exacta de prod).
+  - **Paridad de esquema (segura, aplicada en AMBOS):** columnas faltantes (caja_sesiones totales en prod; tenants/defectives.updated_at, caja_sesiones.closed_role/efectivo_contado en staging), índices, y `decrement_stock` robusta (FOR UPDATE + validación) igualada en staging. PENDIENTE (no tocar a la ligera): tipos de `id` text(prod) vs uuid(staging) y columnas duplicadas en `repairs`.
+  - **Piloto (demo):** catálogo recortado a 50 productos completos (5 por categoría, todos los campos llenos, stock 10). Respaldo `products_backup_staging_pretrim` (279 originales).
+  - **Frontend:** validación de `position` (no permite posición sin estante, ni `·`, ni basura) + campo `Código` ahora solo-lectura/automático en el formulario.
 - **Último cambio (28 jun 2026):** 7 brechas funcionales + ronda de fixes de cobro de reparaciones y auditoría de esquema. Migraciones 009-015 aplicadas en staging.
 - **Rama de trabajo activa:** `claude/gifted-heisenberg-r6n8jo` (en AMBOS repos)
 - **Producción frontend:** ✅ mundoceldiaz.com (NO tocar hasta validar piloto completo)
@@ -788,6 +794,12 @@ mundo-cel-diaz-api/
 > `repairs.client`/`device` inexistentes, `sales.date` inexistente). **Antes de tocar cualquier query nueva,
 > verificar columnas reales** con `SELECT column_name FROM information_schema.columns WHERE table_name='X'`.
 > La BD de staging diverge del esquema versionado (columnas agregadas a mano en producción y no replicadas).
+
+> **LECCIÓN (28 jun 2026) — UBICACIÓN DE PRODUCTOS: columnas invertidas entre ambientes.**
+> `products` guarda ubicación en 3 columnas: `location_id` (FK a `locations` = el mueble), `position` (texto = la fila) y `shelf` (texto legacy combinado "Mueble N · X", **lo que muestran las pantallas** Productos/Inventario).
+> ⚠️ La columna-verdad **DIFIERE por ambiente**: **producción usa `shelf`** (convención "Mueble N"); **staging usa `position`** (alfanumérico B5-1/V-34, y `shelf` casi vacío). NUNCA correr el mismo script de datos en ambos sin ajustar la columna.
+> **Limpieza hecha en PRODUCCIÓN (28 jun):** 104 productos tenían `shelf` sucio "n-n" (ej "2-5") aunque `location_id`+`position` YA eran correctos. Se normalizó `shelf` → "Mueble N · X" reconstruyéndolo desde location_id+position (UPDATE reversible, respaldo `products_backup_20260628`, solo tenant prod `00000000-...-0001`, solo columna `shelf`; stock/precio/código intactos). Los 3 sin mueble se acoplaron (Pantallas→Mueble 1, P095→Mueble 2). Resultado: 260/260 con ubicación limpia.
+> **Endurecimiento (PR frontend):** `ProductForm` ahora valida `position` (no permite posición sin estante elegido, ni el carácter `·`, ni >12 chars, ni símbolos raros) para que no vuelva a ensuciarse. Multi-tenant-safe: acepta tanto numérico ("5") como alfanumérico ("B5-1").
 
 ### Próximos pasos (en orden)
 
@@ -860,6 +872,8 @@ mundo-cel-diaz-api/
 - [ ] **📘 Manual técnico completo (`docs/MANUAL-TECNICO.md`):** Enciclopedia del software para tener "el hilo completo" en cada sesión. Pedido por el usuario (28 jun 2026). Estructura acordada: (1) visión general + glosario, (2) arquitectura de sistemas + flujo frontend→API→BD, (3) inventario de las 25 pantallas, (4) inventario de los 21 endpoints, (5) modelo de datos completo + divergencias de esquema reales, (6) flujos de negocio end-to-end, (7) integraciones (Supabase/Railway/Vercel/Resend/WebPush/Sentry/Redis), (8) 🔦 funciones ocultas/subutilizadas, (9) runbook de operación, (10) roadmap + deuda técnica. Construir explorando ambos repos a fondo (no inventar). CLAUDE.md queda como "reglas + estado" y enlaza este manual.
 - [ ] **IVA en boleta de reparación:** mostrar desglose IVA igual que la venta normal del POS (ver Próximos pasos #2).
 - [ ] **Limpiar columnas duplicadas en `repairs`:** el ALTER del 28 jun dejó duplicados (`issue`+`problem_desc`, `price`+`estimated_cost`, `technician`+`tech_name`, `notes`+`internal_note`). Unificar a las canónicas y migrar datos/código. Ver `docs/DB-SCHEMA-REAL.md`. Baja prioridad (no rompe nada hoy).
+- [ ] **Unificar tipos de `id` entre ambientes (migración mayor):** producción usa `text` y staging usa `uuid` en `clients.id`, `repairs.id`, y los `*_id` relacionados (`accounts.client_id`, `sales.client_id`, `repairs.client_id`, `repair_items.repair_id`). El API tolera ambos hoy (por eso funcionan). Igualar requiere decidir un modelo canónico + migración con respaldo y reconstrucción de FKs. NO migrar a ciegas (un ALTER TYPE fallaría con datos no-uuid en prod). Baja prioridad.
+- [ ] **Limpiar tablas de respaldo temporales** cuando ya no se necesiten: `products_backup_20260628` (prod), `products_backup_staging_20260628` y `products_backup_staging_pretrim` (staging).
 - [ ] **Mantener `docs/DB-SCHEMA-REAL.md` sincronizado** con producción cuando se apliquen migraciones allá (hoy refleja staging).
 
 ---
