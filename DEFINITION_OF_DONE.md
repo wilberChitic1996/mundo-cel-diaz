@@ -8,13 +8,13 @@
 
 > Cruce de hallazgos YA EXISTENTES (sesión + auditoría de abajo) contra los bloqueantes de v1.0. No se re-auditó; evidencia citada de la auditoría.
 
-**Conteo de bloqueantes: 2 CUMPLIDOS · 1 PARCIAL · 10 NO CUMPLIDOS (de 13).**
-**Faltan para v1.0: 11 bloqueantes.**
+**Conteo de bloqueantes: 3 CUMPLIDOS · 1 PARCIAL · 9 NO CUMPLIDOS (de 13).**
+**Faltan para v1.0: 10 bloqueantes.**
 
 ### Bloqueantes 🔴 — dictamen
 
 - [x] **B3 — Cerrar escalada a superadmin** · ✅ **CUMPLIDO (29 jun)** · whitelist `TENANT_ROLES=['admin','cajero','auditor']` + guard de auto-edición en `users.js` (POST y PUT); +7 tests (suite 68/68). PR API #74. _Antes:_ `users.js:48,72` guardaba `role` del body sin validar.
-- [ ] **B2/A6 — Enforcement de suscripción en backend** · ❌ **NO CUMPLIDO** · `middleware/auth.js` solo valida JWT; no consulta `tenants.active/expires_at`. Solo hay banner informativo (`admin.js:349`, `App.jsx:2041`) → un tenant vencido sigue operando por API.
+- [x] **B2/A6 — Enforcement de suscripción en backend** · ✅ **CUMPLIDO (29 jun)** · nuevo `middleware/enforceSubscription.js` consulta `tenants.active/expires_at` (cacheado 5 min, timeout 1500ms + fail-open) y devuelve **403 `SUBSCRIPTION_INACTIVE`** en toda escritura de un tenant inactivo/vencido (sales, accounts, returns, warranties, caja, repairs, variants). Orden `auth → requireRole → enforceSubscription`; `admin PUT /tenants/:id` invalida la caché. +tests de decisión pura `isSubscriptionBlocked` + bypass + smoke (suite 91/91). PR API #75. _Antes:_ `auth.js` solo validaba JWT; solo había banner informativo → un vencido seguía operando por API.
 - [ ] **A1/A15 — `decrement_stock` robusto + drop del overload** · 🟡 **PARCIAL** · el runtime en vivo YA es robusto en ambos ambientes (verificado esta sesión), pero la migración versionada (`000_full_schema.sql:366-373`) sigue siendo el `UPDATE` plano y el overload `decrement_stock(uuid,integer)` sin tenant sigue existiendo en ambos.
 - [ ] **A2/A3 — Fixes de 1 línea (refresh JWT + RemindersWidget)** · ❌ **NO CUMPLIDO** · `session.js:69` y `RemindersWidget.jsx:24` leen `res.data` sobre una respuesta ya desempaquetada por el interceptor (`api.js:38`) → nunca operan.
 - [x] **A8 — RBAC server-side en endpoints de escritura** · ✅ **CUMPLIDO (29 jun)** · nuevo `middleware/requireRole.js` aplicado a sales/accounts/returns/warranties/caja/repairs (admin+cajero) y variants (admin); superadmin pasa. +12 tests (suite 80/80). PR API #74. _Antes:_ esas escrituras no validaban rol.
@@ -32,7 +32,7 @@
 
 ### 🚦 Plan de cierre (agrupado por módulo / dependencia)
 
-1. **Grupo A — Auth/Autorización backend** (mismo módulo `middleware/` + `routes/*`): **B3** (whitelist roles users.js) → **A8** (requireRole en escritura) → **B2/A6** (middleware enforceSubscription) → **NUEVO-1/A7** (revocar sesión por `users.active`). Atacarlos juntos: comparten middleware y patrón.
+1. **Grupo A — Auth/Autorización backend** (mismo módulo `middleware/` + `routes/*`): **B3 ✅** (whitelist roles users.js) → **A8 ✅** (requireRole en escritura) → **B2/A6 ✅** (middleware enforceSubscription) → **B4/A7 ⏳ (siguiente)** (revocar sesión por `users.active`). Atacarlos juntos: comparten middleware y patrón.
 2. **Grupo B — Bugs front + sesión/token** (capa de sesión front+api): **A2/A3** (fixes `res.data`) → **A11/A12** (CSP estricta + refresh token a cookie HttpOnly, unificar `App.jsx`/`session.js`).
 3. **Grupo C — Integridad de inventario/dinero (BD)**: **A1/A15** (migración versionada `decrement_stock` con FOR UPDATE + drop overload) → **NUEVO-2/M6** (idempotencia en accounts).
 4. **Grupo D — Datos y escala**: **A13** (cifrar DPI + sacarlo de audit_logs) → **A14** (paginación server-side sales/accounts).
