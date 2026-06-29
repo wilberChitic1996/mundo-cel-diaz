@@ -183,15 +183,21 @@ export default function ProductForm({ product, categories, locations, onSave, on
           />
         </div>
 
-        {/* Código de producto */}
+        {/* Código de producto — lo asigna el sistema automáticamente (no editable) */}
         <div>
           <label style={sLabel}>Código</label>
           <input
-            type="text" style={sInput}
-            value={form.code || ''} placeholder="Ej: MCD-001"
-            onChange={function(e) { set('code', e.target.value); }}
-            onBlur={function(e)   { set('code', (e.target.value || '').trim().toUpperCase()); }}
+            type="text"
+            style={Object.assign({}, sInput, { background: '#f3f4f6', color: '#6b7280', cursor: 'not-allowed' })}
+            value={form.code || ''}
+            placeholder="Se asigna automáticamente"
+            readOnly disabled
           />
+          {!product.id && (
+            <p style={{ fontSize: 11, color: '#6b7280', margin: '3px 0 0' }}>
+              El sistema genera el código (ej: MCD0001).
+            </p>
+          )}
         </div>
 
         {/* Precio de venta */}
