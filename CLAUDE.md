@@ -922,6 +922,8 @@ RESEND_API_KEY     = API key de Resend
 REDIS_URL          = URL de Redis (opcional, Map en memoria si no está)
 VAPID_PUBLIC_KEY   = Clave pública VAPID para Web Push
 VAPID_PRIVATE_KEY  = Clave privada VAPID para Web Push
+ENCRYPTION_KEY     = (opcional) Clave para cifrar DPI en reposo (A13, AES-256-GCM). Sin ella el DPI se guarda como hoy (texto plano). Al activarla, correr scripts/reencrypt-dpi.js. NUNCA cambiarla tras cifrar datos (perderías el descifrado).
+DB_LOOKUP_TIMEOUT_MS = (opcional) Tope ms para consultas de revocación de sesión/suscripción (default 1500). Tests usan 50.
 
 # Backend Railway (staging)
 SUPABASE_URL       = URL de Supabase STAGING (aawjhttlaydwsipsifre)
