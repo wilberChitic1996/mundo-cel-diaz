@@ -1310,16 +1310,18 @@ function App(props) {
     checkoutInProgress.current=false;
   }
 
-  async function addPayment(accountId,amount,method,note){
+  async function addPayment(accountId,amount,method,note,idempotencyKey){
     try{
-      await accountsAPI.addPayment(accountId,{amount:amount,method:method||'Efectivo',note:note||''});
+      await accountsAPI.addPayment(accountId,{amount:amount,method:method||'Efectivo',note:note||'',idempotencyKey:idempotencyKey||gid()});
       var freshAccs2 = await accountsAPI.getAll();
       var na2=(freshAccs2||[]).map(function(a){return Object.assign({},a,{items:a.account_items||[],payments:(a.account_payments||[]).map(function(_pp){return Object.assign({},_pp,{date:_pp.date||_pp.created_at,amount:Number(_pp.amount),registradoPor:_pp.registrado_por||_pp.registradoPor||null});}),total:Number(a.total),paid:Number(a.paid),balance:Number(a.balance),clientId:a.client_id,date:a.created_at,registradoPor:a.registrado_por||null});});
       setAccounts(na2);
       showFlash("✓ Pago registrado","ok");
+      return true;
     }catch(e){
       var em=e&&e.error?e.error:null;
       showFlash("⛔ "+(em||"Error al registrar el pago. Verifica tu conexión."),"err");
+      return false;
     }
   }
 
