@@ -12,6 +12,11 @@ y dame un resumen de: arquitectura actual, último estado del trabajo,
 y pendientes. No hagas nada hasta que yo te confirme qué tarea seguiremos.
 ```
 
+> 🟢 **Para trabajar desde consola:** el prompt de arranque perfecto (copiable) está en
+> **`docs/PROMPT-INICIO.md`** — pegalo como primer mensaje en cada sesión nueva y Claude lee todo
+> esto solo. Guía de instalación: `docs/CONSOLA-WINDOWS.md`. Manual completo: `docs/MANUAL-TECNICO.md`.
+> El repo del API tiene su propio `CLAUDE.md` (contexto backend) para sesiones paradas en ese repo.
+
 > **Cómo funciona la memoria (para el usuario):** Claude **no recuerda entre sesiones distintas** — cada sesión NUEVA arranca en blanco y se pone al día leyendo este CLAUDE.md (se carga solo; el prompt de arriba es para que resuma y se alinee). **Dentro de una misma sesión recuerda todo** — no hay que repetir nada. Reconectarse a la MISMA sesión conserva el historial. Por eso CLAUDE.md (estado + pendientes + lecciones) es la memoria del proyecto entre sesiones: **todo lo importante se anota acá (regla #9)**.
 
 ---
