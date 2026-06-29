@@ -8,14 +8,14 @@
 
 > Cruce de hallazgos YA EXISTENTES (sesión + auditoría de abajo) contra los bloqueantes de v1.0. No se re-auditó; evidencia citada de la auditoría.
 
-**Conteo de bloqueantes: 8 CUMPLIDOS · 1 PARCIAL · 4 NO CUMPLIDOS (de 13).**
-**Faltan para v1.0: 5 bloqueantes** (1 a un paso: A1/A15 solo espera correr el SQL en BD).
+**Conteo de bloqueantes: 9 CUMPLIDOS · 0 PARCIAL · 4 NO CUMPLIDOS (de 13).**
+**Faltan para v1.0: 4 bloqueantes** (A11/A12, A14, A16, B1).
 
 ### Bloqueantes 🔴 — dictamen
 
 - [x] **B3 — Cerrar escalada a superadmin** · ✅ **CUMPLIDO (29 jun)** · whitelist `TENANT_ROLES=['admin','cajero','auditor']` + guard de auto-edición en `users.js` (POST y PUT); +7 tests (suite 68/68). PR API #74. _Antes:_ `users.js:48,72` guardaba `role` del body sin validar.
 - [x] **B2/A6 — Enforcement de suscripción en backend** · ✅ **CUMPLIDO (29 jun)** · nuevo `middleware/enforceSubscription.js` consulta `tenants.active/expires_at` (cacheado 5 min, timeout 1500ms + fail-open) y devuelve **403 `SUBSCRIPTION_INACTIVE`** en toda escritura de un tenant inactivo/vencido (sales, accounts, returns, warranties, caja, repairs, variants). Orden `auth → requireRole → enforceSubscription`; `admin PUT /tenants/:id` invalida la caché. +tests de decisión pura `isSubscriptionBlocked` + bypass + smoke (suite 91/91). PR API #74. _Antes:_ `auth.js` solo validaba JWT; solo había banner informativo → un vencido seguía operando por API.
-- [~] **A1/A15 — `decrement_stock` robusto + drop del overload** · 🟡 **CÓDIGO LISTO, espera correr SQL** · migración `016_decrement_stock_robusto.sql` (API PR #74) codifica la función robusta viva (copia exacta verificada en staging) y elimina el overload legacy `decrement_stock(uuid,integer)` (sin tenant, sin uso). Falta SOLO: correr el SQL en la BD de staging (script entregado inline). El runtime ya es robusto; el drop del overload cierra el riesgo multi-tenant.
+- [x] **A1/A15 — `decrement_stock` robusto + drop del overload** · ✅ **CUMPLIDO (29 jun)** · migración `016_decrement_stock_robusto.sql` (API PR #74) codifica la función robusta. **SQL corrido en staging por el usuario y verificado:** queda solo `decrement_stock(uuid,integer,uuid)→integer`; el overload legacy `decrement_stock(uuid,integer)` (sin tenant) fue eliminado → cerrado el riesgo multi-tenant. _Pendiente para prod:_ correr el mismo SQL en la BD de producción cuando se libere `staging → main`.
 - [x] **A2/A3 — Fixes de 1 línea (refresh JWT + RemindersWidget)** · ✅ **CUMPLIDO (29 jun)** · `session.js` (tryRefreshSession) y `RemindersWidget.jsx` ahora usan el cuerpo ya desempaquetado por el interceptor (`api.js:38`). _Efecto:_ el auto-refresh del JWT vuelve a renovar la sesión (antes deslogueaba al expirar pese a tener refresh token) y el widget de recordatorios muestra datos (antes siempre `null`). Barrido confirmó que `AuditScreen` no tiene el bug (su `res.data`/`res.total` son campos del payload del backend). PR frontend #164.
 - [x] **A8 — RBAC server-side en endpoints de escritura** · ✅ **CUMPLIDO (29 jun)** · nuevo `middleware/requireRole.js` aplicado a sales/accounts/returns/warranties/caja/repairs (admin+cajero) y variants (admin); superadmin pasa. +12 tests (suite 80/80). PR API #74. _Antes:_ esas escrituras no validaban rol.
 - [ ] **A11/A12 — CSP estricta + refresh token en cookie HttpOnly** · ❌ **NO CUMPLIDO** · `vercel.json:8` con `unsafe-inline`+`unsafe-eval`; refresh token (30d) en `localStorage` (`session.js:55-56`).
