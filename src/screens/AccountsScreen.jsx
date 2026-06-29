@@ -95,6 +95,23 @@ export default function AccountsScreen({ accounts, pendingAccs, totalPend, produ
   // Totales globales
   var totalCobrado = accounts.reduce(function(s, a) { return s + a.paid; }, 0);
 
+  // ── Aging (antigüedad de cuentas) ─────────────────────────────────────────
+  // Debe calcularse ANTES de `filtradas`: el filtro 'aging-N' lo usa más abajo.
+  var ahora = new Date();
+  var aging = [
+    { label: '0 – 30 días',  color: '#2E7D32', bg: '#EAF3DE', accs: [] },
+    { label: '31 – 60 días', color: '#E65100', bg: '#FFF3E0', accs: [] },
+    { label: '61 – 90 días', color: '#C62828', bg: '#FDECEA', accs: [] },
+    { label: '+90 días',     color: '#7B1FA2', bg: '#F3E5F5', accs: [] },
+  ];
+  pendingAccs.forEach(function(a) {
+    var dias = Math.floor((ahora - new Date(a.date)) / 86400000);
+    if      (dias <= 30) aging[0].accs.push(a);
+    else if (dias <= 60) aging[1].accs.push(a);
+    else if (dias <= 90) aging[2].accs.push(a);
+    else                 aging[3].accs.push(a);
+  });
+
   // Lista filtrada
   var filtradas = accounts.filter(function(a) {
     if (clientQ) return (a.client || '').toLowerCase().indexOf(clientQ.toLowerCase()) >= 0;
@@ -253,22 +270,6 @@ export default function AccountsScreen({ accounts, pendingAccs, totalPend, produ
       </div>
     );
   }
-
-  // ── Aging (antigüedad de cuentas) ─────────────────────────────────────────
-  var ahora = new Date();
-  var aging = [
-    { label: '0 – 30 días',  color: '#2E7D32', bg: '#EAF3DE', accs: [] },
-    { label: '31 – 60 días', color: '#E65100', bg: '#FFF3E0', accs: [] },
-    { label: '61 – 90 días', color: '#C62828', bg: '#FDECEA', accs: [] },
-    { label: '+90 días',     color: '#7B1FA2', bg: '#F3E5F5', accs: [] },
-  ];
-  pendingAccs.forEach(function(a) {
-    var dias = Math.floor((ahora - new Date(a.date)) / 86400000);
-    if      (dias <= 30) aging[0].accs.push(a);
-    else if (dias <= 60) aging[1].accs.push(a);
-    else if (dias <= 90) aging[2].accs.push(a);
-    else                 aging[3].accs.push(a);
-  });
 
   // ── Vista de lista ─────────────────────────────────────────────────────────
   return (
