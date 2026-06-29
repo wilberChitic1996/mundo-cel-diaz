@@ -3,9 +3,9 @@ import * as XLSX from 'xlsx';
 import html2canvas from 'html2canvas';
 import { AreaChart, Area, BarChart, Bar, PieChart, Pie, Cell, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend } from 'recharts';
 import { db } from './utils/db.js';
-import { authAPI, productsAPI, salesAPI, accountsAPI, returnsAPI, defectivesAPI, usersAPI, checkAPI, clientsAPI, repairsAPI, auditAPI, warrantiesAPI, cajaAPI, settingsAPI, suppliersAPI, adminAPI, categoriesAPI, locationsAPI } from './utils/api.js';
+import { authAPI, productsAPI, salesAPI, accountsAPI, returnsAPI, defectivesAPI, usersAPI, checkAPI, clientsAPI, repairsAPI, auditAPI, warrantiesAPI, cajaAPI, settingsAPI, suppliersAPI, adminAPI, categoriesAPI, locationsAPI, backupAPI } from './utils/api.js';
 // Sincroniza la config de tienda con el módulo de impresión (receipt.js usa su propio estado).
-import { setStore as setReceiptStore, printVoucher as printVoucherDoc, descargarImagen as descargarBoletaImagen } from './utils/receipt.js';
+import { setStore as setReceiptStore, printVoucher as printVoucherDoc, descargarImagen as descargarBoletaImagen, buildReceiptHTML } from './utils/receipt.js';
 
 
 // ── Pantallas extraídas a módulos independientes ──────────────────────────────
@@ -85,6 +85,18 @@ function waBoletaVenta(sale,si){
   var items=(sale.items||[]).map(function(i){return "  • "+i.name+" x"+i.qty+" — Q"+Number(i.price*i.qty).toFixed(2);}).join("\n");
   return "✅ *"+sn+"*\n"+st+"\n\n📋 *Boleta de compra*\n📅 "+fmtD(sale.date)+"\n👤 "+sale.client+"\n\n*Productos:*\n"+items+"\n\n💰 *Total: Q"+Number(sale.total).toFixed(2)+"*\nMétodo: "+(sale.method||"Efectivo")+"\n\n¡Gracias por su compra! 🙏";
 }
+// Mensaje de WhatsApp según el tipo de comprobante (venta / abono / devolución).
+function waComprobante(sale,docType,opts){
+  opts=opts||{};
+  var si=getStore(); var sn=si.store_name||STORE_FALLBACK; var st=si.store_tagline||APP_TAGLINE;
+  if(docType==="abono"){
+    return "✅ *"+sn+"*\n"+st+"\n\n💵 *Comprobante de Abono*\n📅 "+fmtD(sale.date)+"\n👤 "+sale.client+"\n\nAbono recibido: Q"+Number(opts.abonoHoy||0).toFixed(2)+"\nTotal cuenta: Q"+Number(sale.total).toFixed(2)+"\nPagado acumulado: Q"+Number(opts.pagado||sale.paid||0).toFixed(2)+"\n*Saldo pendiente: Q"+Number(opts.saldo||sale.balance||0).toFixed(2)+"*\nMétodo: "+(sale.method||"Efectivo")+"\n\n¡Gracias por su pago! 🙏";
+  }
+  if(docType==="devolucion"){
+    return "✅ *"+sn+"*\n"+st+"\n\n🔄 *Comprobante de Devolución*\n📅 "+fmtD(sale.date)+"\n👤 "+sale.client+"\n\nMonto reembolsado: Q"+Number(sale.total).toFixed(2)+"\nMétodo: "+(sale.method||"Efectivo")+"\n\n¡Gracias! 🙏";
+  }
+  return waBoletaVenta(sale);
+}
 function waRecordatorio(acc,si){
   si=si||getStore(); var sn=si.store_name||STORE_FALLBACK;
   return "Hola *"+acc.client+"*, le saludamos de *"+sn+"*.\n\nLe recordamos que tiene un saldo pendiente de *Q"+Number(acc.balance).toFixed(2)+"* de su compra del "+fmtD(acc.date||acc.created_at)+".\n\nTotal de la compra: Q"+Number(acc.total).toFixed(2)+"\nYa abonado: Q"+Number(acc.paid).toFixed(2)+"\n*Saldo pendiente: Q"+Number(acc.balance).toFixed(2)+"*\n\nPor favor comuníquese con nosotros para coordinar su pago. ¡Gracias! 🙏";
@@ -104,67 +116,7 @@ function pedirTelYEnviar(nombre, getMensaje, opts){
   compartirWhatsApp(tel.trim(), getMensaje, opts);
 }
 
-// Genera el HTML del recibo (versión simplificada para captura)
-function buildReceiptHTML(sale, opts, si){
-  opts=opts||{}; si=si||getStore();
-  var sn=si.store_name||STORE_FALLBACK;
-  var st=si.store_tagline||"Tecnología · Accesorios · Reparaciones · Guatemala";
-  var ivaPct=parseFloat(si.iva_percent||'0')||0;
-  var total=Number(sale.total)||0;
-  var ivaAmt=ivaPct>0?total-total/(1+ivaPct/100):0;
-  var subtot=total-ivaAmt;
-  var items=(sale.items||[]).map(function(it){
-    return '<tr>'+
-      '<td style="padding:8px 10px;border-bottom:1px solid #eee;font-size:12px;font-weight:600;">'+it.name+'</td>'+
-      '<td style="padding:8px 10px;border-bottom:1px solid #eee;text-align:center;font-size:12px;">'+it.qty+'</td>'+
-      '<td style="padding:8px 10px;border-bottom:1px solid #eee;text-align:right;font-size:12px;">Q '+Number(it.price).toFixed(2)+'</td>'+
-      '<td style="padding:8px 10px;border-bottom:1px solid #eee;text-align:right;font-size:12px;font-weight:700;">Q '+Number(it.price*it.qty).toFixed(2)+'</td>'+
-    '</tr>';
-  }).join("");
-  var fecha=new Date(sale.date||sale.created_at).toLocaleDateString("es-GT",{day:"2-digit",month:"long",year:"numeric"});
-  var hora=new Date(sale.date||sale.created_at).toLocaleTimeString("es-GT",{hour:"2-digit",minute:"2-digit"});
-  var estadoHTML="";
-  if(opts.estado==="pendiente")estadoHTML='<div style="text-align:center;padding:8px;margin-bottom:14px;background:#FCEBEB;color:#791F1F;border-radius:6px;font-weight:900;font-size:15px;letter-spacing:2px;">PENDIENTE DE PAGO</div>';
-  else if(opts.estado==="parcial")estadoHTML='<div style="text-align:center;padding:8px;margin-bottom:14px;background:#FAEEDA;color:#633806;border-radius:6px;font-weight:900;font-size:15px;letter-spacing:2px;">ABONO — SALDO PENDIENTE</div>';
-  else if(opts.estado==="pagado")estadoHTML='<div style="text-align:center;padding:8px;margin-bottom:14px;background:#EAF3DE;color:#27500A;border-radius:6px;font-weight:900;font-size:15px;letter-spacing:2px;">✓ CUENTA CANCELADA</div>';
-  var saldoHTML="";
-  if(opts.estado&&opts.estado!=="")saldoHTML='<tr style="background:#f0f9f5;"><td colspan="3" style="padding:8px 10px;font-weight:700;font-size:13px;">Abonado</td><td style="padding:8px 10px;text-align:right;font-weight:700;font-size:13px;color:#1D9E75;">Q '+Number(opts.pagado||sale.paid||0).toFixed(2)+'</td></tr>'+
-    '<tr style="background:#fff0f0;"><td colspan="3" style="padding:8px 10px;font-weight:900;font-size:14px;">Saldo pendiente</td><td style="padding:8px 10px;text-align:right;font-weight:900;font-size:14px;color:#E24B4A;">Q '+Number(opts.saldo||sale.balance||0).toFixed(2)+'</td></tr>';
-  return '<div style="font-family:Arial,sans-serif;font-size:12px;background:#fff;width:600px;padding:24px;box-sizing:border-box;">'+
-    '<div style="border-bottom:3px solid #1D9E75;padding-bottom:12px;margin-bottom:16px;display:flex;justify-content:space-between;align-items:flex-start;">'+
-      '<div><div style="font-size:20px;font-weight:900;color:#1a2535;">'+sn+'</div>'+
-        '<div style="font-size:9px;color:#1D9E75;font-weight:700;letter-spacing:2px;margin-top:2px;">SISTEMA DE GESTIÓN</div>'+
-        '<div style="font-size:9px;color:#999;margin-top:3px;">'+st+'</div></div>'+
-      '<div style="text-align:right;"><div style="font-size:9px;color:#999;text-transform:uppercase;">'+(opts.estado?"Comprobante de Cuenta":"Comprobante de Venta")+'</div>'+
-        '<div style="font-size:20px;font-weight:900;color:#1D9E75;"># '+String(sale.id||"").toUpperCase().slice(-8)+'</div></div>'+
-    '</div>'+
-    estadoHTML+
-    '<div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:16px;padding:12px;background:#f8f9fa;border-radius:8px;border-left:4px solid #1D9E75;">'+
-      '<div><div style="font-size:9px;color:#999;text-transform:uppercase;letter-spacing:0.8px;margin-bottom:3px;">Cliente</div><div style="font-size:12px;font-weight:700;color:#222;">'+sale.client+'</div></div>'+
-      '<div><div style="font-size:9px;color:#999;text-transform:uppercase;letter-spacing:0.8px;margin-bottom:3px;">Fecha</div><div style="font-size:12px;font-weight:700;color:#222;">'+fecha+'</div><div style="font-size:10px;color:#666;">'+hora+' hrs</div></div>'+
-      '<div><div style="font-size:9px;color:#999;text-transform:uppercase;letter-spacing:0.8px;margin-bottom:3px;">Método</div><div style="font-size:12px;font-weight:700;color:#222;">'+(sale.method||"Efectivo")+'</div></div>'+
-      '<div><div style="font-size:9px;color:#999;text-transform:uppercase;letter-spacing:0.8px;margin-bottom:3px;">Atendido por</div><div style="font-size:12px;font-weight:700;color:#222;">'+((sale.registradoPor&&sale.registradoPor.name)||opts.usuario||"—")+'</div></div>'+
-    '</div>'+
-    '<table style="width:100%;border-collapse:collapse;margin-bottom:12px;">'+
-      '<thead><tr style="background:#1a2535;">'+
-        '<th style="padding:8px 10px;color:#fff;font-size:10px;font-weight:700;text-transform:uppercase;text-align:left;">Producto</th>'+
-        '<th style="padding:8px 10px;color:#fff;font-size:10px;font-weight:700;text-transform:uppercase;text-align:center;">Cant.</th>'+
-        '<th style="padding:8px 10px;color:#fff;font-size:10px;font-weight:700;text-transform:uppercase;text-align:right;">Precio</th>'+
-        '<th style="padding:8px 10px;color:#fff;font-size:10px;font-weight:700;text-transform:uppercase;text-align:right;">Subtotal</th>'+
-      '</tr></thead>'+
-      '<tbody>'+items+saldoHTML+'</tbody>'+
-    '</table>'+
-    '<div style="display:flex;justify-content:flex-end;margin-bottom:16px;">'+
-      '<div style="border:1px solid #eee;border-radius:8px;overflow:hidden;min-width:220px;">'+
-        (ivaPct>0?'<div style="display:flex;justify-content:space-between;padding:6px 12px;font-size:11px;border-bottom:1px solid #eee;color:#666;"><span>Subtotal (sin IVA)</span><span>Q '+subtot.toFixed(2)+'</span></div>'+
-        '<div style="display:flex;justify-content:space-between;padding:6px 12px;font-size:11px;border-bottom:1px solid #eee;color:#666;"><span>IVA ('+ivaPct+'%)</span><span>Q '+ivaAmt.toFixed(2)+'</span></div>':'')+
-        '<div style="display:flex;justify-content:space-between;padding:7px 12px;background:#1D9E75;color:#fff;font-weight:700;font-size:14px;"><span>TOTAL</span><span>Q '+total.toFixed(2)+'</span></div>'+
-      '</div>'+
-    '</div>'+
-    '<div style="border-top:2px dashed #ccc;padding-top:12px;font-size:10px;color:#999;display:flex;justify-content:space-between;"><span>Generado por '+sn+' POS</span><span>'+fecha+' · '+hora+'</span></div>'+
-    '<div style="text-align:center;margin-top:16px;font-size:13px;color:#1D9E75;font-weight:700;letter-spacing:1px;">¡Gracias por su compra!</div>'+
-    '</div>';
-}
+// buildReceiptHTML se importa desde ./utils/receipt.js (builder unificado E3).
 
 async function compartirWhatsApp(tel, getMensaje, opts){
   opts=opts||{};
@@ -1317,6 +1269,14 @@ function App(props) {
       var na2=(freshAccs2||[]).map(function(a){return Object.assign({},a,{items:a.account_items||[],payments:(a.account_payments||[]).map(function(_pp){return Object.assign({},_pp,{date:_pp.date||_pp.created_at,amount:Number(_pp.amount),registradoPor:_pp.registrado_por||_pp.registradoPor||null});}),total:Number(a.total),paid:Number(a.paid),balance:Number(a.balance),clientId:a.client_id,date:a.created_at,registradoPor:a.registrado_por||null});});
       setAccounts(na2);
       showFlash("✓ Pago registrado","ok");
+      // Ofrecer comprobante de abono (reutiliza el modal post-venta — E1)
+      var _acc=na2.find(function(a){return a.id===accountId;});
+      if(_acc){
+        setPostSale({
+          sale:{id:_acc.id,client:_acc.client,total:Number(_acc.total),method:method||"Efectivo",items:_acc.items||[],date:new Date().toISOString(),registradoPor:{userId:session.userId,name:session.name,role:session.role},paid:Number(_acc.paid),balance:Number(_acc.balance)},
+          opts:{usuario:session.name,usuarioRole:session.role,estado:Number(_acc.balance)<=0.009?"pagado":"parcial",abonoHoy:Number(amount),pagado:Number(_acc.paid),saldo:Number(_acc.balance),docType:"abono",docLabel:"Comprobante de Abono"}
+        });
+      }
       return true;
     }catch(e){
       var em=e&&e.error?e.error:null;
@@ -1358,6 +1318,11 @@ function App(props) {
         ?"🔄 Devolución registrada — artículo reintegrado al stock"
         :"🔄 Devolución registrada — artículo enviado a Piezas Defectuosas";
     showFlash(msg,"ok");
+    // Ofrecer comprobante de devolución (reutiliza el modal post-venta — E2)
+    setPostSale({
+      sale:{id:newId,client:data.client||"Cliente",total:Number(data.refundAmount||total),method:data.refundMethod||"Efectivo",items:(data.items||[]),date:new Date().toISOString(),registradoPor:registradoPor},
+      opts:{usuario:session.name,usuarioRole:session.role,docType:"devolucion",docLabel:"Comprobante de Devolución",tipo:"devolucion"}
+    });
   }
 
   async function updateDefectiveStatus(id,status){
@@ -2024,12 +1989,12 @@ function App(props) {
           <div style={{position:"fixed",inset:0,zIndex:9500,background:"rgba(20,30,45,0.55)",display:"flex",alignItems:"center",justifyContent:"center",padding:16}} onClick={function(){setPostSale(null);}}>
             <div style={{background:"#fff",borderRadius:14,padding:24,maxWidth:380,width:"100%",boxShadow:"0 12px 40px rgba(0,0,0,0.25)"}} onClick={function(e){e.stopPropagation();}}>
               <div style={{textAlign:"center",marginBottom:6,fontSize:34}}>🧾</div>
-              <p style={{textAlign:"center",fontWeight:800,fontSize:17,margin:"0 0 4px",color:"#1a2535"}}>Venta registrada</p>
+              <p style={{textAlign:"center",fontWeight:800,fontSize:17,margin:"0 0 4px",color:"#1a2535"}}>{(function(){var _dt=postSale.opts&&postSale.opts.docType; return _dt==="abono"?"Abono registrado":_dt==="devolucion"?"Devolución registrada":"Venta registrada";})()}</p>
               <p style={{textAlign:"center",fontSize:13,color:"#777",margin:"0 0 18px"}}>{Q(postSale.sale.total)} · {postSale.sale.client||"Cliente ocasional"}<br/>¿Entregar comprobante al cliente?</p>
               <div style={{display:"grid",gap:8}}>
                 <button style={Object.assign({},mB("teal"),{padding:"11px"})} onClick={function(){printVoucherDoc(postSale.sale,postSale.opts);}}>🖨 Imprimir / PDF</button>
                 <button style={Object.assign({},mB("blue"),{padding:"11px"})} onClick={function(){descargarBoletaImagen(postSale.sale,postSale.opts).then(function(ok){showFlash(ok?"🖼 Imagen de boleta descargada":"⛔ No se pudo generar la imagen",ok?"ok":"err");});}}>🖼 Descargar imagen</button>
-                <button style={Object.assign({},mB("green"),{background:"#25D366",padding:"11px"})} onClick={function(){var _ps=postSale; pedirTelYEnviar(_ps.sale.client,function(){return waBoletaVenta(_ps.sale);},{sale:_ps.sale,receiptOpts:_ps.opts});}}>💬 Enviar por WhatsApp</button>
+                <button style={Object.assign({},mB("green"),{background:"#25D366",padding:"11px"})} onClick={function(){var _ps=postSale; var _dt=_ps.opts&&_ps.opts.docType; pedirTelYEnviar(_ps.sale.client,function(){return waComprobante(_ps.sale,_dt,_ps.opts);},{sale:_ps.sale,receiptOpts:_ps.opts});}}>💬 Enviar por WhatsApp</button>
                 {postSale.opts&&(postSale.opts.estado==="pendiente"||postSale.opts.estado==="parcial")&&(
                   <button style={Object.assign({},mB("amber"),{padding:"10px",background:"#F59E0B",color:"#fff"})} onClick={function(){setPostSale(null);navTo("accounts",{search:postSale.sale.client||""});}}>💳 Ver cuenta por cobrar →</button>
                 )}
@@ -2066,7 +2031,7 @@ function App(props) {
         <div key={view} style={{flex:1,padding:"clamp(12px,3vw,28px)",overflowY:"auto",minWidth:0}} className="main-content screen-enter">
           {view==="dashboard"&&canAccess(session.role,"dashboard")&&<DashboardScreen sales={sales} todaySales={todaySales} pendingAccs={pendingAccs} totalPend={totalPend} products={products} top5={top5} setSelectedSale={setSelSale} setView={setView} navTo={navTo} accounts={accounts} returns={returns} repairs={repairs} warranties={warranties}/>}
           {view==="pos"      &&canAccess(session.role,"pos")&&<POSScreen products={products} filteredPOS={filteredPOS} cart={cart} posQ={posQ} setPosQ={setPosQ} payMethod={payMethod} setPayMethod={setPayMethod} secondMethod={secondMethod} setSecondMethod={setSecondMethod} secondAmount={secondAmount} setSecondAmount={setSecondAmount} payType={payType} setPayType={setPayType} cashIn={cashIn} setCashIn={setCashIn} initialPay={initialPay} setInitialPay={setInitialPay} clientName={clientName} setClientName={setClientName} selectedClientId={selectedClientId} setSelectedClientId={setSelectedClientId} saleNote={saleNote} setSaleNote={setSaleNote} cartTotal={cartTotal} vuelto={vuelto} initPaidVal={initPaidVal} addToCart={addToCart} changeQty={changeQty} removeFromCart={removeFromCart} applyDiscount={applyDiscount} checkout={checkout} resetPOS={resetPOS} flash={flash} clients={clients} accounts={accounts} ivaPercent={ivaPercent} ivaAmount={ivaAmount} subtotalNeto={subtotalNeto}/>}
-          {view==="caja"     &&canAccess(session.role,"caja")&&<CajaScreen sales={sales} accounts={accounts} returns={returns} session={session}/>}
+          {view==="caja"     &&canAccess(session.role,"caja")&&<CajaScreen sales={sales} accounts={accounts} returns={returns} session={session} onBackup={function(){ backupAPI.create().catch(function(){}); }}/>}
           {view==="accounts" &&canAccess(session.role,"accounts")&&<AccountsScreen accounts={accounts} pendingAccs={pendingAccs} totalPend={totalPend} addPayment={addPayment} showFlash={showFlash} products={products} session={session} clients={clients} navTo={navTo} initialSearch={view==="accounts"&&deepLink?deepLink.search||'':''}/>}
           {view==="returns"  &&canAccess(session.role,"returns")&&<ReturnsScreen returns={returns} products={products} onProcess={processReturn} showFlash={showFlash} clients={clients} sales={sales}/>}
           {view==="defective"&&canAccess(session.role,"defective")&&<DefectiveScreen defectives={defectives} onUpdateStatus={updateDefectiveStatus} onReingress={reingresarDefective}/>}
