@@ -4,6 +4,44 @@
 
 ---
 
+## 0. COBERTURA DEL DEFINITION OF DONE (v1.0)
+
+> Cruce de hallazgos YA EXISTENTES (sesión + auditoría de abajo) contra los bloqueantes de v1.0. No se re-auditó; evidencia citada de la auditoría.
+
+**Conteo de bloqueantes: 0 CUMPLIDOS · 1 PARCIAL · 10 NO CUMPLIDOS (de 11).**
+**Faltan para v1.0: 11 bloqueantes.**
+
+### Bloqueantes 🔴 — dictamen
+
+- [ ] **B3 — Cerrar escalada a superadmin** · ❌ **NO CUMPLIDO** · `users.js:48,72` usa `role` del body sin whitelist (vs `admin.js:272` que sí valida) → un admin puede crearse/promoverse a superadmin.
+- [ ] **B2/A6 — Enforcement de suscripción en backend** · ❌ **NO CUMPLIDO** · `middleware/auth.js` solo valida JWT; no consulta `tenants.active/expires_at`. Solo hay banner informativo (`admin.js:349`, `App.jsx:2041`) → un tenant vencido sigue operando por API.
+- [ ] **A1/A15 — `decrement_stock` robusto + drop del overload** · 🟡 **PARCIAL** · el runtime en vivo YA es robusto en ambos ambientes (verificado esta sesión), pero la migración versionada (`000_full_schema.sql:366-373`) sigue siendo el `UPDATE` plano y el overload `decrement_stock(uuid,integer)` sin tenant sigue existiendo en ambos.
+- [ ] **A2/A3 — Fixes de 1 línea (refresh JWT + RemindersWidget)** · ❌ **NO CUMPLIDO** · `session.js:69` y `RemindersWidget.jsx:24` leen `res.data` sobre una respuesta ya desempaquetada por el interceptor (`api.js:38`) → nunca operan.
+- [ ] **A8 — RBAC server-side en endpoints de escritura** · ❌ **NO CUMPLIDO** · sales/accounts/returns/repairs/warranties/variants/caja sin chequeo de rol → la autorización depende del frontend.
+- [ ] **A11/A12 — CSP estricta + refresh token en cookie HttpOnly** · ❌ **NO CUMPLIDO** · `vercel.json:8` con `unsafe-inline`+`unsafe-eval`; refresh token (30d) en `localStorage` (`session.js:55-56`).
+- [ ] **A13 — Cifrado de DPI / no volcarlo a `audit_logs`** · ❌ **NO CUMPLIDO** · `clients.js:33` dpi en texto plano; `clients.js:36` lo vuelca a `audit_logs`.
+- [ ] **A14 — Paginación server-side `sales`/`accounts`** · ❌ **NO CUMPLIDO** · `sales.js:21`, `accounts.js:21` traen toda la tabla con anidados, sin `.range/.limit`.
+- [ ] **M23 — Términos de Servicio + Política de Privacidad** · ❌ **NO CUMPLIDO** · no existen en el repo.
+- [ ] **A16 — Cobro recurrente + signup self-serve** · ❌ **NO CUMPLIDO** · alta de tenant es superadminOnly; renovación = editar `expires_at` a mano; sin pasarela (Recurrente/Stripe).
+- [ ] **B1 — Integración FEL (facturación SAT)** · ❌ **NO CUMPLIDO** · columnas `fel_*` nunca escritas (0 usos en `routes/`); `receipt.js:121,340` imprime "no válido como factura".
+
+### Ítems NUEVOS propuestos (en la auditoría, NO en el DoD original)
+
+- [ ] **NUEVO-1 — Revocación de sesión (A7)** · al desactivar/eliminar un usuario su JWT de 8h sigue vivo (`middleware/auth.js` no consulta `users.active` por request). **Por qué bloquea:** un empleado despedido o un token filtrado conserva acceso; riesgo de seguridad/cumplimiento al vender a terceros. Esfuerzo **M**.
+- [ ] **NUEVO-2 — Idempotencia en `accounts` POST (M6)** · a diferencia de `sales`, crear cuenta por cobrar no tiene idempotency key (`accounts.js`). **Por qué bloquea:** doble-click/reintento duplica deudas (dinero) → erosiona confianza del cliente. Esfuerzo **S**.
+
+### 🚦 Plan de cierre (agrupado por módulo / dependencia)
+
+1. **Grupo A — Auth/Autorización backend** (mismo módulo `middleware/` + `routes/*`): **B3** (whitelist roles users.js) → **A8** (requireRole en escritura) → **B2/A6** (middleware enforceSubscription) → **NUEVO-1/A7** (revocar sesión por `users.active`). Atacarlos juntos: comparten middleware y patrón.
+2. **Grupo B — Bugs front + sesión/token** (capa de sesión front+api): **A2/A3** (fixes `res.data`) → **A11/A12** (CSP estricta + refresh token a cookie HttpOnly, unificar `App.jsx`/`session.js`).
+3. **Grupo C — Integridad de inventario/dinero (BD)**: **A1/A15** (migración versionada `decrement_stock` con FOR UPDATE + drop overload) → **NUEVO-2/M6** (idempotencia en accounts).
+4. **Grupo D — Datos y escala**: **A13** (cifrar DPI + sacarlo de audit_logs) → **A14** (paginación server-side sales/accounts).
+5. **Grupo E — Comercial/legal (los grandes, en paralelo a lo demás)**: **M23** (ToS+Privacidad, rápido) → **A16** (pasarela de cobro + signup self-serve) → **B1** (FEL con certificador homologado, el de mayor plazo).
+
+> Orden recomendado: **Grupo A primero** (riesgo de seguridad/aislamiento, esfuerzo bajo), luego **B** y **C** (calidad/integridad), luego **D**, y **E** arrancando en paralelo lo legal (M23) mientras se contrata FEL/pasarela.
+
+---
+
 ## 1. Resumen ejecutivo
 
 **¿Se puede vender hoy como SaaS comercial autoservicio?** **NO.**
