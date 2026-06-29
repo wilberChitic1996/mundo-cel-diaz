@@ -10,6 +10,7 @@
 // ══════════════════════════════════════════════════════════════════════════════
 
 import html2canvas from 'html2canvas';
+import { qrDataUrl } from './qr.js';
 import { fmtD } from './formatters.js';
 import { abrirWA } from './whatsapp.js';
 import { STORE_FALLBACK, APP_TAGLINE, APP_NAME } from '../constants/index.js';
@@ -281,7 +282,7 @@ export function printVoucher(sale, opts) {
   '<div class="header">' +
     '<div class="brand"><h1>' + _rSn + '</h1><p>' + _rSt + '</p>' + _contactLine + '</div>' +
     '<div class="venta-num"><div class="label">' + _docLabel + '</div><div class="num"># ' + ventaNum + '</div></div>' +
-    '<div style="text-align:center;margin-top:4px;"><div id="qrv" style="display:inline-block;"></div><div style="font-size:9px;color:#999;margin-top:3px;letter-spacing:0.5px;">ESCANEAR PARA VERIFICAR</div></div>' +
+    '<div style="text-align:center;margin-top:4px;"><img src="' + qrDataUrl(_verifyUrl) + '" width="90" height="90" alt="QR" style="display:inline-block;image-rendering:pixelated;" /><div style="font-size:9px;color:#999;margin-top:3px;letter-spacing:0.5px;">ESCANEAR PARA VERIFICAR</div></div>' +
   '</div>' +
   (_sello ? '<div style="text-align:center;margin:0 0 16px;padding:10px;border-radius:8px;font-size:17px;font-weight:900;letter-spacing:2px;' + _selloCss + '">' + _sello + '</div>' : '') +
   '<div class="info-grid">' +
@@ -340,10 +341,15 @@ export function printVoucher(sale, opts) {
   '<p style="text-align:center;margin:8px 0 0;font-size:9px;color:#bbb;">Comprobante interno · No es documento tributario (no válido como factura)</p>' +
   '</body></html>';
 
-  var qrTxt = _verifyUrl;
+  // QR embebido como imagen (arriba) e impresión disparada desde la ventana padre:
+  // sin scripts inline ni CDN → compatible con la CSP estricta (A11).
   var w = window.open('', '_blank', 'width=800,height=700');
-  w.document.write(html + '<scr' + 'ipt src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></scr' + 'ipt><scr' + 'ipt>window.onload=function(){try{new QRCode(document.getElementById("qrv"),{text:' + JSON.stringify(qrTxt) + ',width:90,height:90,colorDark:"#1a2535",colorLight:"#fff"});}catch(e){}setTimeout(function(){window.print();},800);};</scr' + 'ipt>');
-  w.document.close();
+  if (w) {
+    w.document.write(html);
+    w.document.close();
+    w.focus();
+    setTimeout(function() { try { w.print(); } catch (e) {} }, 400);
+  }
 }
 
 export async function compartirWhatsApp(tel, getMensaje, opts) {

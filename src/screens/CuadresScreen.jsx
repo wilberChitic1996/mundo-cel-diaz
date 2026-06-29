@@ -331,11 +331,13 @@ export default function CuadresScreen({ sales, accounts, returns, products, repa
       '</div>' +
       '</body></html>';
 
-    var htmlWithPrint = html.replace('</body>', '<script>window.onload=function(){window.print();};<\/script></body>');
     var w = window.open('', '_blank', 'width=900,height=700');
     if (!w) { showFlash('⚠️ El navegador bloqueó la ventana emergente. Permití los popups para este sitio e intentá de nuevo.', 'err'); return; }
-    w.document.write(htmlWithPrint);
+    w.document.write(html);
     w.document.close();
+    w.focus();
+    // Impresión desde la ventana padre (CSP-safe, sin script inline).
+    setTimeout(function() { try { w.print(); } catch (e) {} }, 400);
   }
 
   function exportCuadreExcel() {
