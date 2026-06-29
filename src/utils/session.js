@@ -65,8 +65,8 @@ export async function tryRefreshSession() {
   var rt = localStorage.getItem(REFRESH_KEY);
   if (!rt) return null;
   try {
-    var res = await authAPI.refresh(rt);
-    var data = res.data;
+    // authAPI.refresh ya devuelve el cuerpo desempaquetado (interceptor en api.js).
+    var data = await authAPI.refresh(rt);
     if (!data || !data.token) return null;
     if (data.refreshToken) localStorage.setItem(REFRESH_KEY, data.refreshToken);
     // Re-decode user from the existing session (user info doesn't change on refresh)

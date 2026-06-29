@@ -554,6 +554,8 @@ export default function LandingPage({ onLogin }) {
             <span style={{ color: 'rgba(255,255,255,0.3)', fontSize: 13 }}>— {APP_TAGLINE}</span>
           </div>
           <div style={{ display: 'flex', gap: 24, alignItems: 'center', flexWrap: 'wrap' }}>
+            <a href="?legal=privacy" style={{ color: 'rgba(255,255,255,0.55)', fontSize: 13, textDecoration: 'none' }}>Privacidad</a>
+            <a href="?legal=terms" style={{ color: 'rgba(255,255,255,0.55)', fontSize: 13, textDecoration: 'none' }}>Términos</a>
             <span style={{ color: 'rgba(255,255,255,0.3)', fontSize: 12 }}>© {new Date().getFullYear()} · Hecho en Guatemala 🇬🇹</span>
           </div>
         </div>
