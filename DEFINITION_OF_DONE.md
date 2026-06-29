@@ -8,8 +8,8 @@
 
 > Cruce de hallazgos YA EXISTENTES (sesión + auditoría de abajo) contra los bloqueantes de v1.0. No se re-auditó; evidencia citada de la auditoría.
 
-**Conteo de bloqueantes: 1 CUMPLIDO · 1 PARCIAL · 11 NO CUMPLIDOS (de 13).**
-**Faltan para v1.0: 12 bloqueantes.**
+**Conteo de bloqueantes: 2 CUMPLIDOS · 1 PARCIAL · 10 NO CUMPLIDOS (de 13).**
+**Faltan para v1.0: 11 bloqueantes.**
 
 ### Bloqueantes 🔴 — dictamen
 
@@ -17,7 +17,7 @@
 - [ ] **B2/A6 — Enforcement de suscripción en backend** · ❌ **NO CUMPLIDO** · `middleware/auth.js` solo valida JWT; no consulta `tenants.active/expires_at`. Solo hay banner informativo (`admin.js:349`, `App.jsx:2041`) → un tenant vencido sigue operando por API.
 - [ ] **A1/A15 — `decrement_stock` robusto + drop del overload** · 🟡 **PARCIAL** · el runtime en vivo YA es robusto en ambos ambientes (verificado esta sesión), pero la migración versionada (`000_full_schema.sql:366-373`) sigue siendo el `UPDATE` plano y el overload `decrement_stock(uuid,integer)` sin tenant sigue existiendo en ambos.
 - [ ] **A2/A3 — Fixes de 1 línea (refresh JWT + RemindersWidget)** · ❌ **NO CUMPLIDO** · `session.js:69` y `RemindersWidget.jsx:24` leen `res.data` sobre una respuesta ya desempaquetada por el interceptor (`api.js:38`) → nunca operan.
-- [ ] **A8 — RBAC server-side en endpoints de escritura** · ❌ **NO CUMPLIDO** · sales/accounts/returns/repairs/warranties/variants/caja sin chequeo de rol → la autorización depende del frontend.
+- [x] **A8 — RBAC server-side en endpoints de escritura** · ✅ **CUMPLIDO (29 jun)** · nuevo `middleware/requireRole.js` aplicado a sales/accounts/returns/warranties/caja/repairs (admin+cajero) y variants (admin); superadmin pasa. +12 tests (suite 80/80). PR API #74. _Antes:_ esas escrituras no validaban rol.
 - [ ] **A11/A12 — CSP estricta + refresh token en cookie HttpOnly** · ❌ **NO CUMPLIDO** · `vercel.json:8` con `unsafe-inline`+`unsafe-eval`; refresh token (30d) en `localStorage` (`session.js:55-56`).
 - [ ] **A13 — Cifrado de DPI / no volcarlo a `audit_logs`** · ❌ **NO CUMPLIDO** · `clients.js:33` dpi en texto plano; `clients.js:36` lo vuelca a `audit_logs`.
 - [ ] **A14 — Paginación server-side `sales`/`accounts`** · ❌ **NO CUMPLIDO** · `sales.js:21`, `accounts.js:21` traen toda la tabla con anidados, sin `.range/.limit`.
