@@ -8,8 +8,8 @@
 
 > Cruce de hallazgos YA EXISTENTES (sesión + auditoría de abajo) contra los bloqueantes de v1.0. No se re-auditó; evidencia citada de la auditoría.
 
-**Conteo de bloqueantes: 5 CUMPLIDOS · 1 PARCIAL · 7 NO CUMPLIDOS (de 13).**
-**Faltan para v1.0: 8 bloqueantes.**
+**Conteo de bloqueantes: 6 CUMPLIDOS · 1 PARCIAL · 6 NO CUMPLIDOS (de 13).**
+**Faltan para v1.0: 7 bloqueantes.**
 
 ### Bloqueantes 🔴 — dictamen
 
@@ -28,7 +28,7 @@
 ### Bloqueantes 🔴 adicionales (aceptados 29 jun — total v1.0 = 13)
 
 - [x] **B4 — Revocación de sesión (A7)** · ✅ **CUMPLIDO (29 jun)** · `middleware/auth.js` ahora verifica por request que el usuario siga **activo y existente** (cacheado 1 min, timeout configurable + fail-open) → **401 `SESSION_REVOKED`** si está inactivo/eliminado; `users PUT` invalida la caché → revocación inmediata. Login y refresh ya filtraban inactivos; esto cierra la ventana del access token de 8h ya emitido. +tests (decisión pura + HTTP). Suite 100/100. PR API #74. _Antes:_ un empleado despedido o un token filtrado conservaba acceso hasta 8h.
-- [ ] **B5 — Idempotencia en `accounts` POST (M6)** · a diferencia de `sales`, crear cuenta por cobrar no tiene idempotency key (`accounts.js`). **Por qué bloquea:** doble-click/reintento duplica deudas (dinero) → erosiona confianza del cliente. Esfuerzo **S**.
+- [x] **B5 — Idempotencia en `accounts` POST (M6)** · ✅ **CUMPLIDO (29 jun)** · `POST /accounts` ahora honra `idempotencyKey` (devuelve la cuenta previa si la clave ya existe; usa la columna existente). Hallazgo del cierre: la ruta de creación de cuenta **vía ventas** (`sales.js:62-65,177`) **ya era idempotente** — el endpoint directo (sin uso por el front actual) era el que faltaba. PR API #74. ⚠️ _Pendiente menor:_ `POST /accounts/:id/payments` (abonos) no tiene idempotencia porque `account_payments` carece de columna `idempotency_key` → requiere migración (ver backlog).
 
 ### 🚦 Plan de cierre (agrupado por módulo / dependencia)
 

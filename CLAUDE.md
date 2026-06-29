@@ -875,6 +875,7 @@ mundo-cel-diaz-api/
 - [ ] **Unificar tipos de `id` entre ambientes (migración mayor):** producción usa `text` y staging usa `uuid` en `clients.id`, `repairs.id`, y los `*_id` relacionados (`accounts.client_id`, `sales.client_id`, `repairs.client_id`, `repair_items.repair_id`). El API tolera ambos hoy (por eso funcionan). Igualar requiere decidir un modelo canónico + migración con respaldo y reconstrucción de FKs. NO migrar a ciegas (un ALTER TYPE fallaría con datos no-uuid en prod). Baja prioridad.
 - [ ] **Limpiar tablas de respaldo temporales** cuando ya no se necesiten: `products_backup_20260628` (prod), `products_backup_staging_20260628` y `products_backup_staging_pretrim` (staging).
 - [ ] **Mantener `docs/DB-SCHEMA-REAL.md` sincronizado** con producción cuando se apliquen migraciones allá (hoy refleja staging).
+- [ ] **Idempotencia en abonos (`account_payments`):** `POST /accounts/:id/payments` puede duplicar un abono por doble-click. Requiere agregar columna `idempotency_key` a `account_payments` (migración + aprobación) y luego chequearla en la ruta, igual que `accounts`/`sales`. Surgió al cerrar B5 (29 jun). Prioridad media (dinero, pero ruta menos expuesta que crear cuenta).
 
 ---
 
