@@ -67,6 +67,8 @@ export function buildReceiptHTML(sale, opts, si) {
   if (opts.estado === 'pendiente') estadoHTML = '<div style="text-align:center;padding:8px;margin-bottom:14px;background:#FCEBEB;color:#791F1F;border-radius:6px;font-weight:900;font-size:15px;letter-spacing:2px;">PENDIENTE DE PAGO</div>';
   else if (opts.estado === 'parcial') estadoHTML = '<div style="text-align:center;padding:8px;margin-bottom:14px;background:#FAEEDA;color:#633806;border-radius:6px;font-weight:900;font-size:15px;letter-spacing:2px;">ABONO — SALDO PENDIENTE</div>';
   else if (opts.estado === 'pagado')  estadoHTML = '<div style="text-align:center;padding:8px;margin-bottom:14px;background:#EAF3DE;color:#27500A;border-radius:6px;font-weight:900;font-size:15px;letter-spacing:2px;">✓ CUENTA CANCELADA</div>';
+  // Banner de devolución (comprobante de devolución de venta)
+  if (opts.tipo === 'devolucion') estadoHTML = '<div style="text-align:center;padding:8px;margin-bottom:14px;background:#FCEBEB;color:#791F1F;border-radius:6px;font-weight:900;font-size:15px;letter-spacing:2px;">DEVOLUCIÓN</div>';
 
   // Filas de abono y saldo para cuentas por cobrar
   var saldoHTML = '';
@@ -86,7 +88,7 @@ export function buildReceiptHTML(sale, opts, si) {
           '<div style="font-size:9px;color:#999;margin-top:3px;">' + st + '</div>' +
         '</div>' +
         '<div style="text-align:right;">' +
-          '<div style="font-size:9px;color:#999;text-transform:uppercase;">' + (opts.estado ? 'Comprobante de Cuenta' : 'Comprobante de Venta') + '</div>' +
+          '<div style="font-size:9px;color:#999;text-transform:uppercase;">' + (opts.docLabel || (opts.estado ? 'Comprobante de Cuenta' : 'Comprobante de Venta')) + '</div>' +
           '<div style="font-size:20px;font-weight:900;color:#1D9E75;"># ' + String(sale.id || '').toUpperCase().slice(-8) + '</div>' +
         '</div>' +
       '</div>' +
@@ -203,7 +205,7 @@ export function printVoucher(sale, opts) {
     _sello = opts.abonoHoy != null ? 'CANCELADO - ULTIMO ABONO' : 'CUENTA CANCELADA';
     _selloCss = 'background:#EAF3DE;color:#27500A;border:2px solid #2E7D32;';
   }
-  var _docLabel = _E ? 'Comprobante de Cuenta' : 'Comprobante de Venta';
+  var _docLabel = opts.docLabel || (_E ? 'Comprobante de Cuenta' : 'Comprobante de Venta');
   var _pmap = {};
   (opts.products || []).forEach(function(pp) { _pmap[pp.code] = pp.shelf; });
 
