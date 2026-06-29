@@ -822,6 +822,33 @@ mundo-cel-diaz-api/
 
 ## Backlog / Pendientes
 
+### 🚆 Vagones listos para anclar — CHECKLISTS DE ACTIVACIÓN (29 jun 2026)
+
+El backend ya quedó **preparado y dormido** para FEL y cobro recurrente (no afectan nada hasta activarse). Lo que sigue es lo que vos (usuario) tenés que conseguir/configurar — "traer el tren". Cuando tengas cada cosa, me avisás y yo conecto el adapter concreto.
+
+#### 📄 Checklist FEL (facturación electrónica SAT) — para activar B1
+- [ ] **1. Contratar un certificador homologado por SAT** (INFILE, G4S, Digifact, etc.).
+- [ ] **2. Pedirle al certificador:** usuario/clave o API key, URL del endpoint, y el **certificado** (`.p12`/`.pem`) con su contraseña.
+- [ ] **3. Tener el NIT y datos fiscales reales del negocio** (nombre fiscal, dirección, régimen SAT).
+- [ ] **4. Correr `migrations/017_fel_fields.sql`** (Claude te pasa el SQL inline) — primero en BD staging, luego prod.
+- [ ] **5. Llenar en `tenants`** el emisor: `nit, fiscal_name, address, sat_regime, currency` (Claude te pasa el UPDATE).
+- [ ] **6. Decirme el certificador elegido** → yo escribo el adapter concreto en `services/felProvider.js` con su API (HOY hay un stub no-op).
+- [ ] **7. Configurar env en Railway:** `FEL_ENABLED=true`, `FEL_PROVIDER=...`, `FEL_USERNAME/FEL_PASSWORD/FEL_CERT_PATH/FEL_CERT_PASSWORD`.
+- [ ] **8. Probar en staging con certificado de PRUEBA** antes de producción (existe `POST /api/sales/:id/emit-fel` para reintentar).
+- [ ] **9. (Opcional) mostrar el N° de autorización/serie FEL en la boleta** (frontend).
+
+#### 💳 Checklist Cobro recurrente (suscripción SaaS) — para activar A16
+- [ ] **1. Elegir pasarela:** Recurrente (Guatemala) o Stripe.
+- [ ] **2. Crear cuenta y obtener** las API keys + un `WEBHOOK_SECRET`.
+- [ ] **3. Crear los planes/precios** en la pasarela (mensual, etc.).
+- [ ] **4. (Opcional) Crear tabla `payment_webhooks`** para auditoría de pagos (Claude te pasa el SQL).
+- [ ] **5. Configurar env en Railway:** `PAYMENTS_ENABLED=true`, `WEBHOOK_SECRET=...`, `PAYMENT_PROVIDER=recurrente|stripe`.
+- [ ] **6. Registrar el webhook** en la pasarela apuntando a `https://<api>/api/webhooks/payment`, eventos de pago, y mandando el `tenant_id` en `metadata`.
+- [ ] **7. Decirme la pasarela** → ajusto el parseo del payload (cada una manda campos distintos) y, si querés, el **signup self-serve** (alta de cliente con prueba de 14 días).
+- [ ] **8. Probar con el simulador de webhook** de la pasarela en staging (verificar que `expires_at` del tenant se extiende).
+
+> El cobro ya se ata a la barrera de suscripción que hice (B2 `enforceSubscription`): apenas un pago renueva `expires_at`, el tenant puede operar; si vence, se bloquea solo.
+
 ### 🔴 Alta prioridad — Funcional
 
 - [ ] **2FA reactivar:** Cuando Resend termine de verificar dominio, descomentar código en `auth.js` líneas 82-99
@@ -877,10 +904,25 @@ mundo-cel-diaz-api/
 - [ ] **📘 Manual técnico completo (`docs/MANUAL-TECNICO.md`):** Enciclopedia del software para tener "el hilo completo" en cada sesión. Pedido por el usuario (28 jun 2026). Estructura acordada: (1) visión general + glosario, (2) arquitectura de sistemas + flujo frontend→API→BD, (3) inventario de las 25 pantallas, (4) inventario de los 21 endpoints, (5) modelo de datos completo + divergencias de esquema reales, (6) flujos de negocio end-to-end, (7) integraciones (Supabase/Railway/Vercel/Resend/WebPush/Sentry/Redis), (8) 🔦 funciones ocultas/subutilizadas, (9) runbook de operación, (10) roadmap + deuda técnica. Construir explorando ambos repos a fondo (no inventar). CLAUDE.md queda como "reglas + estado" y enlaza este manual.
 - [ ] **IVA en boleta de reparación:** mostrar desglose IVA igual que la venta normal del POS (ver Próximos pasos #2).
 
-> **Pendientes detectados en validación de piloto (29 jun 2026) — PREEXISTENTES (frontend viejo aún en vivo; no son regresiones de esta sesión). Resolver en otra ronda de frontend:**
-- [ ] **IVA en boletas de abono/cuenta y compra:** la constancia de abono y la boleta de cuenta NO muestran el desglose "Subtotal sin IVA / IVA 12% / Total" (igual que el pendiente de reparación). En GT también llevan IVA. Tocar `utils/receipt.js`. Agrupar con el IVA de reparación.
-- [ ] **Abono/cuota no ofrece boleta ni opciones de entrega:** al registrar un pago/cuota de una cuenta, el recibo solo queda en Historial; NO aparece automáticamente el modal con opciones (Imprimir/PDF · Descargar imagen · WhatsApp) como en la venta normal del POS. Hacer que registrar un abono dispare el mismo flujo de comprobante. Tocar `AccountsScreen.jsx` (registrar pago) + `utils/receipt.js`.
-- [ ] **Saldo no se refresca en la lista de Cuentas tras abono parcial:** al abonar parcialmente, la pantalla principal "Cuentas por Cobrar" mantiene el saldo viejo hasta recargar; con el pago TOTAL sí se refleja. Refrescar el estado de la lista tras cada abono (no solo al pagar todo). Tocar `AccountsScreen.jsx` (re-fetch/optimistic update tras `addPayment`).
+> **Pendientes de UX detectados en piloto + BARRIDO EXHAUSTIVO (29 jun 2026) — PREEXISTENTES (no son regresiones; el frontend viejo aún está vivo). Evaluados en TODO el software. Resolver en una ronda de frontend (agrupar por disciplina Vercel, regla #8):**
+>
+> **(1) Falta desglose de IVA en comprobantes** — solo `buildReceiptHTML` (venta/cuenta/abono por WhatsApp) lo muestra; el resto NO:
+- [ ] `utils/receipt.js` → `printVoucher()` (boleta formal/PDF que usa Historial): sin desglose IVA → afecta **ventas impresas, reparaciones cobradas, cuentas y devoluciones**.
+- [ ] `screens/SuppliersScreen.jsx` → `printCompra()`: comprobante de compra sin línea de IVA.
+- [ ] `screens/ReturnsScreen.jsx`: boleta de devolución (vía printVoucher) sin IVA.
+- [ ] **Inconsistencia:** el abono por WhatsApp (buildReceiptHTML) SÍ trae IVA pero el impreso (printVoucher) NO → unificar.
+>
+> **(2) Flujos que NO ofrecen opciones de comprobante** (Imprimir/PDF · Descargar · WhatsApp) tras la operación, como sí hace el POS:
+- [ ] `screens/AccountsScreen.jsx` → `registrarPago()` (abono/cuota): el recibo solo queda en Historial.
+- [ ] `screens/RepairsScreen.jsx` → cobro de reparación.
+- [ ] `screens/SuppliersScreen.jsx` → `savePurchase()` (compra).
+- [ ] `screens/ReturnsScreen.jsx` → procesar devolución.
+>
+> **(3) Listas que no refrescan el estado en vivo tras mutar** (hay que recargar):
+- [ ] `screens/AccountsScreen.jsx`: saldo no se actualiza tras abono parcial (sí tras pago total).
+- [ ] `screens/InventoryScreen.jsx` / `CajaScreen.jsx` / `ProductsScreen.jsx` / `RepairsScreen.jsx`: re-fetch tras compra/gasto/edición/cambio de estado.
+>
+> **(4) Deuda de arquitectura de comprobantes (raíz de (1) y (2)):** existen **3 builders de boleta** casi duplicados (`utils/receipt.js:buildReceiptHTML`, `utils/receipt.js:printVoucher`, y una tercera copia en `App.jsx`). El bug de IVA está replicado en las 3. **Unificar en un solo builder paramétrico** resuelve IVA + consistencia de una vez. (También: el QR depende de un CDN sin fallback — endurecer.)
 - [ ] **Limpiar columnas duplicadas en `repairs`:** el ALTER del 28 jun dejó duplicados (`issue`+`problem_desc`, `price`+`estimated_cost`, `technician`+`tech_name`, `notes`+`internal_note`). Unificar a las canónicas y migrar datos/código. Ver `docs/DB-SCHEMA-REAL.md`. Baja prioridad (no rompe nada hoy).
 - [ ] **Unificar tipos de `id` entre ambientes (migración mayor):** producción usa `text` y staging usa `uuid` en `clients.id`, `repairs.id`, y los `*_id` relacionados (`accounts.client_id`, `sales.client_id`, `repairs.client_id`, `repair_items.repair_id`). El API tolera ambos hoy (por eso funcionan). Igualar requiere decidir un modelo canónico + migración con respaldo y reconstrucción de FKs. NO migrar a ciegas (un ALTER TYPE fallaría con datos no-uuid en prod). Baja prioridad.
 - [ ] **Limpiar tablas de respaldo temporales** cuando ya no se necesiten: `products_backup_20260628` (prod), `products_backup_staging_20260628` y `products_backup_staging_pretrim` (staging).
@@ -934,6 +976,14 @@ VAPID_PUBLIC_KEY   = Clave pública VAPID para Web Push
 VAPID_PRIVATE_KEY  = Clave privada VAPID para Web Push
 ENCRYPTION_KEY     = (opcional) Clave para cifrar DPI en reposo (A13, AES-256-GCM). Sin ella el DPI se guarda como hoy (texto plano). Al activarla, correr scripts/reencrypt-dpi.js. NUNCA cambiarla tras cifrar datos (perderías el descifrado).
 DB_LOOKUP_TIMEOUT_MS = (opcional) Tope ms para consultas de revocación de sesión/suscripción (default 1500). Tests usan 50.
+# FEL (facturación electrónica) — DORMIDO si no están. Ver checklist FEL.
+FEL_ENABLED        = (opcional) 'true' activa la certificación FEL en cada venta. Default: apagado (no certifica).
+FEL_PROVIDER       = (opcional) Certificador a usar (ej. 'infile','g4s'). Requiere su adapter concreto en services/felProvider.js.
+FEL_USERNAME / FEL_PASSWORD / FEL_CERT_PATH / FEL_CERT_PASSWORD = credenciales del certificador.
+# Cobro recurrente SaaS — DORMIDO si no están. Ver checklist Cobro.
+PAYMENTS_ENABLED   = (opcional) 'true' activa el webhook de pagos. Default: apagado (responde 503).
+WEBHOOK_SECRET     = secreto para verificar la firma HMAC del webhook de la pasarela.
+PAYMENT_PROVIDER   = (opcional) 'recurrente' | 'stripe' (etiqueta del proveedor activo).
 
 # Backend Railway (staging)
 SUPABASE_URL       = URL de Supabase STAGING (aawjhttlaydwsipsifre)

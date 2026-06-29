@@ -8,8 +8,8 @@
 
 > Cruce de hallazgos YA EXISTENTES (sesión + auditoría de abajo) contra los bloqueantes de v1.0. No se re-auditó; evidencia citada de la auditoría.
 
-**Conteo de bloqueantes: 9 CUMPLIDOS · 0 PARCIAL · 4 NO CUMPLIDOS (de 13).**
-**Faltan para v1.0: 4 bloqueantes** (A11/A12, A14, A16, B1).
+**Conteo de bloqueantes: 9 CUMPLIDOS · 2 PREPARADOS (vagón listo, esperan proveedor externo: A16, B1) · 2 NO CUMPLIDOS (A11/A12, A14).**
+**Faltan para v1.0: 2 de código (A11/A12, A14) + 2 que dependen de contratar externo (A16 pasarela, B1 certificador).**
 
 ### Bloqueantes 🔴 — dictamen
 
@@ -22,8 +22,8 @@
 - [x] **A13 — Cifrado de DPI / no volcarlo a `audit_logs`** · ✅ **CUMPLIDO (29 jun)** · nuevo `utils/crypto.js` (AES-256-GCM, clave `ENCRYPTION_KEY`, prefijo `enc:v1:` para convivir con texto plano legacy, passthrough sin clave). `clients.js` cifra DPI al crear/editar y descifra al leer. El DPI ya NO se vuelca a `audit_logs` (ni en creación ni en el diff de edición → "(modificado)"). +9 tests. Script `scripts/reencrypt-dpi.js` para datos previos. PR API #74. ⚠️ _Activación:_ configurar `ENCRYPTION_KEY` en Railway (staging y prod) y correr el re-cifrado; sin la env el comportamiento es el actual (la parte de audit_logs ya está activa).
 - [ ] **A14 — Paginación server-side `sales`/`accounts`** · ❌ **NO CUMPLIDO** · `sales.js:21`, `accounts.js:21` traen toda la tabla con anidados, sin `.range/.limit`.
 - [x] **M23 — Términos de Servicio + Política de Privacidad** · ✅ **CUMPLIDO (29 jun)** · nueva `src/screens/LegalPage.jsx` con ToS y Política de Privacidad (español, contexto SaaS GT: multi-tenant, encargados Supabase/Railway/Vercel/Resend/Sentry, transferencia internacional, rol del negocio sobre datos de sus clientes, aviso FEL). Públicas vía `?legal=privacy|terms` (standalone, sin sesión, como la verificación de boletas) y enlazadas en el footer del landing y en el login. PR frontend #164. ⚠️ Redacción base: el operador debe completar datos de la entidad legal/contacto y hacerla revisar por un abogado.
-- [ ] **A16 — Cobro recurrente + signup self-serve** · ❌ **NO CUMPLIDO** · alta de tenant es superadminOnly; renovación = editar `expires_at` a mano; sin pasarela (Recurrente/Stripe).
-- [ ] **B1 — Integración FEL (facturación SAT)** · ❌ **NO CUMPLIDO** · columnas `fel_*` nunca escritas (0 usos en `routes/`); `receipt.js:121,340` imprime "no válido como factura".
+- [~] **A16 — Cobro recurrente + signup self-serve** · 🟡 **VAGÓN LISTO (29 jun), espera pasarela** · `services/subscriptionService.js` (renueva `expires_at`/`active` + invalida caché de B2) y `routes/webhooks.js` (`POST /api/webhooks/payment`, firma HMAC, dormido por `PAYMENTS_ENABLED`). PR API #75. Falta (externo): contratar Recurrente/Stripe + configurar (ver **Checklist Cobro** en CLAUDE.md). Signup self-serve se arma cuando se elija pasarela.
+- [~] **B1 — Integración FEL (facturación SAT)** · 🟡 **VAGÓN LISTO (29 jun), espera certificador** · `services/felProvider.js` (adapter provider-agnostic, stub no-op) + `services/felService.js` (arma DTE, certifica, escribe `fel_*` en `sales`, fail-safe) + hook en venta + `POST /api/sales/:id/emit-fel` (reintento) + migración `017_fel_fields.sql`. Dormido por `FEL_ENABLED`. PR API #75. Falta (externo): contratar certificador homologado + su adapter + datos fiscales (ver **Checklist FEL** en CLAUDE.md).
 
 ### Bloqueantes 🔴 adicionales (aceptados 29 jun — total v1.0 = 13)
 
