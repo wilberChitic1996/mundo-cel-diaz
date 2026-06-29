@@ -51,13 +51,14 @@ var MOTIVOS_AJUSTE = [
 
 var H1 = { fontSize: 'clamp(17px,4vw,22px)', fontWeight: 600, margin: '0 0 20px', color: 'var(--text-primary,#1a1a1a)' };
 
-export default function ProductsScreen({ products, categories, locations, saveProduct, deleteProduct, importProducts, showFlash, initialSearch }) {
+export default function ProductsScreen({ products, categories, locations, saveProduct, deleteProduct, importProducts, showFlash, setProducts, initialSearch }) {
   products       = products       || [];
   categories     = categories     || [];
   locations      = locations      || [];
   saveProduct    = saveProduct    || function() {};
   deleteProduct  = deleteProduct  || function() {};
   importProducts = importProducts || function() {};
+  setProducts    = setProducts    || function() {};
   showFlash      = showFlash      || function() {};
 
   // Búsqueda y filtros de la lista
@@ -189,9 +190,12 @@ export default function ProductsScreen({ products, categories, locations, savePr
     var qty = parseInt(adjQty);
     if (isNaN(qty) || qty < 0) { setAdjErr('Cantidad inválida'); return; }
     if (!adjReason.trim())     { setAdjErr('El motivo es obligatorio'); return; }
+    var pid = adjProd.id;
     setAdjBusy(true);
     try {
-      await productsAPI.adjustStock(adjProd.id, { new_stock: qty, reason: adjReason });
+      await productsAPI.adjustStock(pid, { new_stock: qty, reason: adjReason });
+      // Refresca el stock en la lista al instante (antes había que recargar la página).
+      setProducts(function(list){ return (list||[]).map(function(x){ return x.id===pid ? Object.assign({},x,{stock:qty}) : x; }); });
       setAdjProd(null);
       setAdjQty('');
       setAdjReason('');

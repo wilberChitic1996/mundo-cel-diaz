@@ -88,7 +88,7 @@ export default function RemindersWidget({ setView }) {
           {repairs_stalled.slice(0, 3).map(function(r) {
             return (
               <div key={r.id} style={Object.assign({}, styles.row, { cursor: 'pointer' })} onClick={function() { setView('repairs'); }}>
-                <span style={{ flex: 1 }}>{r.client} — {r.device}</span>
+                <span style={{ flex: 1 }}>{r.client_name} — {r.brand} {r.model}</span>
                 <span style={{ color: '#9ca3af', fontSize: 11 }}>Atender →</span>
               </div>
             );
