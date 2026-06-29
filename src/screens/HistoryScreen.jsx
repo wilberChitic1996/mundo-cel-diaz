@@ -125,7 +125,7 @@ export default function HistoryScreen({ sales, selectedSale, setSelectedSale, ac
       movs.push({
         k: 'p' + (p.id || (a.id + _ac)),
         date: p.date,
-        tipo: _fin ? 'Cancelacion' : 'Abono',
+        tipo: _fin ? 'Abono final' : 'Abono',
         color: _fin ? 'green' : 'amber',
         cliente: a.client, metodo: p.method,
         atendio: (p.registradoPor && p.registradoPor.name) ? p.registradoPor.name : (session.name || '—'),
@@ -161,7 +161,10 @@ export default function HistoryScreen({ sales, selectedSale, setSelectedSale, ac
   var histPag = usePaginator(fmovs, 25);
 
   // Totales globales (sin filtro de período/tipo)
-  var totEnt = movs.filter(function(m) { return m.signo > 0; }).reduce(function(x, m) { return x + m.monto; }, 0);
+  // "Entradas" = efectivo que entró: ventas de contado + abonos cobrados.
+  // La venta a crédito (kind 'credito') NO se suma: aún no es efectivo, entra vía sus abonos.
+  // (Sumarla además de sus abonos era doble conteo.)
+  var totEnt = movs.filter(function(m) { return m.signo > 0 && m.kind !== 'credito'; }).reduce(function(x, m) { return x + m.monto; }, 0);
   var totSal = movs.filter(function(m) { return m.signo < 0; }).reduce(function(x, m) { return x + m.monto; }, 0);
 
   // Imprimir comprobante según el tipo de movimiento
