@@ -41,6 +41,7 @@ import { fmtD, fmtT } from '../utils/formatters.js';
 import { exportExcel, exportPDF } from '../utils/export.js';
 import { usePaginator } from '../hooks/usePaginator.jsx';
 import { getStore } from '../utils/receipt.js';
+import { qrDataUrl } from '../utils/qr.js';
 import { APP_NAME, STORE_FALLBACK } from '../constants/index.js';
 import HelpTip from '../components/ui/HelpTip.jsx';
 import { repairsAPI } from '../utils/api.js';
@@ -103,7 +104,7 @@ function printRepairTicket(rep) {
       '<div class="brand"><h1>' + _sn + '</h1><p>' + (rep.status === 'entregado' ? 'COMPROBANTE DE ENTREGA' : 'ORDEN DE TRABAJO · RECEPCIÓN') + '</p></div>' +
       '<div style="display:flex;align-items:flex-start;gap:14px;">' +
         '<div class="rep-num"><div class="label">N° Orden</div><div class="num">' + rep.repCode + '</div></div>' +
-        '<div style="text-align:center;margin-top:4px;"><div id="qrr" style="display:inline-block;"></div><div style="font-size:9px;color:#999;margin-top:3px;">ESCANEAR</div></div>' +
+        '<div style="text-align:center;margin-top:4px;"><img src="' + qrDataUrl(_sn + ' | Orden: ' + rep.repCode + ' | ' + rep.clientName + ' | ' + rep.brand + ' ' + rep.model) + '" width="85" height="85" alt="QR" style="display:inline-block;image-rendering:pixelated;" /><div style="font-size:9px;color:#999;margin-top:3px;">ESCANEAR</div></div>' +
       '</div>' +
     '</div>' +
     '<div class="status-bar"><span>Estado: <b>' + statusInfo.icon + ' ' + statusInfo.label + '</b></span>' +
@@ -131,12 +132,14 @@ function printRepairTicket(rep) {
     '<p style="text-align:center;margin:10px 0 0;font-size:9px;color:#bbb;">Comprobante interno · No es documento tributario (no válido como factura)</p>' +
     '</body></html>';
 
+  // QR embebido como imagen e impresión desde la ventana padre (CSP-safe, sin CDN ni inline).
   var w = window.open('', '_blank', 'width=800,height=700');
-  var qrTxt = _sn + ' | Orden: ' + rep.repCode + ' | ' + rep.clientName + ' | ' + rep.brand + ' ' + rep.model;
-  w.document.write(html +
-    '<scr' + 'ipt src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></scr' + 'ipt>' +
-    '<scr' + 'ipt>window.onload=function(){try{new QRCode(document.getElementById("qrr"),{text:' + JSON.stringify(qrTxt) + ',width:85,height:85,colorDark:"#1a2535",colorLight:"#fff"});}catch(e){}setTimeout(function(){window.print();},800);};</scr' + 'ipt>');
-  w.document.close();
+  if (w) {
+    w.document.write(html);
+    w.document.close();
+    w.focus();
+    setTimeout(function() { try { w.print(); } catch (e) {} }, 400);
+  }
 }
 
 // ── Componente MetricBox (métrica local, solo para esta pantalla) ──────────
