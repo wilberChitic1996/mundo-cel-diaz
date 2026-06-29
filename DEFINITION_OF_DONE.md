@@ -8,8 +8,8 @@
 
 > Cruce de hallazgos YA EXISTENTES (sesión + auditoría de abajo) contra los bloqueantes de v1.0. No se re-auditó; evidencia citada de la auditoría.
 
-**Conteo de bloqueantes: 0 CUMPLIDOS · 1 PARCIAL · 10 NO CUMPLIDOS (de 11).**
-**Faltan para v1.0: 11 bloqueantes.**
+**Conteo de bloqueantes: 0 CUMPLIDOS · 1 PARCIAL · 12 NO CUMPLIDOS (de 13).**
+**Faltan para v1.0: 13 bloqueantes.**
 
 ### Bloqueantes 🔴 — dictamen
 
@@ -25,10 +25,10 @@
 - [ ] **A16 — Cobro recurrente + signup self-serve** · ❌ **NO CUMPLIDO** · alta de tenant es superadminOnly; renovación = editar `expires_at` a mano; sin pasarela (Recurrente/Stripe).
 - [ ] **B1 — Integración FEL (facturación SAT)** · ❌ **NO CUMPLIDO** · columnas `fel_*` nunca escritas (0 usos en `routes/`); `receipt.js:121,340` imprime "no válido como factura".
 
-### Ítems NUEVOS propuestos (en la auditoría, NO en el DoD original)
+### Bloqueantes 🔴 adicionales (aceptados 29 jun — total v1.0 = 13)
 
-- [ ] **NUEVO-1 — Revocación de sesión (A7)** · al desactivar/eliminar un usuario su JWT de 8h sigue vivo (`middleware/auth.js` no consulta `users.active` por request). **Por qué bloquea:** un empleado despedido o un token filtrado conserva acceso; riesgo de seguridad/cumplimiento al vender a terceros. Esfuerzo **M**.
-- [ ] **NUEVO-2 — Idempotencia en `accounts` POST (M6)** · a diferencia de `sales`, crear cuenta por cobrar no tiene idempotency key (`accounts.js`). **Por qué bloquea:** doble-click/reintento duplica deudas (dinero) → erosiona confianza del cliente. Esfuerzo **S**.
+- [ ] **B4 — Revocación de sesión (A7)** · al desactivar/eliminar un usuario su JWT de 8h sigue vivo (`middleware/auth.js` no consulta `users.active` por request). **Por qué bloquea:** un empleado despedido o un token filtrado conserva acceso; riesgo de seguridad/cumplimiento al vender a terceros. Esfuerzo **M**.
+- [ ] **B5 — Idempotencia en `accounts` POST (M6)** · a diferencia de `sales`, crear cuenta por cobrar no tiene idempotency key (`accounts.js`). **Por qué bloquea:** doble-click/reintento duplica deudas (dinero) → erosiona confianza del cliente. Esfuerzo **S**.
 
 ### 🚦 Plan de cierre (agrupado por módulo / dependencia)
 
