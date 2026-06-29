@@ -300,7 +300,12 @@ function createSession(user) {
   sessionStorage.setItem(SESS_KEY, JSON.stringify(s));
   return s;
 }
-function clearSession() { sessionStorage.removeItem(SESS_KEY); }
+function clearSession() {
+  // Revoca el refresh token en el servidor y lo borra de localStorage (no solo sessionStorage),
+  // para que "Cerrar sesión" realmente termine el acceso (antes el token de 30d sobrevivía).
+  try { var _rt = localStorage.getItem('mnpos-refresh-token'); if (_rt) { authAPI.logout(_rt).catch(function(){}); localStorage.removeItem('mnpos-refresh-token'); } } catch(e) {}
+  sessionStorage.removeItem(SESS_KEY);
+}
 
 /* ══════════════════════════════════════════════════════════════════════
    LANDING PAGE
@@ -1067,11 +1072,11 @@ function App(props) {
         }
         var normalProds = (prods||[]).map(function(p){return Object.assign({},p,{id:p.id,code:p.code,name:p.name,category:p.category||'',shelf:p.shelf||'',price:Number(p.price),cost:Number(p.cost),stock:Number(p.stock),unit:p.unit||'uni'});});
         var normalSales = (sls||[]).map(function(s){return Object.assign({},s,{items:s.sale_items||[],total:Number(s.total),date:s.created_at,registradoPor:s.registrado_por||null,payType:s.pay_type||'completo',status:s.status||'completado'});});
-        var normalAccs  = (accs||[]).map(function(a){return Object.assign({},a,{items:a.account_items||[],payments:(a.account_payments||[]).map(function(_pp){return Object.assign({},_pp,{date:_pp.date||_pp.created_at,amount:Number(_pp.amount),registradoPor:_pp.registrado_por||_pp.registradoPor||null});}),total:Number(a.total),paid:Number(a.paid),balance:Number(a.balance),date:a.created_at,registradoPor:a.registrado_por||null});});
+        var normalAccs  = (accs||[]).map(function(a){return Object.assign({},a,{items:a.account_items||[],payments:(a.account_payments||[]).map(function(_pp){return Object.assign({},_pp,{date:_pp.date||_pp.created_at,amount:Number(_pp.amount),registradoPor:_pp.registrado_por||_pp.registradoPor||null});}),total:Number(a.total),paid:Number(a.paid),balance:Number(a.balance),clientId:a.client_id,date:a.created_at,registradoPor:a.registrado_por||null});});
         var normalRets  = (rets||[]).map(function(r){return Object.assign({},r,{items:r.return_items||[],refundAmount:Number(r.refund_amount),itemCondition:r.item_condition,refundMethod:r.refund_method,date:r.created_at,saleId:r.sale_id||null});});
         var normalDefs  = (defs||[]).map(function(d){return Object.assign({},d,{price:Number(d.price||0)});});
         var normalClis  = (clis||[]).map(function(c){return Object.assign({},c,{cliCode:c.cli_code,createdAt:c.created_at});});
-        var normalReps  = (reps||[]).map(function(r){return Object.assign({},r,{repCode:r.rep_code,clientId:r.client_id,clientName:r.client_name,clientPhone:r.client_phone,clientCli:r.client_cli,problemDesc:r.problem_desc,techName:r.tech_name,estimatedCost:Number(r.estimated_cost||0),promisedDate:r.promised_date,internalNote:r.internal_note,registradoPor:r.registrado_por||{},parts:r.parts||[],createdAt:r.created_at,finalCost:r.final_cost!=null?Number(r.final_cost):null,receptionPhotos:r.reception_photos||[],deliveryPhotos:r.delivery_photos||[]});});
+        var normalReps  = (reps||[]).map(function(r){return Object.assign({},r,{repCode:r.rep_code,clientId:r.client_id,clientName:r.client_name,clientPhone:r.client_phone,clientCli:r.client_cli,problemDesc:r.problem_desc,techName:r.tech_name,estimatedCost:Number(r.estimated_cost||0),promisedDate:r.promised_date,internalNote:r.internal_note,registradoPor:r.registrado_por||{},parts:r.parts||[],createdAt:r.created_at,finalCost:r.final_cost!=null?Number(r.final_cost):null,receptionChecklist:r.reception_checklist||null,receptionPhotos:r.reception_photos||[],deliveryPhotos:r.delivery_photos||[]});});
         setProducts(normalProds);
         setSales(normalSales);
         setAccounts(normalAccs);
@@ -1283,7 +1288,7 @@ function App(props) {
       try{
         _createdAcc = await salesAPI.create({client:client,total:cartTotal,method:payMethod,items:cart,payType:payType,initialPay:paid,nota:nota,idempotencyKey:idempotencyKey,ivaPct:ivaPercent,secondMethod:secondMethod||null,secondAmount:secondAmount?parseFloat(secondAmount):null,repairId:cobrandoRepId||null});
         var freshAccs = await accountsAPI.getAll();
-        var na=(freshAccs||[]).map(function(a){return Object.assign({},a,{items:a.account_items||[],payments:(a.account_payments||[]).map(function(_pp){return Object.assign({},_pp,{date:_pp.date||_pp.created_at,amount:Number(_pp.amount),registradoPor:_pp.registrado_por||_pp.registradoPor||null});}),total:Number(a.total),paid:Number(a.paid),balance:Number(a.balance),date:a.created_at,registradoPor:a.registrado_por||null});});
+        var na=(freshAccs||[]).map(function(a){return Object.assign({},a,{items:a.account_items||[],payments:(a.account_payments||[]).map(function(_pp){return Object.assign({},_pp,{date:_pp.date||_pp.created_at,amount:Number(_pp.amount),registradoPor:_pp.registrado_por||_pp.registradoPor||null});}),total:Number(a.total),paid:Number(a.paid),balance:Number(a.balance),clientId:a.client_id,date:a.created_at,registradoPor:a.registrado_por||null});});
         setAccounts(na);
       }catch(e){
         var errMsg2=e&&e.error?e.error:null;
@@ -1309,7 +1314,7 @@ function App(props) {
     try{
       await accountsAPI.addPayment(accountId,{amount:amount,method:method||'Efectivo',note:note||''});
       var freshAccs2 = await accountsAPI.getAll();
-      var na2=(freshAccs2||[]).map(function(a){return Object.assign({},a,{items:a.account_items||[],payments:(a.account_payments||[]).map(function(_pp){return Object.assign({},_pp,{date:_pp.date||_pp.created_at,amount:Number(_pp.amount),registradoPor:_pp.registrado_por||_pp.registradoPor||null});}),total:Number(a.total),paid:Number(a.paid),balance:Number(a.balance),date:a.created_at,registradoPor:a.registrado_por||null});});
+      var na2=(freshAccs2||[]).map(function(a){return Object.assign({},a,{items:a.account_items||[],payments:(a.account_payments||[]).map(function(_pp){return Object.assign({},_pp,{date:_pp.date||_pp.created_at,amount:Number(_pp.amount),registradoPor:_pp.registrado_por||_pp.registradoPor||null});}),total:Number(a.total),paid:Number(a.paid),balance:Number(a.balance),clientId:a.client_id,date:a.created_at,registradoPor:a.registrado_por||null});});
       setAccounts(na2);
       showFlash("✓ Pago registrado","ok");
     }catch(e){
@@ -1491,7 +1496,7 @@ function App(props) {
     try{
       await repairsAPI.create({id:rep.id,repCode:rep.repCode,clientId:rep.clientId||null,clientName:rep.clientName,clientPhone:rep.clientPhone||null,clientCli:rep.clientCli||null,brand:rep.brand,model:rep.model,imei:rep.imei||null,problemDesc:rep.problemDesc,diagnosis:rep.diagnosis||null,techName:rep.techName||null,estimatedCost:rep.estimatedCost||0,promisedDate:rep.promisedDate||null,internalNote:rep.internalNote||null,status:rep.status||'recibido',registradoPor:rep.registradoPor||{},parts:rep.parts||[],receptionChecklist:rep.receptionChecklist||null,receptionPhotos:null,createdAt:rep.createdAt});
       var fr=await repairsAPI.getAll();
-      setRepairs((fr||[]).map(function(r){return Object.assign({},r,{repCode:r.rep_code,clientId:r.client_id,clientName:r.client_name,clientPhone:r.client_phone,clientCli:r.client_cli,problemDesc:r.problem_desc,techName:r.tech_name,estimatedCost:Number(r.estimated_cost||0),promisedDate:r.promised_date,internalNote:r.internal_note,registradoPor:r.registrado_por||{},parts:r.parts||[],createdAt:r.created_at,finalCost:r.final_cost!=null?Number(r.final_cost):null,receptionPhotos:r.reception_photos||[],deliveryPhotos:r.delivery_photos||[]});}));
+      setRepairs((fr||[]).map(function(r){return Object.assign({},r,{repCode:r.rep_code,clientId:r.client_id,clientName:r.client_name,clientPhone:r.client_phone,clientCli:r.client_cli,problemDesc:r.problem_desc,techName:r.tech_name,estimatedCost:Number(r.estimated_cost||0),promisedDate:r.promised_date,internalNote:r.internal_note,registradoPor:r.registrado_por||{},parts:r.parts||[],createdAt:r.created_at,finalCost:r.final_cost!=null?Number(r.final_cost):null,receptionChecklist:r.reception_checklist||null,receptionPhotos:r.reception_photos||[],deliveryPhotos:r.delivery_photos||[]});}));
       return true;
     }catch(e){
       var emRep=e&&e.error?e.error:null;
@@ -1503,7 +1508,7 @@ function App(props) {
     try{
       await repairsAPI.updateStatus(id, status);
       var fr2=await repairsAPI.getAll();
-      setRepairs((fr2||[]).map(function(r){return Object.assign({},r,{repCode:r.rep_code,clientId:r.client_id,clientName:r.client_name,clientPhone:r.client_phone,clientCli:r.client_cli,problemDesc:r.problem_desc,techName:r.tech_name,estimatedCost:Number(r.estimated_cost||0),promisedDate:r.promised_date,internalNote:r.internal_note,registradoPor:r.registrado_por||{},parts:r.parts||[],createdAt:r.created_at,finalCost:r.final_cost!=null?Number(r.final_cost):null,receptionPhotos:r.reception_photos||[],deliveryPhotos:r.delivery_photos||[]});}));
+      setRepairs((fr2||[]).map(function(r){return Object.assign({},r,{repCode:r.rep_code,clientId:r.client_id,clientName:r.client_name,clientPhone:r.client_phone,clientCli:r.client_cli,problemDesc:r.problem_desc,techName:r.tech_name,estimatedCost:Number(r.estimated_cost||0),promisedDate:r.promised_date,internalNote:r.internal_note,registradoPor:r.registrado_por||{},parts:r.parts||[],createdAt:r.created_at,finalCost:r.final_cost!=null?Number(r.final_cost):null,receptionChecklist:r.reception_checklist||null,receptionPhotos:r.reception_photos||[],deliveryPhotos:r.delivery_photos||[]});}));
     }catch(e){
       var emRS=e&&e.error?e.error:null;
       showFlash("⛔ "+(emRS||"Error al actualizar la reparación. Verifica tu conexión."),"err");
@@ -1529,7 +1534,7 @@ function App(props) {
   async function reloadRepairs(){
     try{
       var fr=await repairsAPI.getAll();
-      setRepairs((fr||[]).map(function(r){return Object.assign({},r,{repCode:r.rep_code,clientId:r.client_id,clientName:r.client_name,clientPhone:r.client_phone,clientCli:r.client_cli,problemDesc:r.problem_desc,techName:r.tech_name,estimatedCost:Number(r.estimated_cost||0),promisedDate:r.promised_date,internalNote:r.internal_note,registradoPor:r.registrado_por||{},parts:r.parts||[],createdAt:r.created_at,finalCost:r.final_cost!=null?Number(r.final_cost):null,receptionPhotos:r.reception_photos||[],deliveryPhotos:r.delivery_photos||[]});}));
+      setRepairs((fr||[]).map(function(r){return Object.assign({},r,{repCode:r.rep_code,clientId:r.client_id,clientName:r.client_name,clientPhone:r.client_phone,clientCli:r.client_cli,problemDesc:r.problem_desc,techName:r.tech_name,estimatedCost:Number(r.estimated_cost||0),promisedDate:r.promised_date,internalNote:r.internal_note,registradoPor:r.registrado_por||{},parts:r.parts||[],createdAt:r.created_at,finalCost:r.final_cost!=null?Number(r.final_cost):null,receptionChecklist:r.reception_checklist||null,receptionPhotos:r.reception_photos||[],deliveryPhotos:r.delivery_photos||[]});}));
     }catch(e){ /* silencioso */ }
   }
 
