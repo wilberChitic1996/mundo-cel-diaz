@@ -8,8 +8,8 @@
 
 > Cruce de hallazgos YA EXISTENTES (sesión + auditoría de abajo) contra los bloqueantes de v1.0. No se re-auditó; evidencia citada de la auditoría.
 
-**Conteo de bloqueantes: 3 CUMPLIDOS · 1 PARCIAL · 9 NO CUMPLIDOS (de 13).**
-**Faltan para v1.0: 10 bloqueantes.**
+**Conteo de bloqueantes: 4 CUMPLIDOS · 1 PARCIAL · 8 NO CUMPLIDOS (de 13).**
+**Faltan para v1.0: 9 bloqueantes.**
 
 ### Bloqueantes 🔴 — dictamen
 
@@ -27,12 +27,12 @@
 
 ### Bloqueantes 🔴 adicionales (aceptados 29 jun — total v1.0 = 13)
 
-- [ ] **B4 — Revocación de sesión (A7)** · al desactivar/eliminar un usuario su JWT de 8h sigue vivo (`middleware/auth.js` no consulta `users.active` por request). **Por qué bloquea:** un empleado despedido o un token filtrado conserva acceso; riesgo de seguridad/cumplimiento al vender a terceros. Esfuerzo **M**.
+- [x] **B4 — Revocación de sesión (A7)** · ✅ **CUMPLIDO (29 jun)** · `middleware/auth.js` ahora verifica por request que el usuario siga **activo y existente** (cacheado 1 min, timeout configurable + fail-open) → **401 `SESSION_REVOKED`** si está inactivo/eliminado; `users PUT` invalida la caché → revocación inmediata. Login y refresh ya filtraban inactivos; esto cierra la ventana del access token de 8h ya emitido. +tests (decisión pura + HTTP). Suite 100/100. PR API #74. _Antes:_ un empleado despedido o un token filtrado conservaba acceso hasta 8h.
 - [ ] **B5 — Idempotencia en `accounts` POST (M6)** · a diferencia de `sales`, crear cuenta por cobrar no tiene idempotency key (`accounts.js`). **Por qué bloquea:** doble-click/reintento duplica deudas (dinero) → erosiona confianza del cliente. Esfuerzo **S**.
 
 ### 🚦 Plan de cierre (agrupado por módulo / dependencia)
 
-1. **Grupo A — Auth/Autorización backend** (mismo módulo `middleware/` + `routes/*`): **B3 ✅** (whitelist roles users.js) → **A8 ✅** (requireRole en escritura) → **B2/A6 ✅** (middleware enforceSubscription) → **B4/A7 ⏳ (siguiente)** (revocar sesión por `users.active`). Atacarlos juntos: comparten middleware y patrón.
+1. **Grupo A — Auth/Autorización backend** ✅ **COMPLETO** (mismo módulo `middleware/` + `routes/*`): **B3 ✅** (whitelist roles users.js) → **A8 ✅** (requireRole en escritura) → **B2/A6 ✅** (middleware enforceSubscription) → **B4/A7 ✅** (revocar sesión por `users.active`). Los 4 bloqueantes de auth backend cerrados.
 2. **Grupo B — Bugs front + sesión/token** (capa de sesión front+api): **A2/A3** (fixes `res.data`) → **A11/A12** (CSP estricta + refresh token a cookie HttpOnly, unificar `App.jsx`/`session.js`).
 3. **Grupo C — Integridad de inventario/dinero (BD)**: **A1/A15** (migración versionada `decrement_stock` con FOR UPDATE + drop overload) → **NUEVO-2/M6** (idempotencia en accounts).
 4. **Grupo D — Datos y escala**: **A13** (cifrar DPI + sacarlo de audit_logs) → **A14** (paginación server-side sales/accounts).
