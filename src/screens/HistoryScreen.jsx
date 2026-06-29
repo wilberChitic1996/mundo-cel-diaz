@@ -33,7 +33,7 @@ import React, { useState } from 'react';
 import { TEAL, NAVY, sCard, sInput, sLabel, sTH, sTD, mkBtn, mkBadge } from '../styles/theme.js';
 import { Q, fmtD, fmtT } from '../utils/formatters.js';
 import { exportExcel, exportPDF } from '../utils/export.js';
-import { printVoucher, compartirWhatsApp } from '../utils/receipt.js';
+import { printVoucher, compartirWhatsApp, getStore } from '../utils/receipt.js';
 import { pedirTelYEnviar } from '../utils/whatsapp.js';
 import { waBoletaVenta } from '../utils/whatsapp.js';
 import { usePaginator } from '../hooks/usePaginator.jsx';
@@ -264,9 +264,25 @@ export default function HistoryScreen({ sales, selectedSale, setSelectedSale, ac
               })}
             </tbody>
           </table>
-          <div style={{ borderTop: '1px solid rgba(0,0,0,0.1)', marginTop: 8, paddingTop: 10, textAlign: 'right' }}>
-            <span style={{ fontSize: 16, fontWeight: 700, color: TEAL }}>Total: {Q(selectedSale.total)}</span>
-          </div>
+          {(function() {
+            var ivaPct = parseFloat((getStore().iva_percent) || 0) || 0;
+            var total  = Number(selectedSale.total) || 0;
+            var ivaAmt = ivaPct > 0 ? total - total / (1 + ivaPct / 100) : 0;
+            var subtot = total - ivaAmt;
+            return (
+              <div style={{ borderTop: '1px solid rgba(0,0,0,0.1)', marginTop: 8, paddingTop: 10, textAlign: 'right' }}>
+                {ivaPct > 0 && (
+                  <div style={{ fontSize: 12, color: '#888', marginBottom: 4 }}>
+                    <div>Subtotal (sin IVA): {Q(subtot)}</div>
+                    <div>IVA ({ivaPct}%): {Q(ivaAmt)}</div>
+                  </div>
+                )}
+                <span style={{ fontSize: 16, fontWeight: 700, color: TEAL }}>
+                  Total{ivaPct > 0 ? ' (IVA incl.)' : ''}: {Q(total)}
+                </span>
+              </div>
+            );
+          })()}
         </div>
       </div>
     );
