@@ -8,12 +8,12 @@
 
 > Cruce de hallazgos YA EXISTENTES (sesión + auditoría de abajo) contra los bloqueantes de v1.0. No se re-auditó; evidencia citada de la auditoría.
 
-**Conteo de bloqueantes: 0 CUMPLIDOS · 1 PARCIAL · 12 NO CUMPLIDOS (de 13).**
-**Faltan para v1.0: 13 bloqueantes.**
+**Conteo de bloqueantes: 1 CUMPLIDO · 1 PARCIAL · 11 NO CUMPLIDOS (de 13).**
+**Faltan para v1.0: 12 bloqueantes.**
 
 ### Bloqueantes 🔴 — dictamen
 
-- [ ] **B3 — Cerrar escalada a superadmin** · ❌ **NO CUMPLIDO** · `users.js:48,72` usa `role` del body sin whitelist (vs `admin.js:272` que sí valida) → un admin puede crearse/promoverse a superadmin.
+- [x] **B3 — Cerrar escalada a superadmin** · ✅ **CUMPLIDO (29 jun)** · whitelist `TENANT_ROLES=['admin','cajero','auditor']` + guard de auto-edición en `users.js` (POST y PUT); +7 tests (suite 68/68). PR API #74. _Antes:_ `users.js:48,72` guardaba `role` del body sin validar.
 - [ ] **B2/A6 — Enforcement de suscripción en backend** · ❌ **NO CUMPLIDO** · `middleware/auth.js` solo valida JWT; no consulta `tenants.active/expires_at`. Solo hay banner informativo (`admin.js:349`, `App.jsx:2041`) → un tenant vencido sigue operando por API.
 - [ ] **A1/A15 — `decrement_stock` robusto + drop del overload** · 🟡 **PARCIAL** · el runtime en vivo YA es robusto en ambos ambientes (verificado esta sesión), pero la migración versionada (`000_full_schema.sql:366-373`) sigue siendo el `UPDATE` plano y el overload `decrement_stock(uuid,integer)` sin tenant sigue existiendo en ambos.
 - [ ] **A2/A3 — Fixes de 1 línea (refresh JWT + RemindersWidget)** · ❌ **NO CUMPLIDO** · `session.js:69` y `RemindersWidget.jsx:24` leen `res.data` sobre una respuesta ya desempaquetada por el interceptor (`api.js:38`) → nunca operan.
