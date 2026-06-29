@@ -235,6 +235,13 @@ export function printVoucher(sale, opts) {
   var _rAddr    = _store.store_address || '';
   var _rEmail   = _store.store_email   || '';
 
+  // IVA (Guatemala: el precio ya lleva IVA incluido → se desglosa hacia atrás).
+  // Se muestra solo si el negocio tiene IVA configurado (iva_percent > 0).
+  var _ivaPct     = parseFloat(_store.iva_percent || '0') || 0;
+  var _totalNum   = Number(sale.total) || 0;
+  var _ivaAmt     = _ivaPct > 0 ? _totalNum - _totalNum / (1 + _ivaPct / 100) : 0;
+  var _subtotNeto = _totalNum - _ivaAmt;
+
   // Línea de contacto del negocio (solo lo que esté configurado en la BD — nada inventado)
   var _contactBits = [];
   if (_rAddr)  _contactBits.push('📍 ' + _rAddr);
@@ -305,7 +312,11 @@ export function printVoucher(sale, opts) {
       ? '<div class="totals-row"><span>Precio lista:</span><span>Q ' + subtotal.toFixed(2) + '</span></div>' +
         '<div class="totals-row"><span style="color:#E65100">Descuentos:</span><span style="color:#E65100">- Q ' + totalDesc.toFixed(2) + '</span></div>'
       : '') +
-    '<div class="totals-row"><span>TOTAL:</span><span>Q ' + Number(sale.total).toFixed(2) + '</span></div>' +
+    (_ivaPct > 0
+      ? '<div class="totals-row"><span>Subtotal (sin IVA):</span><span>Q ' + _subtotNeto.toFixed(2) + '</span></div>' +
+        '<div class="totals-row"><span>IVA (' + _ivaPct + '%):</span><span>Q ' + _ivaAmt.toFixed(2) + '</span></div>'
+      : '') +
+    '<div class="totals-row"><span>TOTAL' + (_ivaPct > 0 ? ' (IVA incl.)' : '') + ':</span><span>Q ' + _totalNum.toFixed(2) + '</span></div>' +
   '</div></div>' +
   (_E
     ? '<div class="totals" style="margin-top:-10px;"><div class="totals-box" style="width:280px;">' +
