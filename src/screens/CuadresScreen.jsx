@@ -28,10 +28,11 @@
 //   showFlash  {Function} — (msg, type) notificación flash
 // ══════════════════════════════════════════════════════════════════════════════
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { TEAL, NAVY, sCard, sInput, sLabel, sTH, sTD, mkBtn, mkBadge } from '../styles/theme.js';
 import { fmtD, fmtT } from '../utils/formatters.js';
 import { getStore } from '../utils/receipt.js';
+import { suppliersAPI } from '../utils/api.js';
 import { APP_NAME, APP_VERSION, STORE_FALLBACK, ROLE_LABEL } from '../constants/index.js';
 import HelpTip from '../components/ui/HelpTip.jsx';
 import { exportExcel } from '../utils/export.js';
@@ -115,6 +116,13 @@ export default function CuadresScreen({ sales, accounts, returns, products, repa
     return false;
   }
 
+  // Compras del tenant (para el IVA crédito). Se cargan aquí para no tocar App.jsx;
+  // el API ya filtra por tenant (withTenant), así que solo llegan las del negocio en sesión.
+  var _purch = useState([]); var purchases = _purch[0]; var setPurchasesC = _purch[1];
+  useEffect(function() {
+    suppliersAPI.getPurchases().then(function(d) { setPurchasesC(d || []); }).catch(function() {});
+  }, []);
+
   // ── Cálculos del período ────────────────────────────────────────────────
 
   // Ventas cobradas del período
@@ -122,6 +130,17 @@ export default function CuadresScreen({ sales, accounts, returns, products, repa
   // Ventas a crédito del período
   var periodSalesCredito = sales.filter(function(s) { return inRange(s.date) && s.status === 'cuenta'; });
   var totalVentasCredito = periodSalesCredito.reduce(function(s, x) { return s + x.total; }, 0);
+
+  // ── IVA del período: débito (ventas) vs crédito (compras con factura) ──
+  // GT: precio con IVA incluido → desglose hacia atrás. Débito = todas las ventas emitidas
+  // en el período (contado + crédito). Crédito = IVA de las compras que tuvieron factura.
+  var ivaPctCuadre   = parseFloat((getStore().iva_percent) || 0) || 0;
+  var baseVentasIva  = periodSales.concat(periodSalesCredito).reduce(function(s, x) { return s + Number(x.total || 0); }, 0);
+  var ivaDebito      = ivaPctCuadre > 0 ? baseVentasIva - baseVentasIva / (1 + ivaPctCuadre / 100) : 0;
+  var periodCompras  = purchases.filter(function(p) { return inRange(p.created_at); });
+  var comprasFactura = periodCompras.filter(function(p) { return p.has_factura; });
+  var ivaCredito     = comprasFactura.reduce(function(s, p) { return s + Number(p.iva_amount || 0); }, 0);
+  var ivaNeto        = ivaDebito - ivaCredito;
 
   // Ingresos por método de pago (ventas cobradas)
   var byMethod = { Efectivo: 0, Tarjeta: 0, Transferencia: 0 };
@@ -542,6 +561,19 @@ export default function CuadresScreen({ sales, accounts, returns, products, repa
           {topProfitable.length === 0 && costoVentas === 0 && <p style={{ fontSize: 11, color: '#aaa', marginTop: 8 }}>Configurá el costo de los productos para ver este reporte.</p>}
         </div>
       </div>
+
+      {/* Resumen de IVA del período (débito vs crédito) */}
+      {ivaPctCuadre > 0 && (
+        <div style={Object.assign({}, sCard, { marginBottom: 16 })}>
+          <p style={{ fontWeight: 600, fontSize: 14, margin: '0 0 12px' }}>🧾 Resumen de IVA del período <span style={{ fontWeight: 400, color: '#999', fontSize: 12 }}>({ivaPctCuadre}%)</span></p>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit,minmax(160px,1fr))', gap: 12 }}>
+            <MetricBox label="IVA débito (ventas)" value={Q(ivaDebito)} color="#378ADD" />
+            <MetricBox label={'IVA crédito (compras c/factura: ' + comprasFactura.length + ')'} value={Q(ivaCredito)} color="#2E7D32" />
+            <MetricBox label={ivaNeto >= 0 ? 'IVA a pagar' : 'Saldo a favor'} value={Q(Math.abs(ivaNeto))} color={ivaNeto >= 0 ? '#E65100' : '#2E7D32'} />
+          </div>
+          <p style={{ fontSize: 11, color: '#999', marginTop: 10 }}>Débito = IVA de las ventas del período (contado + crédito). Crédito = IVA de las compras con factura. Estimación de control interno; no sustituye la declaración formal ante la SAT.</p>
+        </div>
+      )}
 
       {/* Detalle de ventas del período */}
       <div style={sCard}>

@@ -48,6 +48,11 @@ function printCompra(p) {
   var hora  = new Date(p.created_at).toLocaleTimeString('es-GT', { hour: '2-digit', minute: '2-digit' });
   var folio = String(p.id || '').toUpperCase().slice(-8);
 
+  // Crédito fiscal (solo si la compra tuvo factura del proveedor).
+  var conFactura = !!p.has_factura;
+  var ivaCred    = conFactura ? (Number(p.iva_amount) || 0) : 0;
+  var baseSinIva = Number(p.total || 0) - ivaCred;
+
   var filas = items.map(function(it) {
     var costo = it.cost != null ? Number(it.cost) : (it.qty ? Number(it.subtotal) / Number(it.qty) : 0);
     var sub   = it.subtotal != null ? Number(it.subtotal) : costo * Number(it.qty || 0);
@@ -69,7 +74,7 @@ function printCompra(p) {
     '.aviso{background:#FFF8E1;border:1px solid #FFD54F;border-radius:8px;padding:8px 12px;margin-top:16px;font-size:11px;color:#8a6d00;text-align:center;}' +
     '@media print{body{padding:12px;}}</style></head><body>' +
     '<div class="header">' +
-      '<div class="brand"><h1>' + _sn + '</h1><p>COMPROBANTE DE COMPRA · USO INTERNO</p></div>' +
+      '<div class="brand"><h1>' + _sn + '</h1><p>' + (conFactura ? 'COMPRA CON FACTURA · CRÉDITO FISCAL' : 'COMPROBANTE DE COMPRA · USO INTERNO') + '</p></div>' +
       '<div class="num"><div class="label">N° Compra</div><div class="val"># ' + folio + '</div></div>' +
     '</div>' +
     '<div class="grid">' +
@@ -77,10 +82,20 @@ function printCompra(p) {
       '<div class="block"><div class="lbl">Fecha</div><div class="val">' + fecha + '</div><div style="font-size:11px;color:#666;">' + hora + ' hrs</div></div>' +
       '<div class="block"><div class="lbl">Registrado por</div><div class="val">' + (p.registered_by || '—') + '</div></div>' +
       '<div class="block"><div class="lbl">Artículos</div><div class="val">' + items.length + ' línea(s)</div></div>' +
+      (conFactura
+        ? '<div class="block"><div class="lbl">NIT proveedor</div><div class="val">' + (p.supplier_nit || '—') + '</div></div>' +
+          '<div class="block"><div class="lbl">N° factura</div><div class="val">' + (p.factura_numero || '—') + '</div></div>'
+        : '') +
     '</div>' +
     '<table><thead><tr><th>Producto</th><th style="text-align:center;">Cant.</th><th style="text-align:right;">Costo unit.</th><th style="text-align:right;">Subtotal</th></tr></thead><tbody>' + filas + '</tbody></table>' +
-    '<div class="total"><div class="total-box"><div class="total-row"><span>TOTAL COMPRA</span><span>Q ' + Number(p.total).toFixed(2) + '</span></div></div></div>' +
-    '<div class="aviso">📦 Documento interno de control de inventario. No es comprobante de venta ni documento tributario; no se entrega al cliente.</div>' +
+    '<div class="total"><div class="total-box">' +
+      (conFactura && ivaCred > 0
+        ? '<div class="total-row" style="background:#fff;color:#222;font-weight:400;font-size:12px;border-bottom:1px solid #eee;"><span>Base (sin IVA)</span><span>Q ' + baseSinIva.toFixed(2) + '</span></div>' +
+          '<div class="total-row" style="background:#fff;color:#222;font-weight:400;font-size:12px;border-bottom:1px solid #eee;"><span>IVA crédito</span><span>Q ' + ivaCred.toFixed(2) + '</span></div>'
+        : '') +
+      '<div class="total-row"><span>TOTAL COMPRA</span><span>Q ' + Number(p.total).toFixed(2) + '</span></div>' +
+    '</div></div>' +
+    '<div class="aviso">📦 Documento interno de control de inventario. No es comprobante de venta ni documento tributario.' + (conFactura ? ' El crédito fiscal proviene de la factura del proveedor (NIT y N° arriba).' : '') + '</div>' +
     '</body></html>';
 
   // Impresión desde la ventana padre (CSP-safe, sin script inline).
@@ -124,6 +139,9 @@ export default function SuppliersScreen({ products, session, showFlash, onStockU
   var _pSupId = useState('');    var pSupId  = _pSupId[0];  var setPSupId  = _pSupId[1];
   var _pNotes = useState('');    var pNotes  = _pNotes[0];  var setPNotes  = _pNotes[1];
   var _pItems = useState([]);    var pItems  = _pItems[0];  var setPItems  = _pItems[1];
+  var _pHasF  = useState(false); var pHasFactura = _pHasF[0]; var setPHasFactura = _pHasF[1];
+  var _pNit   = useState('');    var pNit    = _pNit[0];    var setPNit    = _pNit[1];
+  var _pFacNum= useState('');    var pFacNum = _pFacNum[0]; var setPFacNum = _pFacNum[1];
   var _saving = useState(false); var saving  = _saving[0];  var setSaving  = _saving[1];
 
   // Búsqueda de producto dentro del modal de compra
@@ -194,6 +212,7 @@ export default function SuppliersScreen({ products, session, showFlash, onStockU
   // Abre el modal de nueva compra
   function openNewPurch() {
     setPSup(''); setPSupId(''); setPNotes(''); setPItems([]); setProdQ(''); setProdRes([]);
+    setPHasFactura(false); setPNit(''); setPFacNum('');
     setShowPurchModal(true);
   }
 
@@ -229,7 +248,9 @@ export default function SuppliersScreen({ products, session, showFlash, onStockU
     if (!pSup.trim()) { alert('Seleccione un proveedor'); return; }
     if (!pItems.length) { alert('Agregue al menos un producto'); return; }
     setSaving(true);
-    suppliersAPI.createPurchase({ supplierId: pSupId || null, supplierName: pSup, items: pItems, notes: pNotes })
+    var _ivaPctC  = parseFloat((getStore().iva_percent) || 0) || 0;
+    var _ivaCredC = (pHasFactura && _ivaPctC > 0) ? pTotal - pTotal / (1 + _ivaPctC / 100) : 0;
+    suppliersAPI.createPurchase({ supplierId: pSupId || null, supplierName: pSup, items: pItems, notes: pNotes, hasFactura: pHasFactura, supplierNit: pNit.trim() || null, facturaNumero: pFacNum.trim() || null, ivaAmount: _ivaCredC })
       .then(function(p) {
         setPurchases(function(prev) { return [p].concat(prev); });
         onStockUpdate();
@@ -244,6 +265,9 @@ export default function SuppliersScreen({ products, session, showFlash, onStockU
 
   // Total de la compra en curso
   var pTotal = pItems.reduce(function(s, i) { return s + i.subtotal; }, 0);
+  // IVA crédito fiscal (solo si la compra es con factura). GT: precio con IVA incluido → desglose hacia atrás.
+  var ivaPctCompra     = parseFloat((getStore().iva_percent) || 0) || 0;
+  var ivaCreditoCompra = (pHasFactura && ivaPctCompra > 0) ? pTotal - pTotal / (1 + ivaPctCompra / 100) : 0;
 
   var supPag = usePaginator(suppliers, 20);
   var purPag = usePaginator(purchases, 20);
@@ -492,7 +516,35 @@ export default function SuppliersScreen({ products, session, showFlash, onStockU
             )}
 
             <label style={{ display: 'block', fontWeight: 600, fontSize: 13, margin: '14px 0 5px' }}>Notas (opcional)</label>
-            <input style={sInput} placeholder="Ej: factura #1234, pago en efectivo…" value={pNotes} onChange={function(e) { setPNotes(e.target.value); }} />
+            <input style={sInput} placeholder="Ej: pago en efectivo, orden #…" value={pNotes} onChange={function(e) { setPNotes(e.target.value); }} />
+
+            {/* ── Crédito fiscal: solo si la compra tuvo factura del proveedor ── */}
+            <div style={{ marginTop: 14, padding: 12, background: '#f8f9fa', borderRadius: 8, border: '1px solid #eee' }}>
+              <label style={{ display: 'flex', alignItems: 'center', gap: 8, fontWeight: 600, fontSize: 13, cursor: 'pointer' }}>
+                <input type="checkbox" checked={pHasFactura} onChange={function(e) { setPHasFactura(e.target.checked); }} />
+                🧾 Compra con factura (crédito fiscal)
+              </label>
+              {pHasFactura && (
+                <div style={{ marginTop: 10 }}>
+                  <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap' }}>
+                    <div style={{ flex: 1, minWidth: 140 }}>
+                      <label style={{ display: 'block', fontSize: 12, color: '#666', marginBottom: 3 }}>NIT del proveedor</label>
+                      <input style={sInput} placeholder="NIT en la factura" value={pNit} onChange={function(e) { setPNit(e.target.value); }} />
+                    </div>
+                    <div style={{ flex: 1, minWidth: 140 }}>
+                      <label style={{ display: 'block', fontSize: 12, color: '#666', marginBottom: 3 }}>N° de factura</label>
+                      <input style={sInput} placeholder="Serie y número" value={pFacNum} onChange={function(e) { setPFacNum(e.target.value); }} />
+                    </div>
+                  </div>
+                  {ivaPctCompra > 0
+                    ? <p style={{ fontSize: 12, color: '#1D9E75', fontWeight: 700, marginTop: 8 }}>
+                        IVA crédito ({ivaPctCompra}%): Q {ivaCreditoCompra.toFixed(2)}
+                        <span style={{ color: '#999', fontWeight: 400 }}> · base sin IVA: Q {(pTotal - ivaCreditoCompra).toFixed(2)}</span>
+                      </p>
+                    : <p style={{ fontSize: 11, color: '#999', marginTop: 8 }}>Configurá el IVA del negocio para calcular el crédito fiscal.</p>}
+                </div>
+              )}
+            </div>
 
             <div style={{ display: 'flex', gap: 10, marginTop: 20 }}>
               <button style={Object.assign({}, mkBtn('gray'), { flex: 1 })} onClick={function() { setShowPurchModal(false); }}>Cancelar</button>
