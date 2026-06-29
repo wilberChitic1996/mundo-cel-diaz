@@ -85,6 +85,7 @@ export default function AccountsScreen({ accounts, pendingAccs, totalPend, produ
   var _pm     = useState('Efectivo');   var pmtMethod    = _pm[0];       var setPmtMethod    = _pm[1];
   var _pn     = useState('');           var pmtNote      = _pn[0];       var setPmtNote      = _pn[1];
   var _pe     = useState('');           var pmtErr       = _pe[0];       var setPmtErr       = _pe[1];
+  var _pb     = useState(false);        var pmtBusy      = _pb[0];       var setPmtBusy      = _pb[1];
 
   // Modal recordatorio masivo
   var _wam    = useState(false);        var showWaMasivo = _wam[0];      var setShowWaMasivo = _wam[1];
@@ -129,15 +130,19 @@ export default function AccountsScreen({ accounts, pendingAccs, totalPend, produ
   var accPag         = usePaginator(filtradas, 20);
 
   // ── Registrar pago a una cuenta ───────────────────────────────────────────
-  function registrarPago(acc) {
+  async function registrarPago(acc) {
+    if (pmtBusy) return;                          // evita doble-click → doble abono (B2)
     var amt = parseFloat(pmtAmount);
     if (!amt || amt <= 0)       { setPmtErr('Ingresá un monto válido'); return; }
     if (amt > acc.balance + 0.01) { setPmtErr('El máximo es ' + Q(acc.balance)); return; }
-    addPayment(acc.id, Math.min(amt, acc.balance), pmtMethod, pmtNote);
-    setPmtAmount('');
-    setPmtNote('');
     setPmtErr('');
-    showFlash('✓ Pago registrado — ' + Q(amt), 'ok');
+    setPmtBusy(true);
+    var ok = await addPayment(acc.id, Math.min(amt, acc.balance), pmtMethod, pmtNote);
+    setPmtBusy(false);
+    if (ok !== false) {                            // addPayment ya muestra el flash de éxito/error
+      setPmtAmount('');
+      setPmtNote('');
+    }
   }
 
   // ── Buscar teléfono de cliente por ID ─────────────────────────────────────
@@ -255,7 +260,7 @@ export default function AccountsScreen({ accounts, pendingAccs, totalPend, produ
                 </div>
               </div>
               <div style={{ display: 'flex', gap: 10 }}>
-                <button style={mkBtn('teal')} onClick={function() { registrarPago(acc); }}>✓ Registrar pago</button>
+                <button style={mkBtn('teal')} disabled={pmtBusy} onClick={function() { registrarPago(acc); }}>{pmtBusy ? 'Registrando…' : '✓ Registrar pago'}</button>
                 <button style={mkBtn('blue')} onClick={function() { setPmtAmount(acc.balance.toFixed(2)); setPmtNote('Pago total'); }}>
                   Pagar todo ({Q(acc.balance)})
                 </button>
