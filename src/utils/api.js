@@ -1,19 +1,18 @@
 // src/utils/api.js
 import axios from 'axios';
 
-// ── URL del API — auto-detección por dominio ──────────────────────
-// Producción y staging tienen instancias de API y DB completamente separadas.
-// El hostname detecta automáticamente cuál usar.
-const API_PROD    = 'https://mundo-cel-diaz-api-production.up.railway.app/api';
-const API_STAGING = 'https://mundo-cel-diaz-api-production-e546.up.railway.app/api';
-
+// ── URL del API — MISMO dominio (proxy de Vercel) ─────────────────
+// En producción y staging el frontend llama al API por su PROPIO dominio (/api),
+// y Vercel lo reenvía internamente a Railway (ver "rewrites" en vercel.json — cada
+// ambiente/rama reenvía a SU Railway). Así el navegador NO hace peticiones "cruzadas"
+// (cross-origin) → sin preflight CORS. Motivo: algunas redes/ISP cuelgan el preflight
+// (OPTIONS) hacia el dominio de Railway y el login quedaba en "Sin conexión al servidor".
+// En local se usa el API de desarrollo directo.
 function resolveApiUrl() {
   if (typeof window !== 'undefined' && window.location) {
     var host = window.location.hostname;
     if (host === 'localhost' || host === '127.0.0.1') return 'http://localhost:4000/api';
-    if (host.indexOf('staging') !== -1) return API_STAGING;
-    if (host === 'mundoceldiaz.com' || host === 'www.mundoceldiaz.com') return API_PROD;
-    return API_PROD;
+    return '/api';
   }
   return 'http://localhost:4000/api';
 }
