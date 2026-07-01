@@ -1,4 +1,8 @@
 {
+  "rewrites": [
+    { "source": "/api/:path*", "destination": "https://mundo-cel-diaz-api-production.up.railway.app/api/:path*" },
+    { "source": "/health", "destination": "https://mundo-cel-diaz-api-production.up.railway.app/health" }
+  ],
   "headers": [
     {
       "source": "/(.*)",
