@@ -174,6 +174,18 @@ Estos valores ya están correctos y funcionando. **NUNCA cambiarlos** salvo que 
 **Fix:** PR #49 (API) llevó la misma lógica de CORS a la rama `staging`.
 **Para diagnosticar este tipo de error:** abrir DevTools → Network → reintentar login → revisar Status de la petición `login` (CORS error / failed / 404 / 401) ANTES de tocar credenciales o URLs.
 
+### Lección registrada — caída de login en PRODUCCIÓN por CORS del dominio apex (1 jul 2026)
+
+**Síntoma:** en `mundoceldiaz.com` (SIN www) el login mostraba "Sin conexión al servidor". Con `www.mundoceldiaz.com` sí funcionaba.
+**Causa raíz (confirmada con `curl` de preflight):** el CORS del API de producción devolvía **HTTP 500** para `Origin: https://mundoceldiaz.com` porque la env var `FRONTEND_URL` (Railway prod) solo incluía la variante **con www**. La función `origin` de `cors` hacía `cb(new Error(...))` para orígenes no listados → el error handler respondía 500 → el navegador lo leía como "sin conexión". `www` daba 204 (permitido).
+**Fix (API PR #108 → `main`, #109 → `staging`):** en `app.js` se agregó `STATIC_ALLOWED = ['https://mundoceldiaz.com','https://www.mundoceldiaz.com']` que se permite SIEMPRE (independiente de `FRONTEND_URL`), y los orígenes no permitidos ahora se rechazan limpio (`cb(null, false)`) en vez de lanzar 500. Verificado en vivo: apex pasó de 500 → 204 con `access-control-allow-origin`.
+**Diagnóstico rápido (sin DevTools, desde cualquier terminal):**
+```
+curl -s -o /dev/null -w "%{http_code}\n" -X OPTIONS <API>/api/auth/login \
+  -H "Origin: https://mundoceldiaz.com" -H "Access-Control-Request-Method: POST"
+```
+Si da 500/403 → CORS bloqueando ese origen. **Lección:** incluir SIEMPRE apex + www; nunca lanzar error (500) en la función `origin` de `cors` (rechazá con `cb(null,false)`).
+
 ---
 
 ## Repos GitHub
