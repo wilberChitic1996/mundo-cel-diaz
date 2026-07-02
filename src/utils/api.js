@@ -21,7 +21,9 @@ const API_URL = resolveApiUrl();
 
 const api = axios.create({
   baseURL: API_URL,
-  timeout: 10000,
+  // 30s: tolera lentitud del servidor (ej. incidentes de Railway o arranque en frío).
+  // Antes eran 10s y en un bajón las cargas se cortaban y la app mostraba todo en cero.
+  timeout: 30000,
   headers: { 'Content-Type': 'application/json' }
 });
 
