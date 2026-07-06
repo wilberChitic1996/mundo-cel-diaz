@@ -174,6 +174,49 @@ Estos valores ya están correctos y funcionando. **NUNCA cambiarlos** salvo que 
 **Fix:** PR #49 (API) llevó la misma lógica de CORS a la rama `staging`.
 **Para diagnosticar este tipo de error:** abrir DevTools → Network → reintentar login → revisar Status de la petición `login` (CORS error / failed / 404 / 401) ANTES de tocar credenciales o URLs.
 
+### Lección registrada — caída de login en PRODUCCIÓN por CORS del dominio apex (1 jul 2026)
+
+**Síntoma:** en `mundoceldiaz.com` (SIN www) el login mostraba "Sin conexión al servidor". Con `www.mundoceldiaz.com` sí funcionaba.
+**Causa raíz (confirmada con `curl` de preflight):** el CORS del API de producción devolvía **HTTP 500** para `Origin: https://mundoceldiaz.com` porque la env var `FRONTEND_URL` (Railway prod) solo incluía la variante **con www**. La función `origin` de `cors` hacía `cb(new Error(...))` para orígenes no listados → el error handler respondía 500 → el navegador lo leía como "sin conexión". `www` daba 204 (permitido).
+**Fix (API PR #108 → `main`, #109 → `staging`):** en `app.js` se agregó `STATIC_ALLOWED = ['https://mundoceldiaz.com','https://www.mundoceldiaz.com']` que se permite SIEMPRE (independiente de `FRONTEND_URL`), y los orígenes no permitidos ahora se rechazan limpio (`cb(null, false)`) en vez de lanzar 500. Verificado en vivo: apex pasó de 500 → 204 con `access-control-allow-origin`.
+**Diagnóstico rápido (sin DevTools, desde cualquier terminal):**
+```
+curl -s -o /dev/null -w "%{http_code}\n" -X OPTIONS <API>/api/auth/login \
+  -H "Origin: https://mundoceldiaz.com" -H "Access-Control-Request-Method: POST"
+```
+Si da 500/403 → CORS bloqueando ese origen. **Lección:** incluir SIEMPRE apex + www; nunca lanzar error (500) en la función `origin` de `cors` (rechazá con `cb(null,false)`).
+
+### Lección registrada — login en PRODUCCIÓN por preflight CORS colgado en la red del cliente (1 jul 2026)
+
+**Síntoma:** en `mundoceldiaz.com` el login mostraba "Sin conexión al servidor" — pero solo desde la red del usuario (desde `curl`/servidor funcionaba).
+**Diagnóstico (F12 → Network en la PC del usuario):** la petición `login` (Preflight/OPTIONS) quedaba en **pending** para siempre y el XHR se **cancelaba a los 10s** (timeout de axios). El API respondía perfecto por `curl` (login/health ~1s, CORS correcto). **Causa raíz:** algunas redes/ISP **cuelgan la petición preflight (OPTIONS) cross-origin** hacia `*.up.railway.app`. `curl` no hace preflight, por eso desde afuera nunca se reproducía.
+**Fix (frontend PR #193 → staging, #194 → main):** el frontend ahora llama al API por **su propio dominio** (`/api`) y **Vercel lo reenvía a Railway** (`rewrites` en `vercel.json`; cada rama a SU Railway — staging→e546, main→prod). Al ser **mismo-origen, el navegador NO hace preflight** → nada que se cuelgue. **Sin cambios en el servidor.** `resolveApiUrl()` devuelve `/api` en prod/staging (local sigue directo a `:4000`).
+**Verificado en vivo:** `mundoceldiaz.com/health` → 769 registros (base de prod); `staging.vercel.app/health` → 168 (base de staging) → aislamiento intacto.
+**Lección:** si el login falla "sin conexión" SOLO en ciertas redes pero el API responde por `curl` → sospechar **preflight bloqueado**; la solución robusta es servir el API por el mismo dominio (proxy de Vercel), no depender de CORS cross-origin. Diagnóstico definitivo: `F12 → Network` → ver si el `Preflight` queda en `pending`.
+
+---
+
+## 🔥 Protocolo de HOTFIX "en caliente" (arreglo directo a producción)
+
+Lo normal es **rama → `staging` (piloto) → validar → PR `staging → main`**. El hotfix en caliente es la **excepción** para cuando producción está **caída/rota para usuarios reales** y esperar el ciclo empeora las cosas.
+
+**Cuándo SÍ:** producción rota (login caído, cobros que fallan, algo que impide operar).
+**Cuándo NO:** features nuevas, mejoras, rediseños → esos SIEMPRE por piloto.
+
+**Pasos (en orden, los que se siguieron el 1 jul):**
+1. **Diagnosticar con evidencia, no adivinar** — reproducir, `curl`, `F12 → Network`.
+2. **Cambio mínimo y enfocado** — nada de refactors en caliente.
+3. **Verificar antes de mergear** — build local + tests + **CI verde**.
+4. **Probar el mecanismo aparte si se puede** (ej. por `curl` en piloto/preview) antes de tocar prod.
+5. **Mergear a `main` → esperar deploy → VERIFICAR en vivo** por `curl` que quedó bien **y aislado** (que no se mezclaron datos de ambientes).
+6. **Confirmar con el usuario** que funciona.
+7. **Registrar la lección** aquí (regla #9).
+8. **Llevar el MISMO cambio a `staging`** para que piloto y prod queden idénticos (invariante de paridad).
+
+**Reglas de oro que NO se rompen ni en caliente:** no tocar env vars ni BD sin aprobación explícita; no romper el aislamiento piloto/producción; el cambio siempre reversible.
+
+> **Nota (1 jul 2026):** el usuario aclaró que históricamente probaba directo en producción (no en piloto). De ahora en más, guiarlo a validar en el **piloto** primero salvo urgencias "en caliente" como esta.
+
 ---
 
 ## Repos GitHub
