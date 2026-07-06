@@ -16,6 +16,10 @@ var FEATURES = [
   { ic: '💵', title: 'Caja y Arqueo',         desc: 'Control de caja chica, ingresos y egresos con cierre formal imprimible.' },
   { ic: '🔄', title: 'Devoluciones',          desc: 'Procesa devoluciones con registro de motivo, condición del producto y reembolso.' },
   { ic: '📋', title: 'Auditoría',             desc: 'Registro completo de cada acción del sistema: quién, cuándo y qué módulo.' },
+  { ic: '📱', title: 'Seriales e IMEI',       desc: 'Control de equipos por número de serie o IMEI, con validación automática y trazabilidad por unidad.' },
+  { ic: '☁️', title: 'Respaldos automáticos', desc: 'Copia de seguridad diaria de todos tus datos en la nube, con descarga en un clic.' },
+  { ic: '🔔', title: 'Alertas inteligentes',  desc: 'Notificaciones automáticas de cuentas vencidas, garantías por vencer y reparaciones pendientes.' },
+  { ic: '🧾', title: 'Boletas con QR',        desc: 'Cada comprobante lleva un código QR que tu cliente escanea para verificar su autenticidad.' },
 ];
 
 var PLANES = [
@@ -101,7 +105,7 @@ export default function LandingPage({ onLogin }) {
   var _statsRef = useVisible(0.2); var statsRef = _statsRef[0]; var statsVisible = _statsRef[1];
 
   // Contadores animados
-  var cModulos  = useCounter(11, 1200, statsVisible);
+  var cModulos  = useCounter(15, 1200, statsVisible);
   var cNegocios = useCounter(50, 1500, statsVisible);
   var cUptime   = useCounter(99, 1800, statsVisible);
 
@@ -164,6 +168,19 @@ export default function LandingPage({ onLogin }) {
           from { width: 0; }
           to   { width: 100%; }
         }
+        @keyframes float3d {
+          0%, 100% { transform: perspective(1100px) rotateY(-8deg) rotateX(4deg) translateY(0px); }
+          50%      { transform: perspective(1100px) rotateY(-5deg) rotateX(2deg) translateY(-12px); }
+        }
+        @keyframes orb-drift {
+          0%, 100% { transform: translate(0px, 0px) scale(1); }
+          33%      { transform: translate(26px, -18px) scale(1.08); }
+          66%      { transform: translate(-18px, 14px) scale(0.94); }
+        }
+        @keyframes icon-spin3d {
+          0%   { transform: rotateY(0deg); }
+          100% { transform: rotateY(360deg); }
+        }
 
         .hero-word {
           background: linear-gradient(90deg, #1D9E75, #00d4a0, #1D9E75);
@@ -182,12 +199,13 @@ export default function LandingPage({ onLogin }) {
           cursor: default;
         }
         .feat-card:hover {
-          transform: translateY(-6px);
-          box-shadow: 0 16px 40px rgba(29,158,117,0.13);
-          border-color: rgba(29,158,117,0.35);
+          transform: perspective(900px) rotateX(5deg) rotateY(-5deg) translateY(-8px) scale(1.02);
+          box-shadow: 0 24px 48px rgba(29,158,117,0.16), 0 4px 12px rgba(0,0,0,0.05);
+          border-color: rgba(29,158,117,0.4);
         }
         .feat-card:hover .feat-icon {
-          animation: float 2s ease-in-out infinite;
+          animation: icon-spin3d 0.9s ease both;
+          display: inline-block;
         }
 
         .plan-card {
@@ -196,8 +214,8 @@ export default function LandingPage({ onLogin }) {
           transition: transform 0.25s ease, box-shadow 0.25s ease;
         }
         .plan-card:hover {
-          transform: translateY(-8px);
-          box-shadow: 0 20px 50px rgba(0,0,0,0.12);
+          transform: perspective(1000px) rotateX(3deg) translateY(-10px) !important;
+          box-shadow: 0 28px 60px rgba(0,0,0,0.14);
         }
 
         .testi-card {
@@ -208,8 +226,27 @@ export default function LandingPage({ onLogin }) {
           transition: transform 0.25s ease, box-shadow 0.25s ease;
         }
         .testi-card:hover {
-          transform: translateY(-4px);
-          box-shadow: 0 12px 32px rgba(0,0,0,0.09);
+          transform: perspective(900px) rotateX(3deg) rotateY(2deg) translateY(-6px);
+          box-shadow: 0 18px 40px rgba(0,0,0,0.11);
+        }
+
+        .mock-3d {
+          animation: float3d 7s ease-in-out infinite;
+          transform-style: preserve-3d;
+          will-change: transform;
+        }
+        .mock-3d:hover { animation-play-state: paused; }
+
+        .orb {
+          position: absolute;
+          border-radius: 50%;
+          filter: blur(60px);
+          pointer-events: none;
+          animation: orb-drift 11s ease-in-out infinite;
+        }
+
+        @media (prefers-reduced-motion: reduce) {
+          *, *::before, *::after { animation: none !important; transition: none !important; }
         }
 
         .btn-primary {
@@ -361,6 +398,10 @@ export default function LandingPage({ onLogin }) {
         {/* Fondo decorativo */}
         <div style={{ position: 'absolute', top: '-30%', right: '-10%', width: '60%', height: '160%', background: 'radial-gradient(ellipse, rgba(29,158,117,0.12) 0%, transparent 65%)', pointerEvents: 'none' }} />
         <div style={{ position: 'absolute', bottom: '-20%', left: '-5%', width: '40%', height: '100%', background: 'radial-gradient(ellipse, rgba(29,158,117,0.07) 0%, transparent 65%)', pointerEvents: 'none' }} />
+        {/* Orbes 3D animados */}
+        <div className="orb" style={{ top: '12%', left: '8%', width: 220, height: 220, background: 'rgba(29,158,117,0.22)' }} />
+        <div className="orb" style={{ bottom: '8%', right: '14%', width: 280, height: 280, background: 'rgba(0,196,140,0.14)', animationDelay: '-4s' }} />
+        <div className="orb" style={{ top: '55%', left: '42%', width: 160, height: 160, background: 'rgba(139,92,246,0.12)', animationDelay: '-7s' }} />
 
         <div style={{ maxWidth: 1140, margin: '0 auto', display: 'flex', alignItems: 'center', gap: 48, flexWrap: 'wrap' }}>
           {/* Texto hero */}
@@ -434,7 +475,8 @@ export default function LandingPage({ onLogin }) {
             padding: '20px 18px',
             backdropFilter: 'blur(8px)',
             boxShadow: '0 24px 60px rgba(0,0,0,0.3), inset 0 1px 0 rgba(255,255,255,0.08)',
-            animation: heroReady ? 'fadeUp 0.8s 0.25s ease both' : 'none',
+            animation: heroReady ? 'fadeUp 0.8s 0.25s ease both, float3d 7s ease-in-out 1.3s infinite' : 'none',
+            willChange: 'transform',
           }}>
             {/* Header del mock */}
             <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 18, paddingBottom: 14, borderBottom: '1px solid rgba(255,255,255,0.1)' }}>
@@ -579,7 +621,7 @@ function FeaturesSection({ features, scrollTo }) {
             Todo lo que necesitás en un solo lugar
           </h2>
           <p style={{ fontSize: 16, color: '#666', margin: 0, maxWidth: 500, marginLeft: 'auto', marginRight: 'auto', lineHeight: 1.65 }}>
-            11 módulos integrados que trabajan juntos para que vos solo te preocupés de vender.
+            15 módulos integrados que trabajan juntos para que vos solo te preocupés de vender.
           </p>
         </div>
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill,minmax(240px,1fr))', gap: 18 }}>
