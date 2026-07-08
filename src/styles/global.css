@@ -316,3 +316,28 @@ img, video { max-width: 100%; display: block; }
     overflow-x: auto;
   }
 }
+
+/* ── Ronda dinámica 2: transición entre pantallas + micro-interacciones ──
+   Solo presentación. El contenedor principal ya tiene key={view} y la clase
+   .screen-enter (el gancho existía sin animación definida). */
+@keyframes screenIn {
+  from { opacity: 0; transform: translateY(10px); }
+  to   { opacity: 1; transform: none; }
+}
+.screen-enter { animation: screenIn 0.28s ease both; }
+
+/* Botones que responden al toque (todo el sistema) */
+button:not(:disabled) { transition: transform 0.12s ease, filter 0.12s ease; }
+button:not(:disabled):hover  { filter: brightness(1.06); }
+button:not(:disabled):active { transform: scale(0.97); }
+
+/* Filas de tabla que se iluminan al pasar el cursor */
+tbody tr { transition: background-color 0.15s ease; }
+tbody tr:hover { background-color: rgba(29, 158, 117, 0.06); }
+
+/* Accesibilidad: respetar "reducir movimiento" */
+@media (prefers-reduced-motion: reduce) {
+  .screen-enter { animation: none; }
+  button:not(:disabled), tbody tr { transition: none; }
+  button:not(:disabled):active { transform: none; }
+}
