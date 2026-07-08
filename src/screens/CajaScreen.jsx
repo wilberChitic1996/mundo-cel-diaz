@@ -103,13 +103,22 @@ export default function CajaScreen({ sales, accounts, returns: devos, session, o
 
   // ── Construir lista de movimientos del día ─────────────────────────────────
   var hoyStr = new Date().toDateString();
+  // Ventana de movimientos: si hay sesión ABIERTA, desde su apertura (coincide
+  // con cómo el servidor calcula el arqueo al cerrar). Sin sesión: día de hoy.
+  // Antes se mezclaban ambas ventanas: una caja abierta a las 8pm "perdía" sus
+  // ventas a medianoche pero conservaba los gastos → faltantes fantasma.
+  var desdeSesion = (sesionActiva && sesionActiva.created_at) ? new Date(sesionActiva.created_at) : null;
+  function enVentana(d) {
+    var t = new Date(d);
+    return desdeSesion ? (t >= desdeSesion) : (t.toDateString() === hoyStr);
+  }
   var movimientos = [];
 
   // Ventas cobradas hoy — solo la PORCIÓN pagada en efectivo.
   // Pago dividido: si hay second_method, al método principal le corresponde
   // (total − second_amount) y al segundo método second_amount.
   sales.forEach(function(s) {
-    if (new Date(s.date).toDateString() !== hoyStr || s.status !== 'completado') return;
+    if (!enVentana(s.date) || s.status !== 'completado') return;
     var seg = Number(s.second_amount || 0);
     var efectivo = 0;
     if (s.method === 'Efectivo') efectivo += s.total - (s.second_method ? seg : 0);
@@ -122,7 +131,7 @@ export default function CajaScreen({ sales, accounts, returns: devos, session, o
   // Abonos en efectivo a cuentas por cobrar
   accounts.forEach(function(a) {
     (a.payments || []).forEach(function(p) {
-      if (p.method === 'Efectivo' && new Date(p.date).toDateString() === hoyStr) {
+      if (p.method === 'Efectivo' && enVentana(p.date)) {
         movimientos.push({ id: p.id, date: p.date, desc: 'Abono cuenta', detail: a.client, amount: Number(p.amount), type: 'entrada', note: p.note || '' });
       }
     });
@@ -130,7 +139,7 @@ export default function CajaScreen({ sales, accounts, returns: devos, session, o
 
   // Reembolsos en efectivo de devoluciones
   devos.forEach(function(r) {
-    if (r.refundMethod === 'Efectivo' && r.refundAmount > 0 && new Date(r.date).toDateString() === hoyStr) {
+    if (r.refundMethod === 'Efectivo' && r.refundAmount > 0 && enVentana(r.date)) {
       movimientos.push({ id: r.id, date: r.date, desc: 'Reembolso devolución', detail: r.client, amount: r.refundAmount, type: 'salida', note: r.reason });
     }
   });
@@ -223,7 +232,10 @@ export default function CajaScreen({ sales, accounts, returns: devos, session, o
     var si        = getStore();
     var storeName = si.store_name || STORE_FALLBACK;
     var contado   = s.efectivo_contado != null ? Number(s.efectivo_contado) : null;
-    var diferencia = contado != null ? contado - saldoEsperado : null;
+    // Preferir las cifras PERSISTIDAS por el servidor (son las oficiales del
+    // arqueo); el cálculo local queda solo como respaldo.
+    var esperadoSrv = s.total_efectivo != null ? Number(s.total_efectivo) : saldoEsperado;
+    var diferencia  = s.diferencia != null ? Number(s.diferencia) : (contado != null ? contado - esperadoSrv : null);
 
     var ventasEfectivo = movimientos.filter(function(m) { return m.type === 'entrada' && m.desc === 'Venta'; }).reduce(function(a, m) { return a + m.amount; }, 0);
     var abonosEfectivo = movimientos.filter(function(m) { return m.type === 'entrada' && m.desc === 'Abono cuenta'; }).reduce(function(a, m) { return a + m.amount; }, 0);
@@ -259,7 +271,7 @@ export default function CajaScreen({ sales, accounts, returns: devos, session, o
         + '<div class="row"><span>Abonos en efectivo</span><span>Q ' + abonosEfectivo.toFixed(2) + '</span></div>'
         + '<div class="row neg"><span>Reembolsos</span><span>−Q ' + reembolsosEf.toFixed(2) + '</span></div>'
         + '<div class="row neg"><span>Gastos de caja</span><span>−Q ' + totalGastos.toFixed(2) + '</span></div>'
-        + '<div class="row total"><span>Saldo esperado</span><span>Q ' + saldoEsperado.toFixed(2) + '</span></div>'
+        + '<div class="row total"><span>Saldo esperado</span><span>Q ' + esperadoSrv.toFixed(2) + '</span></div>'
         + (contado != null ? '<div class="row"><span>Efectivo contado</span><span>Q ' + contado.toFixed(2) + '</span></div>' : '')
         + (diferencia != null ? '<div class="row ' + (diferencia >= 0 ? 'pos' : 'neg') + '"><span>Diferencia (sobrante/faltante)</span><span>' + (diferencia >= 0 ? '+' : '') + 'Q ' + diferencia.toFixed(2) + '</span></div>' : '')
       + '</div>'

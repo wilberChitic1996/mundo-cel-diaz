@@ -235,7 +235,10 @@ export default function CuadresScreen({ sales, accounts, returns, products, repa
   periodSales.forEach(function(s) {
     (s.items || []).forEach(function(it) {
       var prod   = products.find(function(p) { return p.id === it.id || p.code === it.code; });
-      var cost   = prod && prod.cost > 0 ? prod.cost : 0;
+      // Sin costo cargado no se puede medir rentabilidad real: excluir del ranking
+      // (antes aparecía como 100% ganancia y distorsionaba el top).
+      if (!prod || !(prod.cost > 0)) return;
+      var cost   = prod.cost;
       var profit = (Number(it.price || 0) - cost) * Number(it.qty || 0);
       if (!profitMap[it.name]) profitMap[it.name] = { name: it.name, qty: 0, revenue: 0, profit: 0 };
       profitMap[it.name].qty     += Number(it.qty || 0);
