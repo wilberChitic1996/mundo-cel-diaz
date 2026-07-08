@@ -1175,12 +1175,15 @@ function App(props) {
       return c.concat([{id:p.id,code:p.code,name:p.name,price:p.price,shelf:p.shelf,unit:p.unit,qty:1,maxStock:p.stock}]);
     });
   }
-  function changeQty(id,d){ setCart(function(c){return c.map(function(i){return i.id===id?Object.assign({},i,{qty:Math.max(1,Math.min(i.qty+d,i.maxStock))}):i;});}); }
-  function removeFromCart(id){ setCart(function(c){return c.filter(function(i){return i.id!==id;});}); }
+  // Identidad de LÍNEA del carrito: con seriales/IMEI puede haber varias líneas
+  // del mismo producto (mismo id); la clave de línea es el serial si existe.
+  function lineKey(i){ return i.serial_id||i.id; }
+  function changeQty(key,d){ setCart(function(c){return c.map(function(i){return lineKey(i)===key?Object.assign({},i,{qty:Math.max(1,Math.min(i.qty+d,i.maxStock))}):i;});}); }
+  function removeFromCart(key){ setCart(function(c){return c.filter(function(i){return lineKey(i)!==key;});}); }
 
-  function applyDiscount(itemId, newPrice){
+  function applyDiscount(itemKey, newPrice){
     setCart(function(c){return c.map(function(i){
-      if(i.id!==itemId) return i;
+      if(lineKey(i)!==itemKey) return i;
       var orig=i.originalPrice||i.price;
       return Object.assign({},i,{
         price:newPrice,
@@ -1221,7 +1224,7 @@ function App(props) {
     var items=cart.map(function(i){return {id:i.id,code:i.code,name:i.name,price:i.price,qty:i.qty,shelf:i.shelf,originalPrice:i.originalPrice||null,discountBy:i.discountBy||null,discountByRole:i.discountByRole||null,discountAt:i.discountAt||null};});
     var registradoPor={userId:session.userId,name:session.name,role:session.role};
     var nota=saleNote.trim()||null;
-    function deduct(){ setProducts(function(p){return p.map(function(x){var ci=cart.find(function(i){return i.id===x.id;});return ci&&x.unit!=="serv"?Object.assign({},x,{stock:x.stock-ci.qty}):x;}); }); }
+    function deduct(){ setProducts(function(p){return p.map(function(x){ if(x.unit==="serv")return x; var q=cart.reduce(function(acc,i){return i.id===x.id?acc+i.qty:acc;},0); return q>0?Object.assign({},x,{stock:x.stock-q}):x; }); }); }
     if(!idemRef.current) idemRef.current=gid()+"-"+Date.now();
     var idempotencyKey=idemRef.current;
     if(payType==="completo"){
