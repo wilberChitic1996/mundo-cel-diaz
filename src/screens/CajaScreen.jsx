@@ -105,10 +105,17 @@ export default function CajaScreen({ sales, accounts, returns: devos, session, o
   var hoyStr = new Date().toDateString();
   var movimientos = [];
 
-  // Ventas en efectivo cobradas hoy
+  // Ventas cobradas hoy — solo la PORCIÓN pagada en efectivo.
+  // Pago dividido: si hay second_method, al método principal le corresponde
+  // (total − second_amount) y al segundo método second_amount.
   sales.forEach(function(s) {
-    if (s.method === 'Efectivo' && new Date(s.date).toDateString() === hoyStr && s.status === 'completado') {
-      movimientos.push({ id: s.id, date: s.date, desc: 'Venta', detail: s.client, amount: s.total, type: 'entrada', note: s.nota || '' });
+    if (new Date(s.date).toDateString() !== hoyStr || s.status !== 'completado') return;
+    var seg = Number(s.second_amount || 0);
+    var efectivo = 0;
+    if (s.method === 'Efectivo') efectivo += s.total - (s.second_method ? seg : 0);
+    if (s.second_method === 'Efectivo') efectivo += seg;
+    if (efectivo > 0) {
+      movimientos.push({ id: s.id, date: s.date, desc: 'Venta', detail: s.client, amount: efectivo, type: 'entrada', note: s.second_method ? 'Pago dividido (solo porción en efectivo)' : (s.nota || '') });
     }
   });
 

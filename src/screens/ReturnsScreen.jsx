@@ -183,7 +183,10 @@ export default function ReturnsScreen({ returns, products, clients, sales, onPro
     var valid = form.items.filter(function(it) { return it.name.trim() && it.qty > 0; });
     if (!valid.length) { setErr('Agregá al menos un producto válido'); return; }
     if (!form.reason.trim()) { setErr('Indicá el motivo'); return; }
-    var refAmt = form.refundMethod === 'Sin reembolso' ? 0 : (parseFloat(form.refundAmount) || itemsTotal);
+    // Monto de reembolso: vacío/no numérico → valor de los artículos; "0" explícito
+    // vale 0; nunca negativo; topado al valor de los artículos devueltos.
+    var _ra = parseFloat(form.refundAmount);
+    var refAmt = form.refundMethod === 'Sin reembolso' ? 0 : (isNaN(_ra) ? itemsTotal : Math.max(0, Math.min(_ra, itemsTotal)));
     onProcess({
       clientId:      form.clientId || null,
       client:        form.client.trim() || 'Cliente general',

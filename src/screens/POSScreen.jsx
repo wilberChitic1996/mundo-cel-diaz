@@ -130,6 +130,13 @@ export default function POSScreen({
   function applyDiscountLocal(itemId) {
     var newPrice = parseFloat(discountVal);
     if (!newPrice || newPrice <= 0) { setDiscountItemId(null); setDiscountVal(''); return; }
+    // Un "descuento" no puede SUBIR el precio por encima del de lista
+    var _it = cart.find(function(c) { return c.id === itemId; });
+    var _orig = _it ? Number(_it.originalPrice || _it.price) : null;
+    if (_orig !== null && newPrice > _orig) {
+      alert('El nuevo precio (' + newPrice + ') no puede ser mayor al precio de lista (' + _orig + ')');
+      return;
+    }
     applyDiscount(itemId, newPrice);
     setDiscountItemId(null);
     setDiscountVal('');
@@ -423,7 +430,7 @@ export default function POSScreen({
             {payType === 'parcial' && (
               <div style={{ marginBottom: 10 }}>
                 <label style={sLabel}>Abono inicial (Q)</label>
-                <input type="number" style={sInput} value={initialPay} placeholder={'Máx: ' + cartTotal.toFixed(2)} onChange={function(e) { setInitialPay(e.target.value); }} />
+                <input type="number" min="0" style={sInput} value={initialPay} placeholder={'Máx: ' + cartTotal.toFixed(2)} onChange={function(e) { var v=e.target.value; if(parseFloat(v)<0) v='0'; setInitialPay(v); }} />
                 {initPaidVal > 0 && <div style={{ marginTop: 5, fontSize: 13, fontWeight: 500, color: '#E24B4A' }}>Saldo: {Q(Math.max(0, cartTotal - initPaidVal))}</div>}
               </div>
             )}

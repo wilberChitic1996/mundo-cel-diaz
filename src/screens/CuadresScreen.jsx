@@ -145,8 +145,16 @@ export default function CuadresScreen({ sales, accounts, returns, products, repa
   // Ingresos por método de pago (ventas cobradas)
   var byMethod = { Efectivo: 0, Tarjeta: 0, Transferencia: 0 };
   periodSales.forEach(function(s) {
-    if (byMethod[s.method] !== undefined) byMethod[s.method] += s.total;
-    else byMethod['Transferencia'] += s.total;
+    // Pago dividido: repartir entre los dos métodos (antes se sumaba todo al primero)
+    var seg = Number(s.second_amount || 0);
+    var m1 = byMethod[s.method] !== undefined ? s.method : 'Transferencia';
+    if (s.second_method && seg > 0) {
+      var m2 = byMethod[s.second_method] !== undefined ? s.second_method : 'Transferencia';
+      byMethod[m1] += s.total - seg;
+      byMethod[m2] += seg;
+    } else {
+      byMethod[m1] += s.total;
+    }
   });
 
   // Abonos recibidos en el período (de cuentas por cobrar), desglosados por método
