@@ -1992,7 +1992,14 @@ function App(props) {
         {postSale&&(
           <div style={{position:"fixed",inset:0,zIndex:9500,background:"rgba(20,30,45,0.55)",display:"flex",alignItems:"center",justifyContent:"center",padding:16}} onClick={function(){setPostSale(null);}}>
             <div style={{background:"#fff",borderRadius:14,padding:24,maxWidth:380,width:"100%",boxShadow:"0 12px 40px rgba(0,0,0,0.25)"}} onClick={function(e){e.stopPropagation();}}>
-              <div style={{textAlign:"center",marginBottom:6,fontSize:34}}>🧾</div>
+              {/* Checkmark de exito animado (solo visual) */}
+              <style dangerouslySetInnerHTML={{__html:`
+                @keyframes ok-pop { 0% { transform: scale(0); opacity: 0; } 60% { transform: scale(1.15); } 100% { transform: scale(1); opacity: 1; } }
+                @keyframes ok-ring { 0% { box-shadow: 0 0 0 0 rgba(29,158,117,0.45); } 100% { box-shadow: 0 0 0 18px rgba(29,158,117,0); } }
+                .ok-badge { width: 56px; height: 56px; border-radius: 50%; background: linear-gradient(135deg,#1D9E75,#00c48c); color: #fff; font-size: 30px; font-weight: 900; display: flex; align-items: center; justify-content: center; margin: 0 auto 10px; animation: ok-pop 0.45s cubic-bezier(0.34,1.56,0.64,1) both, ok-ring 0.9s 0.25s ease-out both; }
+                @media (prefers-reduced-motion: reduce) { .ok-badge { animation: none; } }
+              `}} />
+              <div className="ok-badge">✓</div>
               <p style={{textAlign:"center",fontWeight:800,fontSize:17,margin:"0 0 4px",color:"#1a2535"}}>{(function(){var _dt=postSale.opts&&postSale.opts.docType; return _dt==="abono"?"Abono registrado":_dt==="devolucion"?"Devolución registrada":"Venta registrada";})()}</p>
               <p style={{textAlign:"center",fontSize:13,color:"#777",margin:"0 0 18px"}}>{Q(postSale.sale.total)} · {postSale.sale.client||"Cliente ocasional"}<br/>¿Entregar comprobante al cliente?</p>
               <div style={{display:"grid",gap:8}}>
@@ -2033,7 +2040,7 @@ function App(props) {
         <Sidebar view={view} setView={setView} cartCount={cart.length} pendingCount={pendingAccs.length} products={products} sales={sales} session={session} onLogout={onLogout} isOnline={isOnline} theme={theme} toggleTheme={toggleTheme} sidebarOpen={sidebarOpen} setSidebarOpen={setSidebarOpen} onSearch={function(){setGsOpen(true);}} storeInfo={storeInfo}/>
         {gsOpen&&<GlobalSearch onClose={function(){setGsOpen(false);}} setView={setView} sales={sales} clients={clients} products={products} repairs={repairs} setSelectedSale={setSelSale}/>}
         <div key={view} style={{flex:1,padding:"clamp(12px,3vw,28px)",overflowY:"auto",minWidth:0}} className="main-content screen-enter">
-          {view==="dashboard"&&canAccess(session.role,"dashboard")&&<DashboardScreen sales={sales} todaySales={todaySales} pendingAccs={pendingAccs} totalPend={totalPend} products={products} top5={top5} setSelectedSale={setSelSale} setView={setView} navTo={navTo} accounts={accounts} returns={returns} repairs={repairs} warranties={warranties}/>}
+          {view==="dashboard"&&canAccess(session.role,"dashboard")&&<DashboardScreen sales={sales} todaySales={todaySales} pendingAccs={pendingAccs} totalPend={totalPend} products={products} top5={top5} setSelectedSale={setSelSale} setView={setView} navTo={navTo} accounts={accounts} returns={returns} repairs={repairs} warranties={warranties} loaded={loaded}/>}
           {view==="pos"      &&canAccess(session.role,"pos")&&<POSScreen products={products} filteredPOS={filteredPOS} cart={cart} posQ={posQ} setPosQ={setPosQ} payMethod={payMethod} setPayMethod={setPayMethod} secondMethod={secondMethod} setSecondMethod={setSecondMethod} secondAmount={secondAmount} setSecondAmount={setSecondAmount} payType={payType} setPayType={setPayType} cashIn={cashIn} setCashIn={setCashIn} initialPay={initialPay} setInitialPay={setInitialPay} clientName={clientName} setClientName={setClientName} selectedClientId={selectedClientId} setSelectedClientId={setSelectedClientId} saleNote={saleNote} setSaleNote={setSaleNote} cartTotal={cartTotal} vuelto={vuelto} initPaidVal={initPaidVal} addToCart={addToCart} changeQty={changeQty} removeFromCart={removeFromCart} applyDiscount={applyDiscount} checkout={checkout} resetPOS={resetPOS} flash={flash} clients={clients} accounts={accounts} ivaPercent={ivaPercent} ivaAmount={ivaAmount} subtotalNeto={subtotalNeto}/>}
           {view==="caja"     &&canAccess(session.role,"caja")&&<CajaScreen sales={sales} accounts={accounts} returns={returns} session={session} onBackup={function(){ backupAPI.create().catch(function(){}); }}/>}
           {view==="accounts" &&canAccess(session.role,"accounts")&&<AccountsScreen accounts={accounts} pendingAccs={pendingAccs} totalPend={totalPend} addPayment={addPayment} showFlash={showFlash} products={products} session={session} clients={clients} navTo={navTo} initialSearch={view==="accounts"&&deepLink?deepLink.search||'':''}/>}
