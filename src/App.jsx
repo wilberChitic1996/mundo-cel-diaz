@@ -1200,20 +1200,30 @@ function App(props) {
   var subtotalNeto=cartTotal-ivaAmount;
   var initPaidVal=parseFloat(initialPay)||0;
 
-  function resetPOS(){ setCart([]);setCashIn("");setClientName("");setInitialPay("");setPayType("completo");setPayMethod("Efectivo");setSecondMethod("");setSecondAmount("");setSelectedClientId(null);setSaleNote("");setCobrandoRepId(null); }
+  function resetPOS(){ setCart([]);setCashIn("");setClientName("");setInitialPay("");setPayType("completo");setPayMethod("Efectivo");setSecondMethod("");setSecondAmount("");setSelectedClientId(null);setSaleNote("");setCobrandoRepId(null); idemRef.current=null; }
 
   var checkoutInProgress=useRef(false);
+  // Llave anti-duplicado del cobro: se genera UNA vez por carrito y se reusa en
+  // los reintentos (si la primera venta sí entró pero la respuesta se perdió,
+  // el reintento con la MISMA llave no duplica). Se limpia en resetPOS().
+  var idemRef=useRef(null);
   async function checkout(){
     if(!cart.length)return;
     if(!clientName.trim()){showFlash("El nombre del cliente es obligatorio","err");return;}
     if(checkoutInProgress.current)return;
+    // Pago dividido: el segundo monto debe ser mayor a 0 y menor al total
+    if(secondMethod){
+      var _segVal=parseFloat(secondAmount);
+      if(!isFinite(_segVal)||_segVal<=0||_segVal>=cartTotal){showFlash("El monto del segundo método debe ser mayor a 0 y menor al total","err");return;}
+    }
     checkoutInProgress.current=true;
     var client=clientName.trim();
     var items=cart.map(function(i){return {id:i.id,code:i.code,name:i.name,price:i.price,qty:i.qty,shelf:i.shelf,originalPrice:i.originalPrice||null,discountBy:i.discountBy||null,discountByRole:i.discountByRole||null,discountAt:i.discountAt||null};});
     var registradoPor={userId:session.userId,name:session.name,role:session.role};
     var nota=saleNote.trim()||null;
     function deduct(){ setProducts(function(p){return p.map(function(x){var ci=cart.find(function(i){return i.id===x.id;});return ci&&x.unit!=="serv"?Object.assign({},x,{stock:x.stock-ci.qty}):x;}); }); }
-    var idempotencyKey=gid()+"-"+Date.now();
+    if(!idemRef.current) idemRef.current=gid()+"-"+Date.now();
+    var idempotencyKey=idemRef.current;
     if(payType==="completo"){
       var _createdSale=null;
       try {
@@ -1234,7 +1244,7 @@ function App(props) {
         setPostSale({sale:_rsale,opts:{usuario:session.name,usuarioRole:session.role}});
       }
     } else {
-      var paid=payType==="parcial"?Math.min(initPaidVal,cartTotal):0;
+      var paid=payType==="parcial"?Math.max(0,Math.min(initPaidVal,cartTotal)):0;
       var balance=cartTotal-paid;
       var _createdAcc=null;
       try{
