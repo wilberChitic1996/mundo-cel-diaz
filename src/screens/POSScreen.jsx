@@ -131,7 +131,7 @@ export default function POSScreen({
     var newPrice = parseFloat(discountVal);
     if (!newPrice || newPrice <= 0) { setDiscountItemId(null); setDiscountVal(''); return; }
     // Un "descuento" no puede SUBIR el precio por encima del de lista
-    var _it = cart.find(function(c) { return c.id === itemId; });
+    var _it = cart.find(function(c) { return (c.serial_id || c.id) === itemId; });
     var _orig = _it ? Number(_it.originalPrice || _it.price) : null;
     if (_orig !== null && newPrice > _orig) {
       alert('El nuevo precio (' + newPrice + ') no puede ser mayor al precio de lista (' + _orig + ')');
@@ -270,10 +270,10 @@ export default function POSScreen({
               </div>
             : <div style={{ flex: 1, overflowY: 'auto', marginBottom: 14 }}>
                 {cart.map(function(item) {
-                  var isEditing  = discountItemId === item.id;
+                  var isEditing  = discountItemId === (item.serial_id || item.id);
                   var hasDiscount = item.originalPrice && item.price < item.originalPrice;
                   return (
-                    <div key={item.id} style={{ padding: '10px 0', borderBottom: '1px solid rgba(0,0,0,0.07)' }}>
+                    <div key={item.serial_id || item.id} style={{ padding: '10px 0', borderBottom: '1px solid rgba(0,0,0,0.07)' }}>
                       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 8 }}>
                         <div style={{ flex: 1, marginRight: 8 }}>
                           <div style={{ fontSize: 13, fontWeight: 600, lineHeight: 1.3 }}>{item.name}</div>
@@ -281,15 +281,15 @@ export default function POSScreen({
                           {item.imei && <div style={{ fontSize: 10, color: '#1D9E75', fontFamily: 'monospace', marginTop: 2 }}>IMEI: {item.imei}</div>}
                           {hasDiscount && <div style={{ fontSize: 10, color: '#E65100', marginTop: 2 }}>Desc. auto. por: {item.discountBy || 'usuario'}</div>}
                         </div>
-                        <span style={{ cursor: 'pointer', color: '#E24B4A', fontSize: 18, lineHeight: 1, flexShrink: 0 }} onClick={function() { removeFromCart(item.id); }}>×</span>
+                        <span style={{ cursor: 'pointer', color: '#E24B4A', fontSize: 18, lineHeight: 1, flexShrink: 0 }} onClick={function() { removeFromCart(item.serial_id || item.id); }}>×</span>
                       </div>
 
                       {/* Controles de cantidad y precio */}
                       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
                         <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                          <div style={sQB} onClick={function() { changeQty(item.id, -1); }}>−</div>
+                          <div style={sQB} onClick={function() { changeQty(item.serial_id || item.id, -1); }}>−</div>
                           <span style={{ fontSize: 14, fontWeight: 600, minWidth: 22, textAlign: 'center' }}>{item.qty}</span>
-                          <div style={sQB} onClick={function() { changeQty(item.id, 1); }}>+</div>
+                          <div style={sQB} onClick={function() { changeQty(item.serial_id || item.id, 1); }}>+</div>
                         </div>
                         <div style={{ textAlign: 'right' }}>
                           {hasDiscount && <div style={{ fontSize: 10, color: '#999', textDecoration: 'line-through' }}>{Q(item.originalPrice * item.qty)}</div>}
@@ -301,7 +301,7 @@ export default function POSScreen({
                       {!isEditing ? (
                         <div style={{ marginTop: 6, textAlign: 'right' }}>
                           <span
-                            onClick={function() { setDiscountItemId(item.id); setDiscountVal(item.price.toFixed(2)); }}
+                            onClick={function() { setDiscountItemId(item.serial_id || item.id); setDiscountVal(item.price.toFixed(2)); }}
                             style={{ fontSize: 10, color: '#E65100', cursor: 'pointer', textDecoration: 'underline' }}
                           >
                             {hasDiscount ? 'Editar descuento' : '% Aplicar descuento'}
@@ -318,14 +318,14 @@ export default function POSScreen({
                               placeholder="Nuevo precio Q"
                               onChange={function(e) { setDiscountVal(e.target.value); }}
                               onKeyDown={function(e) {
-                                if (e.key === 'Enter') applyDiscountLocal(item.id);
+                                if (e.key === 'Enter') applyDiscountLocal(item.serial_id || item.id);
                                 if (e.key === 'Escape') { setDiscountItemId(null); setDiscountVal(''); }
                               }}
                               autoFocus
                             />
                           </div>
                           <div style={{ display: 'flex', gap: 4, marginTop: 14 }}>
-                            <button style={Object.assign({}, mkBtn('teal'), { padding: '4px 8px', fontSize: 11 })} onClick={function() { applyDiscountLocal(item.id); }}>✓</button>
+                            <button style={Object.assign({}, mkBtn('teal'), { padding: '4px 8px', fontSize: 11 })} onClick={function() { applyDiscountLocal(item.serial_id || item.id); }}>✓</button>
                             <button style={Object.assign({}, mkBtn('gray'), { padding: '4px 8px', fontSize: 11 })} onClick={function() { setDiscountItemId(null); setDiscountVal(''); }}>✕</button>
                           </div>
                         </div>
