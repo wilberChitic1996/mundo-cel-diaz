@@ -16,7 +16,7 @@ import { migrationAPI } from '../utils/api.js';
 import { Q, fmtD } from '../utils/formatters.js';
 import { TEAL, sCard, sInput, sLabel, sTH, sTD, H1, mkBtn, mkBadge } from '../styles/theme.js';
 
-var EMPTY = { client: '', total: '', paid: '', date: '', note: '' };
+var EMPTY = { client: '', phone: '', total: '', paid: '', date: '', note: '' };
 
 // Valida una fila y devuelve {ok, error} — mismo criterio que el servidor.
 function validaFila(r) {
@@ -58,8 +58,8 @@ export default function MigracionScreen(props) {
   // ── Plantilla e importación Excel ──
   function descargarPlantilla() {
     var ws = XLSX.utils.aoa_to_sheet([
-      ['Cliente', 'Total', 'Ya abono', 'Desde (AAAA-MM-DD)', 'Nota / Que llevo'],
-      ['Juan Pérez', 350, 100, '2026-03-15', 'Pantalla Samsung A32'],
+      ['Cliente', 'Telefono', 'Total', 'Ya abono', 'Desde (AAAA-MM-DD)', 'Nota / Que llevo'],
+      ['Juan Pérez', '5555-5555', 350, 100, '2026-03-15', 'Pantalla Samsung A32'],
     ]);
     var wb = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(wb, ws, 'Deudas');
@@ -78,7 +78,7 @@ export default function MigracionScreen(props) {
         for (var i = 1; i < rows.length; i++) { // fila 0 = encabezados
           var r = rows[i] || [];
           if (!r.length || r.every(function (c) { return c == null || String(c).trim() === ''; })) continue;
-          var fila = { client: String(r[0] || '').trim(), total: String(r[1] || '').replace(/[Qq,\s]/g, ''), paid: String(r[2] || '0').replace(/[Qq,\s]/g, '') || '0', date: String(r[3] || '').trim(), note: String(r[4] || '').trim() };
+          var fila = { client: String(r[0] || '').trim(), phone: String(r[1] || '').trim(), total: String(r[2] || '').replace(/[Qq,\s]/g, ''), paid: String(r[3] || '0').replace(/[Qq,\s]/g, '') || '0', date: String(r[4] || '').trim(), note: String(r[5] || '').trim() };
           var v = validaFila(fila);
           if (v.ok) nuevas.push(fila); else malas.push({ fila: i + 1, cliente: fila.client || '(sin nombre)', motivo: v.error });
         }
@@ -102,10 +102,10 @@ export default function MigracionScreen(props) {
     setBusy(true);
     try {
       var debts = staged.map(function (r) {
-        return { client: r.client.trim(), total: Number(r.total), paid: Number(r.paid) || 0, date: r.date || undefined, note: r.note || undefined };
+        return { client: r.client.trim(), phone: r.phone || undefined, total: Number(r.total), paid: Number(r.paid) || 0, date: r.date || undefined, note: r.note || undefined };
       });
       var res = await migrationAPI.loadDebts(debts);
-      showFlash('✓ Cargadas ' + res.created + ' deuda(s) — saldo ' + Q(res.totalDebt) + '. Ya aparecen en Cuentas.', 'ok');
+      showFlash('✓ Cargadas ' + res.created + ' deuda(s) — saldo ' + Q(res.totalDebt) + (res.clientsCreated ? ' · ' + res.clientsCreated + ' cliente(s) nuevos creados' : '') + '. Ya aparecen en Cuentas.', 'ok');
       setStaged([]); setOmitidas([]);
       loadBatches();
       onChanged();
@@ -135,7 +135,7 @@ export default function MigracionScreen(props) {
       <h1 style={H1}>📒 Pasar mi cuaderno</h1>
       <p style={{ color: 'var(--tx2)', marginTop: -6, fontSize: 13 }}>
         Cargá las deudas viejas del cuaderno como <b>saldo inicial</b>. No tocan caja, inventario ni ventas del día —
-        solo aparecen en <b>Cuentas por Cobrar</b> con la etiqueta 📒. Cada carga se puede <b>deshacer completa</b>.
+        solo aparecen en <b>Cuentas por Cobrar</b> con la etiqueta 📒 y <b>enlazadas al cliente</b> (si no existe, se crea solo). Cada carga se puede <b>deshacer completa</b>.
       </p>
 
       {/* ── Paso 1: agregar deudas ── */}
@@ -143,6 +143,7 @@ export default function MigracionScreen(props) {
         <h3 style={{ margin: '0 0 10px' }}>1️⃣ Agregar deudas</h3>
         <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', alignItems: 'flex-end' }}>
           <div><label style={sLabel}>Cliente *</label><input style={sInput} value={form.client} onChange={setF('client')} placeholder="Nombre del cliente" /></div>
+          <div><label style={sLabel}>Teléfono</label><input style={Object.assign({}, sInput, { width: 110 })} value={form.phone} onChange={setF('phone')} placeholder="5555-5555" /></div>
           <div><label style={sLabel}>Total Q *</label><input style={Object.assign({}, sInput, { width: 90 })} type="number" min="0" value={form.total} onChange={setF('total')} placeholder="0.00" /></div>
           <div><label style={sLabel}>Ya abonó Q</label><input style={Object.assign({}, sInput, { width: 90 })} type="number" min="0" value={form.paid} onChange={setF('paid')} placeholder="0.00" /></div>
           <div><label style={sLabel}>Desde</label><input style={Object.assign({}, sInput, { width: 140 })} type="date" value={form.date} onChange={setF('date')} /></div>
@@ -168,7 +169,7 @@ export default function MigracionScreen(props) {
           <div style={{ overflowX: 'auto' }}>
             <table style={{ width: '100%', borderCollapse: 'collapse' }}>
               <thead><tr>
-                <th style={sTH}>Cliente</th><th style={sTH}>Total</th><th style={sTH}>Ya abonó</th><th style={sTH}>Saldo</th><th style={sTH}>Desde</th><th style={sTH}>Nota</th><th style={sTH}></th>
+                <th style={sTH}>Cliente</th><th style={sTH}>Teléfono</th><th style={sTH}>Total</th><th style={sTH}>Ya abonó</th><th style={sTH}>Saldo</th><th style={sTH}>Desde</th><th style={sTH}>Nota</th><th style={sTH}></th>
               </tr></thead>
               <tbody>
                 {staged.map(function (r, i) {
@@ -176,6 +177,7 @@ export default function MigracionScreen(props) {
                   return (
                     <tr key={i}>
                       <td style={sTD}>{r.client}</td>
+                      <td style={sTD}>{r.phone || '—'}</td>
                       <td style={sTD}>{Q(Number(r.total))}</td>
                       <td style={sTD}>{Q(Number(r.paid) || 0)}</td>
                       <td style={Object.assign({}, sTD, { fontWeight: 700 })}>{Q(saldo)}</td>
