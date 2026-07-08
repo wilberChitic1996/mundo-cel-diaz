@@ -238,6 +238,13 @@ export const serialsAPI = {
   search:  function(q)                 { return api.get('/serials/serials/search?q=' + encodeURIComponent(q)); },
 };
 
+// Migración del cuaderno (deudas históricas) — solo admin. Ver MigracionScreen.jsx.
+export const migrationAPI = {
+  loadDebts: function(debts)   { return api.post('/migration/debts', { debts: debts }); },
+  batches:   function()        { return api.get('/migration/batches'); },
+  undoBatch: function(batchId) { return api.delete('/migration/debts/' + batchId); },
+};
+
 export const checkAPI = async function() {
   try {
     var baseUrl = API_URL.replace('/api', '');
