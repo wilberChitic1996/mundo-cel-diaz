@@ -31,13 +31,28 @@ function validaFila(r) {
 export default function MigracionScreen(props) {
   var onChanged = props.onChanged || function () {};
   var showFlash = props.showFlash || function () {};
+  var clients = props.clients || [];
 
   var [staged, setStaged] = useState([]);       // filas listas para previsualizar
   var [omitidas, setOmitidas] = useState([]);   // filas del Excel que se saltaron (con motivo)
   var [form, setForm] = useState(EMPTY);
   var [batches, setBatches] = useState([]);
   var [busy, setBusy] = useState(false);
+  var [showDrop, setShowDrop] = useState(false); // buscador de clientes (mismo patrón del POS)
   var fileRef = useRef(null);
+
+  // Coincidencia por nombre normalizado — mismo criterio que usa el servidor para enlazar.
+  function normName(n) { return String(n || '').trim().toLowerCase().replace(/\s+/g, ' '); }
+  function findCliente(name) {
+    var k = normName(name);
+    return k ? clients.find(function (c) { return normName(c.name) === k; }) : null;
+  }
+  var cliQ = form.client;
+  var cliResults = cliQ.trim().length > 0 ? clients.filter(function (c) {
+    var q = normName(cliQ);
+    return normName(c.name).includes(q) || String(c.cliCode || '').toLowerCase().includes(q) || String(c.phone || '').includes(cliQ.trim());
+  }).slice(0, 8) : [];
+  var cliMatch = findCliente(form.client);
 
   function loadBatches() {
     migrationAPI.batches().then(function (b) { setBatches(b || []); }).catch(function () {});
@@ -142,7 +157,33 @@ export default function MigracionScreen(props) {
       <div style={Object.assign({}, sCard, { marginBottom: 14 })}>
         <h3 style={{ margin: '0 0 10px' }}>1️⃣ Agregar deudas</h3>
         <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', alignItems: 'flex-end' }}>
-          <div><label style={sLabel}>Cliente *</label><input style={sInput} value={form.client} onChange={setF('client')} placeholder="Nombre del cliente" /></div>
+          <div style={{ position: 'relative', minWidth: 220 }}>
+            <label style={sLabel}>Cliente *</label>
+            <input style={sInput} value={form.client} onChange={function (e) { setF('client')(e); setShowDrop(true); }}
+              onFocus={function () { setShowDrop(true); }} onBlur={function () { setTimeout(function () { setShowDrop(false); }, 200); }}
+              placeholder="Buscar cliente o escribir uno nuevo..." />
+            {showDrop && cliQ.trim().length > 0 && (
+              <div style={{ position: 'absolute', top: '100%', left: 0, right: 0, background: '#fff', border: '1px solid rgba(0,0,0,0.15)', borderRadius: 8, boxShadow: '0 4px 16px rgba(0,0,0,0.12)', zIndex: 100, maxHeight: 200, overflowY: 'auto', marginTop: 2 }}>
+                {cliResults.map(function (c) {
+                  return (
+                    <div key={c.id} onMouseDown={function () { setForm(function (f) { return Object.assign({}, f, { client: c.name, phone: c.phone || f.phone }); }); setShowDrop(false); }}
+                      style={{ padding: '9px 12px', cursor: 'pointer', borderBottom: '1px solid rgba(0,0,0,0.06)' }}>
+                      <div style={{ fontSize: 13, fontWeight: 600 }}>{c.name}</div>
+                      <div style={{ fontSize: 11, color: '#999', fontFamily: 'monospace' }}>{c.cliCode}{c.phone ? ' · ' + c.phone : ''}</div>
+                    </div>
+                  );
+                })}
+                {cliResults.length === 0 && (
+                  <div style={{ padding: '9px 12px', fontSize: 12, color: '#999' }}>No existe "{cliQ}" — se creará como cliente nuevo 🆕</div>
+                )}
+              </div>
+            )}
+            {cliQ.trim().length > 0 && (
+              <div style={{ fontSize: 11, marginTop: 3, color: cliMatch ? '#0F6E56' : '#8a6d1a' }}>
+                {cliMatch ? '✓ Cliente existente (' + (cliMatch.cliCode || 'ficha') + ') — la deuda irá a su perfil' : '🆕 Cliente nuevo — se creará al cargar'}
+              </div>
+            )}
+          </div>
           <div><label style={sLabel}>Teléfono</label><input style={Object.assign({}, sInput, { width: 110 })} value={form.phone} onChange={setF('phone')} placeholder="5555-5555" /></div>
           <div><label style={sLabel}>Total Q *</label><input style={Object.assign({}, sInput, { width: 90 })} type="number" min="0" value={form.total} onChange={setF('total')} placeholder="0.00" /></div>
           <div><label style={sLabel}>Ya abonó Q</label><input style={Object.assign({}, sInput, { width: 90 })} type="number" min="0" value={form.paid} onChange={setF('paid')} placeholder="0.00" /></div>
@@ -169,7 +210,7 @@ export default function MigracionScreen(props) {
           <div style={{ overflowX: 'auto' }}>
             <table style={{ width: '100%', borderCollapse: 'collapse' }}>
               <thead><tr>
-                <th style={sTH}>Cliente</th><th style={sTH}>Teléfono</th><th style={sTH}>Total</th><th style={sTH}>Ya abonó</th><th style={sTH}>Saldo</th><th style={sTH}>Desde</th><th style={sTH}>Nota</th><th style={sTH}></th>
+                <th style={sTH}>Cliente</th><th style={sTH}>Ficha</th><th style={sTH}>Teléfono</th><th style={sTH}>Total</th><th style={sTH}>Ya abonó</th><th style={sTH}>Saldo</th><th style={sTH}>Desde</th><th style={sTH}>Nota</th><th style={sTH}></th>
               </tr></thead>
               <tbody>
                 {staged.map(function (r, i) {
@@ -177,6 +218,7 @@ export default function MigracionScreen(props) {
                   return (
                     <tr key={i}>
                       <td style={sTD}>{r.client}</td>
+                      <td style={sTD}>{findCliente(r.client) ? <span style={mkBadge('green')}>✓ existente</span> : <span style={mkBadge('amber')}>🆕 nuevo</span>}</td>
                       <td style={sTD}>{r.phone || '—'}</td>
                       <td style={sTD}>{Q(Number(r.total))}</td>
                       <td style={sTD}>{Q(Number(r.paid) || 0)}</td>
