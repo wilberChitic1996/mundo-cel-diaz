@@ -17,7 +17,7 @@ export const STORE_FALLBACK = 'Mi Negocio';
 // añadí su ID aquí en los roles que correspondan.
 export const PERMS = {
   superadmin: ['superadmin'],
-  admin:      ['dashboard','pos','caja','accounts','returns','defective','products','catalogos','inventory','history','backup','users','clients','repairs','cuadres','audit','warranties','storeconfig','suppliers','ayuda'],
+  admin:      ['dashboard','pos','caja','accounts','returns','defective','products','catalogos','inventory','history','backup','users','clients','repairs','cuadres','audit','warranties','storeconfig','suppliers','ayuda','migracion'],
   cajero:     ['dashboard','pos','caja','accounts','returns','history','clients','repairs','warranties','ayuda'],
   auditor:    ['dashboard','caja','history','inventory','cuadres','ayuda'],
 };
