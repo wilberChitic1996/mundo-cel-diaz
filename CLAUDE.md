@@ -952,30 +952,22 @@ El backend ya quedó **preparado y dormido** para FEL y cobro recurrente (no afe
 - [ ] **Blue/Green Deploy:** Deploy sin downtime
 - [ ] **OpenTelemetry:** Trazabilidad frontend → API → BD
 - [ ] **Disaster Recovery:** Plan documentado de recuperación ante fallos
+- [ ] **🛒 Carga de productos estilo supermercado (idea del usuario, 6 jul 2026):** hoy los productos se ingresan a mano uno por uno; el usuario quiere el modelo de los software de supermercado/ventas ya establecidos — escanear el **código de barras** y que el producto se autocomplete desde un **catálogo maestro** (nombre, marca, presentación), quedando solo poner precio y stock. Requiere analizar: lector de código de barras (la búsqueda del POS ya lo soporta), catálogo base de productos GT, y flujo de alta rápida. El usuario evalúa si esto va aquí o en otro software aparte — discutir alcance antes de diseñar.
 - [ ] **Importación masiva de clientes:** Excel con saldo inicial para migración desde papel
 - [ ] **Importación masiva de reparaciones/garantías:** Para clientes que migran desde otro sistema
 - [x] **📘 Manual técnico completo (`docs/MANUAL-TECNICO.md`):** ✅ **HECHO (29 jun 2026)** — enciclopedia del software con las 10 secciones acordadas, construida explorando ambos repos a fondo (rutas reales, 25 pantallas, endpoints por archivo, divergencias de esquema, flujos end-to-end, funciones ocultas, runbook). Mantener sincronizado cuando cambien rutas/pantallas/esquema.
-- [ ] **IVA en boleta de reparación:** mostrar desglose IVA igual que la venta normal del POS (ver Próximos pasos #2).
+- [x] **IVA en boleta de reparación:** ✅ HECHO (vía builder unificado E3 — el cobro de reparación pasa por el POS y `printVoucher` ya desglosa IVA).
 
-> **Pendientes de UX detectados en piloto + BARRIDO EXHAUSTIVO (29 jun 2026) — PREEXISTENTES (no son regresiones; el frontend viejo aún está vivo). Evaluados en TODO el software. Resolver en una ronda de frontend (agrupar por disciplina Vercel, regla #8):**
+> **Pendientes de UX (29 jun) — AUDITORÍA 6 JUL 2026: casi todo ya estaba RESUELTO en rondas anteriores (builder unificado "E3"). Verificado en código con líneas citadas; se cierran los ítems y quedan solo los 2 que faltaban (hechos hoy):**
 >
-> **(1) Falta desglose de IVA en comprobantes** — solo `buildReceiptHTML` (venta/cuenta/abono por WhatsApp) lo muestra; el resto NO:
-- [ ] `utils/receipt.js` → `printVoucher()` (boleta formal/PDF que usa Historial): sin desglose IVA → afecta **ventas impresas, reparaciones cobradas, cuentas y devoluciones**.
-- [ ] `screens/SuppliersScreen.jsx` → `printCompra()`: comprobante de compra sin línea de IVA.
-- [ ] `screens/ReturnsScreen.jsx`: boleta de devolución (vía printVoucher) sin IVA.
-- [ ] **Inconsistencia:** el abono por WhatsApp (buildReceiptHTML) SÍ trae IVA pero el impreso (printVoucher) NO → unificar.
+> **(1) IVA en comprobantes — ✅ RESUELTO:** `printVoucher` desglosa Subtotal/IVA/Total (`receipt.js:240-321`); `printCompra` muestra Base + IVA crédito (`SuppliersScreen.jsx:52-94`); devoluciones vía printVoucher heredan el desglose. Consistente con buildReceiptHTML.
 >
-> **(2) Flujos que NO ofrecen opciones de comprobante** (Imprimir/PDF · Descargar · WhatsApp) tras la operación, como sí hace el POS:
-- [ ] `screens/AccountsScreen.jsx` → `registrarPago()` (abono/cuota): el recibo solo queda en Historial.
-- [ ] `screens/RepairsScreen.jsx` → cobro de reparación.
-- [ ] `screens/SuppliersScreen.jsx` → `savePurchase()` (compra).
-- [ ] `screens/ReturnsScreen.jsx` → procesar devolución.
+> **(2) Opciones de comprobante tras operación — ✅ RESUELTO (modal post-operación compartido en `App.jsx:1992-2005`):** abonos (`docType:'abono'`), devoluciones (`docType:'devolucion'`), cobro de reparación (vía POS). **Compras: HECHO 6 jul** — `savePurchase` ahora ofrece imprimir el comprobante al guardar (además del 🖨 del historial).
 >
-> **(3) Listas que no refrescan el estado en vivo tras mutar** (hay que recargar):
-- [ ] `screens/AccountsScreen.jsx`: saldo no se actualiza tras abono parcial (sí tras pago total).
-- [ ] `screens/InventoryScreen.jsx` / `CajaScreen.jsx` / `ProductsScreen.jsx` / `RepairsScreen.jsx`: re-fetch tras compra/gasto/edición/cambio de estado.
+> **(3) Refresh en vivo tras mutar — ✅ RESUELTO:** abonos re-fetchean cuentas (`App.jsx:1269-1274`); compras refrescan productos (`onStockUpdate`); caja/productos/reparaciones actualizan estado u ofrecen `reloadRepairs()`; Inventario refleja el estado del padre.
 >
-> **(4) Deuda de arquitectura de comprobantes (raíz de (1) y (2)):** existen **3 builders de boleta** casi duplicados (`utils/receipt.js:buildReceiptHTML`, `utils/receipt.js:printVoucher`, y una tercera copia en `App.jsx`). El bug de IVA está replicado en las 3. **Unificar en un solo builder paramétrico** resuelve IVA + consistencia de una vez. (También: el QR depende de un CDN sin fallback — endurecer.)
+> **(4) Builders de boleta — ✅ UNIFICADO (E3)** y QR ya es local (sin CDN, PR #166).
+- [x] **Instructivo de instalación de la app (iPhone/Android) en Ayuda:** ✅ HECHO (6 jul) — sección "📲 Instalar la app en tu teléfono" visible para todos los roles, con pasos Android/iPhone y tips (permiso de accesos directos, duplicados, Safari).
 - [ ] **Limpiar columnas duplicadas en `repairs`:** el ALTER del 28 jun dejó duplicados (`issue`+`problem_desc`, `price`+`estimated_cost`, `technician`+`tech_name`, `notes`+`internal_note`). Unificar a las canónicas y migrar datos/código. Ver `docs/DB-SCHEMA-REAL.md`. Baja prioridad (no rompe nada hoy).
 - [ ] **Unificar tipos de `id` entre ambientes (migración mayor):** producción usa `text` y staging usa `uuid` en `clients.id`, `repairs.id`, y los `*_id` relacionados (`accounts.client_id`, `sales.client_id`, `repairs.client_id`, `repair_items.repair_id`). El API tolera ambos hoy (por eso funcionan). Igualar requiere decidir un modelo canónico + migración con respaldo y reconstrucción de FKs. NO migrar a ciegas (un ALTER TYPE fallaría con datos no-uuid en prod). Baja prioridad.
 - [ ] **Limpiar tablas de respaldo temporales** cuando ya no se necesiten: `products_backup_20260628` (prod), `products_backup_staging_20260628` y `products_backup_staging_pretrim` (staging).

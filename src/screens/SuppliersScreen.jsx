@@ -256,6 +256,10 @@ export default function SuppliersScreen({ products, session, showFlash, onStockU
         onStockUpdate();
         showFlash('✓ Compra registrada y stock actualizado', 'ok');
         setShowPurchModal(false); setSaving(false);
+        // Ofrecer el comprobante al momento (igual queda el botón 🖨 en el historial)
+        if (window.confirm('Compra registrada.\n\n¿Imprimir el comprobante de la compra ahora?')) {
+          printCompra(p);
+        }
       })
       .catch(function(e) {
         setSaving(false);

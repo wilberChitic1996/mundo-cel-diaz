@@ -18,6 +18,19 @@ import { APP_NAME } from '../constants/index.js';
 // Secciones del manual con pasos y consejos por módulo
 var SECCIONES = [
   {
+    id: 'instalar', ic: '📲', titulo: 'Instalar la app en tu teléfono',
+    pasos: [
+      "En ANDROID: abrí el sitio en Chrome, tocá el menú ⋮ (arriba a la derecha) y elegí 'Instalar aplicación'. El ícono puede tardar unos segundos en aparecer — buscalo también en el cajón de aplicaciones (deslizando hacia arriba).",
+      "En iPHONE: abrí el sitio en Safari, tocá el botón Compartir (el cuadrito con la flecha ↑, abajo al centro), deslizá hacia abajo y tocá 'Añadir a pantalla de inicio' y luego 'Añadir'. En iPhone NO aparece un botón 'Instalar' — así funciona Apple; este es el camino oficial.",
+      "Listo: la app queda con su ícono y abre a pantalla completa, como cualquier aplicación.",
+    ],
+    tips: [
+      "Si en Android no aparece el ícono, revisá que Chrome tenga permiso de 'crear accesos directos' (Ajustes → Aplicaciones → Chrome → Permisos).",
+      "Si instalaste dos veces y hay íconos duplicados, mantené presionado uno y tocá 'Quitar/Desinstalar'.",
+      "En iPhone usá Safari — otros navegadores en iPhone no siempre ofrecen la opción.",
+    ],
+  },
+  {
     id: 'pos', ic: '🛒', titulo: 'Nueva Venta (Punto de Venta)',
     pasos: [
       "Tocá '🛒 Nueva Venta' en el menú lateral.",
@@ -130,8 +143,8 @@ var SECCIONES = [
 
 // Qué secciones puede ver cada rol
 var ROL_SECCIONES = {
-  cajero:  ['pos', 'cuentas', 'reparaciones', 'clientes', 'caja'],
-  auditor: ['cuadres', 'respaldo'],
+  cajero:  ['instalar', 'pos', 'cuentas', 'reparaciones', 'clientes', 'caja'],
+  auditor: ['instalar', 'cuadres', 'respaldo'],
 };
 
 // Estilos reutilizables dentro de esta pantalla
