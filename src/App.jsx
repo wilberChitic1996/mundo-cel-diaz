@@ -1029,6 +1029,16 @@ function App(props) {
         var normalDefs  = (defs||[]).map(function(d){return Object.assign({},d,{price:Number(d.price||0)});});
         var normalClis  = (clis||[]).map(function(c){return Object.assign({},c,{cliCode:c.cli_code,createdAt:c.created_at});});
         var normalReps  = (reps||[]).map(function(r){return Object.assign({},r,{repCode:r.rep_code,clientId:r.client_id,clientName:r.client_name,clientPhone:r.client_phone,clientCli:r.client_cli,problemDesc:r.problem_desc,techName:r.tech_name,estimatedCost:Number(r.estimated_cost||0),promisedDate:r.promised_date,internalNote:r.internal_note,registradoPor:r.registrado_por||{},parts:r.parts||[],createdAt:r.created_at,finalCost:r.final_cost!=null?Number(r.final_cost):null,receptionChecklist:r.reception_checklist||null,receptionPhotos:r.reception_photos||[],deliveryPhotos:r.delivery_photos||[]});});
+        // Modo consulta sin internet (v1): snapshot LOCAL (localStorage) del
+        // catálogo y clientes para poder CONSULTAR si se cae la conexión.
+        // No toca la base de datos; si el almacenamiento está lleno, se ignora.
+        try {
+          localStorage.setItem('mnpos-offline-cache', JSON.stringify({
+            savedAt: new Date().toISOString(),
+            products: normalProds,
+            clients: normalClis,
+          }));
+        } catch(_e) { /* cuota llena o storage no disponible — sin snapshot */ }
         setProducts(normalProds);
         setSales(normalSales);
         setAccounts(normalAccs);
@@ -1039,7 +1049,22 @@ function App(props) {
         setWarranties((wars||[]).map(function(w){return Object.assign({},w,{entityType:w.entity_type,entityId:w.entity_id,startDate:w.start_date,endDate:w.end_date,createdBy:w.created_by});}));
       } catch(e) {
         console.error("Error cargando datos del servidor:", e);
-        showFlash("⚠️ Error al conectar con el servidor. Verifica tu conexión e intenta recargar la página.","err");
+        // Modo consulta sin internet (v1): si hay snapshot local, mostrar el
+        // catálogo/clientes de la última sincronización en vez de pantalla vacía.
+        var _hydrated = false;
+        try {
+          var _snap = JSON.parse(localStorage.getItem('mnpos-offline-cache') || 'null');
+          if (_snap && _snap.products && _snap.products.length) {
+            setProducts(_snap.products);
+            setClients(_snap.clients || []);
+            _hydrated = true;
+            var _when = _snap.savedAt ? new Date(_snap.savedAt).toLocaleString('es-GT') : '';
+            showFlash("📴 Sin conexión — mostrando datos de la última sincronización" + (_when ? " (" + _when + ")" : "") + ". No se pueden registrar operaciones hasta reconectar.", "warn");
+          }
+        } catch(_e) { /* snapshot corrupto o ausente */ }
+        if (!_hydrated) {
+          showFlash("⚠️ Error al conectar con el servidor. Verifica tu conexión e intenta recargar la página.","err");
+        }
       }
       setLoaded(true);
     }
@@ -1214,6 +1239,11 @@ function App(props) {
     if(!cart.length)return;
     if(!clientName.trim()){showFlash("El nombre del cliente es obligatorio","err");return;}
     if(checkoutInProgress.current)return;
+    // Sin internet: avisar de inmediato en vez de esperar el timeout (30s)
+    if(typeof navigator!=="undefined" && navigator.onLine===false){
+      showFlash("📴 Sin internet — no se puede cobrar hasta reconectar. El catálogo mostrado es de la última sincronización.","err");
+      return;
+    }
     // Pago dividido: el segundo monto debe ser mayor a 0 y menor al total
     if(secondMethod){
       var _segVal=parseFloat(secondAmount);
