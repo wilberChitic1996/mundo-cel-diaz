@@ -45,7 +45,7 @@
 //   setView        {Function} — (pantalla) — navega a otra pantalla
 // ══════════════════════════════════════════════════════════════════════════════
 
-import React, { useState } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import {
   AreaChart, Area,
   BarChart, Bar,
@@ -77,12 +77,49 @@ var BARRA_COLORES = [TEAL, '#378ADD', '#7C4DFF', '#E65100', '#F59E0B'];
 
 var H1 = { fontSize: 'clamp(17px,4vw,22px)', fontWeight: 600, margin: '0 0 16px', color: 'var(--text-primary,#1a1a1a)' };
 
-// ── Componente de métrica simple ────────────────────────────────────────────
-function MetricBox({ label, value, color }) {
+// ── Hook: número que "cuenta" hacia su valor (solo visual, no toca datos) ───
+function useCountUp(target, ms) {
+  var _s = useState(target);
+  var shown = _s[0]; var setShown = _s[1];
+  var prevRef = useRef(0);
+  useEffect(function() {
+    var from = prevRef.current;
+    var to = Number(target) || 0;
+    prevRef.current = to;
+    if (from === to) { setShown(to); return; }
+    var t0 = null; var raf;
+    function tick(ts) {
+      if (t0 === null) t0 = ts;
+      var p = Math.min(1, (ts - t0) / (ms || 900));
+      var ease = 1 - Math.pow(1 - p, 3); // ease-out
+      setShown(from + (to - from) * ease);
+      if (p < 1) raf = requestAnimationFrame(tick);
+    }
+    raf = requestAnimationFrame(tick);
+    return function() { cancelAnimationFrame(raf); };
+  }, [target, ms]);
+  return shown;
+}
+
+// ── Componente de métrica simple (con contador animado opcional) ────────────
+function MetricBox({ label, value, color, num, fmt }) {
+  // Si viene `num`, el valor mostrado "cuenta" hacia el número (fmt lo formatea).
+  var animated = useCountUp(num !== undefined ? num : 0, 900);
+  var display = num !== undefined ? (fmt ? fmt(animated) : Math.round(animated)) : value;
   return (
     <div style={{ background: '#f5f4f0', borderRadius: 10, padding: 16, border: '1px solid rgba(0,0,0,0.07)' }}>
       <p style={{ fontSize: 12, color: '#666', margin: '0 0 6px' }}>{label}</p>
-      <p style={{ fontSize: 22, fontWeight: 600, margin: 0, color: color || '#1a1a1a' }}>{value}</p>
+      <p style={{ fontSize: 22, fontWeight: 600, margin: 0, color: color || '#1a1a1a' }}>{display}</p>
+    </div>
+  );
+}
+
+// ── Skeleton: placeholder animado mientras cargan los datos (solo visual) ───
+function SkelBox() {
+  return (
+    <div style={{ background: '#f5f4f0', borderRadius: 10, padding: 16, border: '1px solid rgba(0,0,0,0.07)' }}>
+      <div className="skel-pulse" style={{ height: 12, width: '55%', borderRadius: 6, marginBottom: 10 }} />
+      <div className="skel-pulse" style={{ height: 22, width: '75%', borderRadius: 6 }} />
     </div>
   );
 }
@@ -117,9 +154,10 @@ function TooltipPie(p) {
 export default function DashboardScreen({
   sales, todaySales, accounts, pendingAccs, totalPend,
   products, top5, returns: devos, repairs, warranties,
-  setSelectedSale, setView, navTo,
+  setSelectedSale, setView, navTo, loaded,
 }) {
   navTo = navTo || function(s) { setView(s); };
+  if (loaded === undefined) loaded = true; // retrocompatible: sin prop, se comporta como antes
   sales       = sales       || [];
   todaySales  = todaySales  || [];
   accounts    = accounts    || [];
@@ -272,13 +310,26 @@ export default function DashboardScreen({
         </div>
       )}
 
-      {/* KPIs principales */}
-      <div className="rg-4" style={{ display: 'grid', gridTemplateColumns: 'repeat(4,1fr)', gap: 14, marginBottom: 16 }}>
-        <MetricBox label="Ventas hoy"     value={todaySales.length}            color={TEAL} />
-        <MetricBox label="Vendido hoy"    value={Q(totalVendido)}              color="#378ADD" />
-        <MetricBox label="Saldo caja hoy" value={Q(saldoCaja)}                 color={saldoCaja >= 0 ? TEAL : '#E24B4A'} />
-        <MetricBox label="Por cobrar"     value={Q(totalPend)}                 color="#E24B4A" />
-      </div>
+      {/* Animación de los skeletons (placeholders de carga) */}
+      <style dangerouslySetInnerHTML={{ __html: `
+        @keyframes skel-shine { 0% { opacity: 0.45; } 50% { opacity: 1; } 100% { opacity: 0.45; } }
+        .skel-pulse { background: #e2e0da; animation: skel-shine 1.3s ease-in-out infinite; }
+        @media (prefers-reduced-motion: reduce) { .skel-pulse { animation: none; } }
+      ` }} />
+
+      {/* KPIs principales — contadores animados; skeletons mientras carga */}
+      {!loaded ? (
+        <div className="rg-4" style={{ display: 'grid', gridTemplateColumns: 'repeat(4,1fr)', gap: 14, marginBottom: 16 }}>
+          <SkelBox /><SkelBox /><SkelBox /><SkelBox />
+        </div>
+      ) : (
+        <div className="rg-4" style={{ display: 'grid', gridTemplateColumns: 'repeat(4,1fr)', gap: 14, marginBottom: 16 }}>
+          <MetricBox label="Ventas hoy"     num={todaySales.length}                       color={TEAL} />
+          <MetricBox label="Vendido hoy"    num={totalVendido} fmt={Q}                    color="#378ADD" />
+          <MetricBox label="Saldo caja hoy" num={saldoCaja}    fmt={Q}                    color={saldoCaja >= 0 ? TEAL : '#E24B4A'} />
+          <MetricBox label="Por cobrar"     num={totalPend}    fmt={Q}                    color="#E24B4A" />
+        </div>
+      )}
 
       {/* Tarjetas de estado rápido */}
       <div className="rg-3" style={{ display: 'grid', gridTemplateColumns: 'repeat(3,1fr)', gap: 14, marginBottom: 16 }}>
