@@ -185,6 +185,7 @@ export default function AccountsScreen({ accounts, pendingAccs, totalPend, produ
               <span style={mkBadge(acc.status === 'pagado' ? 'green' : acc.status === 'parcial' ? 'amber' : 'red')}>
                 {acc.status === 'pagado' ? '✓ Pagado' : acc.status === 'parcial' ? 'Abono parcial' : 'Pendiente'}
               </span>
+              {acc.origin === 'migracion' && <span style={Object.assign({}, mkBadge('purple'), { marginLeft: 6 })}>📒 Del cuaderno</span>}
               <div style={{ marginTop: 10, fontSize: 13, color: '#666' }}>Total: <b>{Q(acc.total)}</b></div>
               <div style={{ fontSize: 13, color: TEAL }}>Pagado: <b>{Q(acc.paid)}</b></div>
               <div style={{ fontSize: 18, fontWeight: 700, color: acc.balance > 0 ? '#E24B4A' : TEAL }}>Saldo: {Q(acc.balance)}</div>
@@ -479,6 +480,7 @@ export default function AccountsScreen({ accounts, pendingAccs, totalPend, produ
                         <span style={mkBadge(a.status === 'pagado' ? 'green' : a.status === 'parcial' ? 'amber' : 'red')}>
                           {a.status === 'pagado' ? '✓ Pagado' : a.status === 'parcial' ? 'Abono parcial' : 'Pendiente'}
                         </span>
+                        {a.origin === 'migracion' && <span style={Object.assign({}, mkBadge('purple'), { marginLeft: 4 })}>📒</span>}
                       </td>
                       <td style={sTD}>
                         <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>

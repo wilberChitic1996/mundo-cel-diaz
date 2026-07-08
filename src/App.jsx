@@ -24,6 +24,7 @@ import InventoryScreen from './screens/InventoryScreen.jsx';
 import HistoryScreen   from './screens/HistoryScreen.jsx';
 import AyudaScreen     from './screens/AyudaScreen.jsx';
 import BackupScreen    from './screens/BackupScreen.jsx';
+import MigracionScreen from './screens/MigracionScreen.jsx';
 import ClientsScreen   from './screens/ClientsScreen.jsx';
 import WarrantiesScreen from './screens/WarrantiesScreen.jsx';
 import SuppliersScreen from './screens/SuppliersScreen.jsx';
@@ -218,7 +219,7 @@ var SESS_KEY = "mnpos-session-v1";
 
 var PERMS = {
   superadmin: ["superadmin"],
-  admin:      ["dashboard","pos","caja","accounts","returns","defective","products","catalogos","inventory","history","backup","users","clients","repairs","cuadres","audit","warranties","storeconfig","suppliers","ayuda"],
+  admin:      ["dashboard","pos","caja","accounts","returns","defective","products","catalogos","inventory","history","backup","users","clients","repairs","cuadres","audit","warranties","storeconfig","suppliers","ayuda","migracion"],
   cajero:     ["dashboard","pos","caja","accounts","returns","history","clients","repairs","warranties","ayuda"],
   auditor:    ["dashboard","caja","history","inventory","cuadres","ayuda"],
 };
@@ -736,6 +737,7 @@ function Sidebar(props) {
     {id:"cuadres",   ic:"📈", lb:"Cuadres"},
     {id:"audit",     ic:"🔍", lb:"Auditoría"},
     {id:"backup",    ic:"💾", lb:"Respaldo"},
+    {id:"migracion", ic:"📒", lb:"Pasar mi cuaderno"},
     {id:"users",       ic:"👥", lb:"Usuarios"},
     {id:"suppliers",   ic:"🏭", lb:"Proveedores"},
     {id:"storeconfig", ic:"⚙️", lb:"Mi Tienda"},
@@ -1177,6 +1179,14 @@ function App(props) {
   var _sn=useState(""); var saleNote=_sn[0]; var setSaleNote=_sn[1];
   var _crep=useState(null); var cobrandoRepId=_crep[0]; var setCobrandoRepId=_crep[1];
 
+  // Re-fetch de cuentas por cobrar (usado por el módulo de migración del cuaderno).
+  async function reloadAccounts(){
+    try{
+      var freshAccs = await accountsAPI.getAll();
+      var na=(freshAccs||[]).map(function(a){return Object.assign({},a,{items:a.account_items||[],payments:(a.account_payments||[]).map(function(_pp){return Object.assign({},_pp,{date:_pp.date||_pp.created_at,amount:Number(_pp.amount),registradoPor:_pp.registrado_por||_pp.registradoPor||null});}),total:Number(a.total),paid:Number(a.paid),balance:Number(a.balance),clientId:a.client_id,date:a.created_at,registradoPor:a.registrado_por||null});});
+      setAccounts(na);
+    }catch(_e){/* sin conexión: se refresca en la próxima carga */}
+  }
   function showFlash(msg,type){
     setFlash({msg:msg,type:type||"ok"});
     setTimeout(function(){setFlash({msg:"",type:"ok"});},4000);
@@ -2095,6 +2105,7 @@ function App(props) {
           {view==="history"  &&canAccess(session.role,"history")&&<HistoryScreen sales={sales} selectedSale={selSale} setSelectedSale={setSelSale} accounts={accounts} returns={returns} products={products} session={session} clients={clients} navTo={navTo}/>}
           {view==="cuadres"  &&canAccess(session.role,"cuadres")&&<CuadresScreen sales={sales} accounts={accounts} returns={returns} products={products} repairs={repairs} session={session} showFlash={showFlash}/>}
           {view==="backup"   &&canAccess(session.role,"backup")&&<BackupScreen products={products} sales={sales} accounts={accounts} returns={returns} defectives={defectives} clients={clients} repairs={repairs} warranties={warranties} onExportJSON={exportJSON} onExportExcel={exportExcel}/>}
+          {view==="migracion"&&canAccess(session.role,"migracion")&&<MigracionScreen session={session} showFlash={showFlash} onChanged={reloadAccounts}/>}
           {view==="users"    &&canAccess(session.role,"users")&&<UsersScreen session={session} showFlash={showFlash}/>}
           {view==="clients"  &&canAccess(session.role,"clients")&&<ClientsScreen clients={clients} sales={sales} accounts={accounts} returns={returns} saveClient={saveClient} session={session} showFlash={showFlash} initialSearch={view==="clients"&&deepLink?deepLink.search||'':''} initialClientId={view==="clients"&&deepLink?deepLink.clientId||null:null}/>}
           {view==="repairs"    &&canAccess(session.role,"repairs")&&<RepairsScreen repairs={repairs} clients={clients} products={products} saveRepair={saveRepair} updateRepairStatus={updateRepairStatus} reloadRepairs={reloadRepairs} onCobrar={cobrarReparacion} session={session} showFlash={showFlash} warranties={warranties} saveWarranty={saveWarranty} initialSearch={view==="repairs"&&deepLink?deepLink.search||'':''} initialRepairId={view==="repairs"&&deepLink?deepLink.repairId||null:null} navTo={navTo}/>}
