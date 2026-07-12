@@ -82,6 +82,9 @@ export default function CajaScreen({ sales, accounts, returns: devos, session, o
   // ── Modal cierre ──────────────────────────────────────────────────────────
   var _mc   = useState(false); var showCierre     = _mc[0];   var setShowCierre     = _mc[1];
   var _ec   = useState('');    var efectivoContado = _ec[0];  var setEfectivoContado = _ec[1];
+  // Desglose opcional de billetes/monedas del arqueo (se guarda en el servidor para el comprobante)
+  var _dg   = useState({});    var desglose        = _dg[0];  var setDesglose        = _dg[1];
+  var _sd2  = useState(false); var showDesglose    = _sd2[0]; var setShowDesglose    = _sd2[1];
   var _ncr  = useState('');    var notaCierre      = _ncr[0]; var setNotaCierre      = _ncr[1];
   var _sv   = useState(false); var guardando       = _sv[0];  var setGuardando       = _sv[1];
 
@@ -206,11 +209,24 @@ export default function CajaScreen({ sales, accounts, returns: devos, session, o
     });
   }
 
+  var DENOMS = [200, 100, 50, 20, 10, 5, 1, 0.5, 0.25];
+  function sumaDesglose(d) {
+    return DENOMS.reduce(function(t, den) { return t + den * (parseInt(d[String(den)]) || 0); }, 0);
+  }
+  function setDenom(den, val) {
+    setDesglose(function(prev) {
+      var n = Object.assign({}, prev); n[String(den)] = val;
+      setEfectivoContado(sumaDesglose(n).toFixed(2));
+      return n;
+    });
+  }
+
   function cerrarCaja() {
     if (!sesionActiva) return;
     setGuardando(true);
     cajaAPI.cerrar(sesionActiva.id, {
       efectivo_contado: efectivoContado === '' ? null : parseFloat(efectivoContado), // '0' ES un conteo (gaveta vacia), no 'sin contar'
+      efectivo_desglose: (function(){ var out={}; var any=false; DENOMS.forEach(function(den){ var c=parseInt(desglose[String(den)])||0; if(c>0){ out[String(den)]=c; any=true; } }); return any?out:null; })(),
       nota:             notaCierre,
     }).then(function(s) {
       imprimirCierreCaja(s);
@@ -219,6 +235,7 @@ export default function CajaScreen({ sales, accounts, returns: devos, session, o
       setGastos([]);
       setShowCierre(false);
       setEfectivoContado('');
+      setDesglose({}); setShowDesglose(false);
       setNotaCierre('');
       setGuardando(false);
       // Respaldo automático al cerrar caja
@@ -275,6 +292,7 @@ export default function CajaScreen({ sales, accounts, returns: devos, session, o
         + '<div class="row neg"><span>Gastos de caja</span><span>−Q ' + totalGastos.toFixed(2) + '</span></div>'
         + '<div class="row total"><span>Saldo esperado</span><span>Q ' + esperadoSrv.toFixed(2) + '</span></div>'
         + (contado != null ? '<div class="row"><span>Efectivo contado</span><span>Q ' + contado.toFixed(2) + '</span></div>' : '')
+        + (s.efectivo_desglose ? Object.keys(s.efectivo_desglose).sort(function(a,b){return Number(b)-Number(a);}).map(function(den){ return '<div class="row" style="font-size:11px;color:#666"><span>&nbsp;&nbsp;Q ' + den + ' × ' + s.efectivo_desglose[den] + '</span><span>Q ' + (Number(den)*Number(s.efectivo_desglose[den])).toFixed(2) + '</span></div>'; }).join('') : '')
         + (diferencia != null ? '<div class="row ' + (diferencia >= 0 ? 'pos' : 'neg') + '"><span>Diferencia (sobrante/faltante)</span><span>' + (diferencia >= 0 ? '+' : '') + 'Q ' + diferencia.toFixed(2) + '</span></div>' : '')
       + '</div>'
       + (gastos.length > 0
@@ -561,6 +579,26 @@ export default function CajaScreen({ sales, accounts, returns: devos, session, o
               value={efectivoContado}
               onChange={function(e) { setEfectivoContado(e.target.value); }}
             />
+            {/* Desglose opcional de billetes (autocompleta el contado) */}
+            <div style={{ marginTop: 8 }}>
+              <span style={{ fontSize: 13, color: '#1D9E75', cursor: 'pointer', fontWeight: 600 }} onClick={function() { setShowDesglose(!showDesglose); }}>
+                {showDesglose ? '▾ Ocultar conteo de billetes' : '▸ Contar billetes y monedas'}
+              </span>
+              {showDesglose && (
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 6, marginTop: 8 }}>
+                  {DENOMS.map(function(den) {
+                    return (
+                      <div key={den} style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+                        <span style={{ fontSize: 12, color: '#666', width: 44, textAlign: 'right' }}>Q {den}</span>
+                        <input type="number" min="0" step="1" placeholder="0" value={desglose[String(den)] || ''}
+                          style={Object.assign({}, sInput, { padding: '6px 8px', fontSize: 13 })}
+                          onChange={function(e) { setDenom(den, e.target.value); }} />
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
+            </div>
             {/* Indicador visual de diferencia */}
             {efectivoContado !== '' && (
               <div style={{ marginTop: 8, fontWeight: 700, fontSize: 14, color: parseFloat(efectivoContado) - saldoEsperado >= 0 ? '#2E7D32' : '#E24B4A' }}>
