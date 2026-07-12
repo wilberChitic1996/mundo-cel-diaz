@@ -131,7 +131,9 @@ export default function ReturnsScreen({ returns, products, clients, sales, onPro
     var items = (s.items || []).map(function(it) {
       var yaDevuelto = s.returnedQty[it.code] || 0;
       var restante   = it.qty - yaDevuelto;
-      return restante > 0 ? { code: it.code, name: it.name, qty: restante, price: it.price } : null;
+      // variant_id/serial_id: viajan con el ítem para que el servidor reingrese la
+      // variante correcta y libere el IMEI devuelto (ventas nuevas los traen).
+      return restante > 0 ? { code: it.code, name: it.name, qty: restante, price: it.price, variant_id: it.variant_id || null, serial_id: it.serial_id || null } : null;
     }).filter(Boolean);
     setForm(function(f) { return Object.assign({}, f, { items }); });
     setStep('form');
