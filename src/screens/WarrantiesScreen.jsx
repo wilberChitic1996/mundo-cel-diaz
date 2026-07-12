@@ -185,7 +185,21 @@ export default function WarrantiesScreen({ warranties, sales, repairs, saveWarra
 
           {war.status === 'reclamada' && (
             <div style={{ background: '#FCEBEB', borderRadius: 8, padding: '10px 14px', border: '1px solid #F09595' }}>
-              <p style={{ margin: 0, color: '#791F1F', fontSize: 13, fontWeight: 600 }}>⚠️ Esta garantía fue reclamada por el cliente.</p>
+              <p style={{ margin: '0 0 8px', color: '#791F1F', fontSize: 13, fontWeight: 600 }}>⚠️ Esta garantía fue reclamada por el cliente. ¿Qué sigue?</p>
+              <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+                {navTo && (
+                  <button style={Object.assign({}, mkBtn('red'), { padding: '6px 12px', fontSize: 13 })}
+                    onClick={function() { navTo('returns', { client: war.client }); }}>
+                    ↩ Hacer devolución
+                  </button>
+                )}
+                {navTo && (
+                  <button style={Object.assign({}, mkBtn('blue'), { padding: '6px 12px', fontSize: 13 })}
+                    onClick={function() { navTo('repairs', { search: war.client }); }}>
+                    🔧 Mandar a reparación
+                  </button>
+                )}
+              </div>
             </div>
           )}
         </div>
