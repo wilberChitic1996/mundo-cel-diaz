@@ -33,7 +33,7 @@
 
 import React, { useState } from 'react';
 import { TEAL, NAVY, sCard, sInput, sLabel, sTH, sTD, mkBtn, mkBadge } from '../styles/theme.js';
-import { Q, fmtD, fmtT } from '../utils/formatters.js';
+import { Q, fmtD, fmtT, gid } from '../utils/formatters.js';
 import { exportExcel, exportPDF } from '../utils/export.js';
 import { usePaginator } from '../hooks/usePaginator.jsx';
 import { abrirWA, waRecordatorio } from '../utils/whatsapp.js';
@@ -86,6 +86,9 @@ export default function AccountsScreen({ accounts, pendingAccs, totalPend, produ
   var _pn     = useState('');           var pmtNote      = _pn[0];       var setPmtNote      = _pn[1];
   var _pe     = useState('');           var pmtErr       = _pe[0];       var setPmtErr       = _pe[1];
   var _pb     = useState(false);        var pmtBusy      = _pb[0];       var setPmtBusy      = _pb[1];
+  // Llave anti-duplicado del abono: se REUSA en reintentos (si la red falla y se
+  // vuelve a intentar, el servidor reconoce la misma llave y no duplica el abono).
+  var pmtKeyRef = React.useRef(null);
 
   // Modal recordatorio masivo
   var _wam    = useState(false);        var showWaMasivo = _wam[0];      var setShowWaMasivo = _wam[1];
@@ -137,9 +140,11 @@ export default function AccountsScreen({ accounts, pendingAccs, totalPend, produ
     if (amt > acc.balance + 0.01) { setPmtErr('El máximo es ' + Q(acc.balance)); return; }
     setPmtErr('');
     setPmtBusy(true);
-    var ok = await addPayment(acc.id, Math.min(amt, acc.balance), pmtMethod, pmtNote);
+    if (!pmtKeyRef.current) pmtKeyRef.current = gid();
+    var ok = await addPayment(acc.id, Math.min(amt, acc.balance), pmtMethod, pmtNote, pmtKeyRef.current);
     setPmtBusy(false);
     if (ok !== false) {                            // addPayment ya muestra el flash de éxito/error
+      pmtKeyRef.current = null;                    // abono registrado: la próxima vez, llave nueva
       setPmtAmount('');
       setPmtNote('');
     }
@@ -245,7 +250,7 @@ export default function AccountsScreen({ accounts, pendingAccs, totalPend, produ
               <div className="form-grid-3" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 12, marginBottom: 12 }}>
                 <div>
                   <label style={sLabel}>Monto (Q)</label>
-                  <input type="number" style={sInput} value={pmtAmount} placeholder={'Saldo: ' + acc.balance.toFixed(2)} onChange={function(e) { setPmtErr(''); setPmtAmount(e.target.value); }} />
+                  <input type="number" style={sInput} value={pmtAmount} placeholder={'Saldo: ' + acc.balance.toFixed(2)} onChange={function(e) { setPmtErr(''); setPmtAmount(e.target.value); pmtKeyRef.current = null; }} />
                 </div>
                 <div>
                   <label style={sLabel}>Método</label>
