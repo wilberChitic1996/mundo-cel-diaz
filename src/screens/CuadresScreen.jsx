@@ -92,7 +92,8 @@ export default function CuadresScreen({ sales, accounts, returns, products, repa
     if (rango === 'hoy') return d.toDateString() === now.toDateString();
     if (rango === 'semana') {
       var wStart = new Date(now);
-      wStart.setDate(now.getDate() - now.getDay());
+      // Semana estandar lunes-domingo (antes empezaba domingo)
+      wStart.setDate(now.getDate() - ((now.getDay() + 6) % 7));
       wStart.setHours(0, 0, 0, 0);
       return d >= wStart && d <= now;
     }
