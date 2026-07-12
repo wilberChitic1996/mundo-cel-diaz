@@ -77,7 +77,8 @@ export default function HistoryScreen({ sales, selectedSale, setSelectedSale, ac
     if (hRango === 'hoy') return d.toDateString() === hNow.toDateString();
     if (hRango === 'semana') {
       var ws = new Date(hNow);
-      ws.setDate(hNow.getDate() - hNow.getDay());
+      // Semana estandar lunes-domingo (antes empezaba domingo)
+      ws.setDate(hNow.getDate() - ((hNow.getDay() + 6) % 7));
       ws.setHours(0, 0, 0, 0);
       return d >= ws && d <= hNow;
     }
