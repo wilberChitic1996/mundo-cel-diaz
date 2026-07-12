@@ -1265,7 +1265,7 @@ function App(props) {
   var subtotalNeto=cartTotal-ivaAmount;
   var initPaidVal=parseFloat(initialPay)||0;
 
-  function resetPOS(){ setCart([]);setCashIn("");setClientName("");setInitialPay("");setPayType("completo");setPayMethod("Efectivo");setSecondMethod("");setSecondAmount("");setSelectedClientId(null);setSaleNote("");setCobrandoRepId(null); idemRef.current=null; }
+  function resetPOS(){ setCart([]);setCashIn("");setClientName("");setInitialPay("");setPayType("completo");setPayMethod("Efectivo");setSecondMethod("");setSecondAmount("");setSelectedClientId(null);setSaleNote("");setCobrandoRepId(null); idemRef.current=null; variantsCache.current={}; }
 
   var checkoutInProgress=useRef(false);
   // Llave anti-duplicado del cobro: se genera UNA vez por carrito y se reusa en
@@ -2151,7 +2151,7 @@ function App(props) {
                   return (
                     <button key={v.id} style={{display:"flex",justifyContent:"space-between",alignItems:"center",width:"100%",padding:"10px 14px",marginBottom:8,borderRadius:8,border:"1.5px solid #d8d4cb",background:"transparent",cursor:"pointer",fontSize:14,fontWeight:600,color:"inherit"}}
                       onClick={function(){pushCartLine(variantPick.product,v);setVariantPick(null);}}>
-                      <span>{lbl}</span>
+                      <span>{lbl} <span style={{fontSize:11,color:"#999",fontWeight:400}}>({Number(v.stock||0)} disp.)</span></span>
                       <span style={{color:TEAL}}>{v.price!=null?'Q '+Number(v.price).toFixed(2):'Q '+Number(variantPick.product.price).toFixed(2)}</span>
                     </button>
                   );
