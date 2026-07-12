@@ -129,7 +129,16 @@ export default function CuadresScreen({ sales, accounts, returns, products, repa
   var periodSales        = sales.filter(function(s) { return inRange(s.date) && s.status === 'completado'; });
   // Ventas a crédito del período
   var periodSalesCredito = sales.filter(function(s) { return inRange(s.date) && s.status === 'cuenta'; });
-  var totalVentasCredito = periodSalesCredito.reduce(function(s, x) { return s + x.total; }, 0);
+  // Crédito otorgado = monto FINANCIADO (total − abono inicial). El abono inicial ya se
+  // reporta en "Abonos cobrados"; sumarlo también aquí lo mostraba dos veces.
+  var abonoInicialPorVenta = {};
+  accounts.forEach(function(a) {
+    if (!a.sale_id) return;
+    (a.payments || []).forEach(function(p) {
+      if ((p.note || '') === 'Abono inicial') abonoInicialPorVenta[a.sale_id] = (abonoInicialPorVenta[a.sale_id] || 0) + Number(p.amount || 0);
+    });
+  });
+  var totalVentasCredito = periodSalesCredito.reduce(function(s, x) { return s + Math.max(0, x.total - (abonoInicialPorVenta[x.id] || 0)); }, 0);
 
   // ── IVA del período: débito (ventas) vs crédito (compras con factura) ──
   // GT: precio con IVA incluido → desglose hacia atrás. Débito = todas las ventas emitidas
@@ -227,7 +236,8 @@ export default function CuadresScreen({ sales, accounts, returns, products, repa
 
   // Top 5 más vendidos por unidades
   var qtyMap = {};
-  periodSales.forEach(function(s) { (s.items || []).forEach(function(it) { qtyMap[it.name] = (qtyMap[it.name] || 0) + it.qty; }); });
+  // Incluye también las ventas a crédito: esas unidades igual salieron del inventario.
+  periodSales.concat(periodSalesCredito).forEach(function(s) { (s.items || []).forEach(function(it) { qtyMap[it.name] = (qtyMap[it.name] || 0) + it.qty; }); });
   var top5 = Object.keys(qtyMap).map(function(k) { return [k, qtyMap[k]]; }).sort(function(a, b) { return b[1] - a[1]; }).slice(0, 5);
 
   // Top 5 más rentables por ganancia Q
@@ -306,7 +316,7 @@ export default function CuadresScreen({ sales, accounts, returns, products, repa
         '<div class="metric"><div class="lbl">Abonos cobrados</div><div class="val">Q ' + abonosPeriod.toFixed(2) + '</div></div>' +
         '<div class="metric" style="border-left-color:#2E7D32;"><div class="lbl">Ingresos netos</div><div class="val" style="color:#2E7D32;">Q ' + totalIngresosNeto.toFixed(2) + '</div></div>' +
       '</div></div>' +
-      (totalVentasCredito > 0 ? '<div style="background:#FFF3E0;border-left:4px solid #E65100;border-radius:8px;padding:10px 14px;margin-bottom:20px;font-size:11px;color:#7A3700;"><b>Nota:</b> Q ' + totalVentasCredito.toFixed(2) + ' corresponden a ventas a crédito (' + periodSalesCredito.length + ' venta' + (periodSalesCredito.length !== 1 ? 's' : '') + ') — aún pendientes de cobro.</div>' : '') +
+      (totalVentasCredito > 0 ? '<div style="background:#FFF3E0;border-left:4px solid #E65100;border-radius:8px;padding:10px 14px;margin-bottom:20px;font-size:11px;color:#7A3700;"><b>Nota:</b> Q ' + totalVentasCredito.toFixed(2) + ' quedaron financiados al crédito (total menos abono inicial; ' + periodSalesCredito.length + ' venta' + (periodSalesCredito.length !== 1 ? 's' : '') + ') — aún pendientes de cobro.</div>' : '') +
 
       '<div class="section"><div class="section-title">💵 Por método de pago (neto)</div>' +
       '<div class="grid3">' +
