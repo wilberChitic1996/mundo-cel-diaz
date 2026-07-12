@@ -81,7 +81,7 @@ export default function WarrantiesScreen({ warranties, sales, repairs, saveWarra
   // Garantías filtradas por estado y búsqueda
   var displayed = warranties.filter(function(w) {
     if (filter === 'vigente')   return w.status === 'vigente';
-    if (filter === 'vencida')   return w.status === 'vencida' || new Date(w.endDate) < now;
+    if (filter === 'vencida')   return w.status !== 'reclamada' && (w.status === 'vencida' || new Date(w.endDate + 'T23:59:59') < now);
     if (filter === 'reclamada') return w.status === 'reclamada';
     return true;
   }).filter(function(w) {
@@ -94,8 +94,8 @@ export default function WarrantiesScreen({ warranties, sales, repairs, saveWarra
   var warPag = usePaginator(displayed, 20);
 
   // KPIs globales
-  var vigentes   = warranties.filter(function(w) { return w.status === 'vigente'   && new Date(w.endDate) >= now; }).length;
-  var vencidas   = warranties.filter(function(w) { return w.status === 'vencida'   || new Date(w.endDate) < now; }).length;
+  var vigentes   = warranties.filter(function(w) { return w.status === 'vigente'   && new Date(w.endDate + 'T23:59:59') >= now; }).length;
+  var vencidas   = warranties.filter(function(w) { return w.status !== 'reclamada' && (w.status === 'vencida' || new Date(w.endDate + 'T23:59:59') < now); }).length;
   var reclamadas = warranties.filter(function(w) { return w.status === 'reclamada'; }).length;
 
   // Limpia el formulario sin cerrarlo aún
@@ -292,7 +292,7 @@ export default function WarrantiesScreen({ warranties, sales, repairs, saveWarra
               </thead>
               <tbody>
                 {warPag.paged.map(function(w, index) {
-                  var wEnd  = new Date(w.endDate);
+                  var wEnd  = new Date(w.endDate + 'T23:59:59');
                   var dias  = Math.ceil((wEnd - now) / 86400000);
                   var isVig = w.status !== 'reclamada' && wEnd >= now;
                   return (

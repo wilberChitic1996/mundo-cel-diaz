@@ -226,7 +226,8 @@ export default function POSScreen({
           />
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill,minmax(148px,1fr))', gap: 10, maxHeight: 460, overflowY: 'auto', paddingRight: 2 }}>
             {filteredPOS.map(function(p) {
-              var inC    = cart.find(function(i) { return i.id === p.id; });
+              var inCQty = cart.filter(function(i) { return i.id === p.id; }).reduce(function(sq, i) { return sq + i.qty; }, 0);
+              var inC    = inCQty > 0;
               var agotado = p.stock === 0 && p.unit !== 'serv';
               return (
                 <div
@@ -241,7 +242,7 @@ export default function POSScreen({
                 >
                   {inC && (
                     <div style={{ position: 'absolute', top: 6, right: 6, background: TEAL, color: '#fff', borderRadius: 10, fontSize: 10, padding: '1px 6px', fontWeight: 700 }}>
-                      {inC.qty}
+                      {inCQty}
                     </div>
                   )}
                   <div style={{ fontSize: 10, color: '#999', marginBottom: 3, fontFamily: 'monospace' }}>{p.code} · {p.shelf}</div>
@@ -439,7 +440,7 @@ export default function POSScreen({
             {payType !== 'pendiente' && (
               <div style={{ marginBottom: 10 }}>
                 <label style={sLabel}>Método de pago</label>
-                <select style={sInput} value={payMethod} onChange={function(e) { setPayMethod(e.target.value); }}>
+                <select style={sInput} value={payMethod} onChange={function(e) { setPayMethod(e.target.value); if (e.target.value === secondMethod) { setSecondMethod(''); setSecondAmount(''); } }}>
                   <option>Efectivo</option>
                   <option>Tarjeta</option>
                   <option>Transferencia</option>

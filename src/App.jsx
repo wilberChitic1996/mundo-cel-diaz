@@ -1028,7 +1028,7 @@ function App(props) {
         var normalSales = (sls||[]).map(function(s){return Object.assign({},s,{items:s.sale_items||[],total:Number(s.total),date:s.created_at,registradoPor:s.registrado_por||null,payType:s.pay_type||'completo',status:s.status||'completado'});});
         var normalAccs  = (accs||[]).map(function(a){return Object.assign({},a,{items:a.account_items||[],payments:(a.account_payments||[]).map(function(_pp){return Object.assign({},_pp,{date:_pp.date||_pp.created_at,amount:Number(_pp.amount),registradoPor:_pp.registrado_por||_pp.registradoPor||null});}),total:Number(a.total),paid:Number(a.paid),balance:Number(a.balance),clientId:a.client_id,date:a.created_at,registradoPor:a.registrado_por||null});});
         var normalRets  = (rets||[]).map(function(r){return Object.assign({},r,{items:r.return_items||[],refundAmount:Number(r.refund_amount),itemCondition:r.item_condition,refundMethod:r.refund_method,date:r.created_at,saleId:r.sale_id||null});});
-        var normalDefs  = (defs||[]).map(function(d){return Object.assign({},d,{price:Number(d.price||0)});});
+        var normalDefs  = (defs||[]).map(function(d){return Object.assign({},d,{price:Number(d.price||0),date:d.created_at});});
         var normalClis  = (clis||[]).map(function(c){return Object.assign({},c,{cliCode:c.cli_code,createdAt:c.created_at});});
         var normalReps  = (reps||[]).map(function(r){return Object.assign({},r,{repCode:r.rep_code,clientId:r.client_id,clientName:r.client_name,clientPhone:r.client_phone,clientCli:r.client_cli,problemDesc:r.problem_desc,techName:r.tech_name,estimatedCost:Number(r.estimated_cost||0),promisedDate:r.promised_date,internalNote:r.internal_note,registradoPor:r.registrado_por||{},parts:r.parts||[],createdAt:r.created_at,finalCost:r.final_cost!=null?Number(r.final_cost):null,receptionChecklist:r.reception_checklist||null,receptionPhotos:r.reception_photos||[],deliveryPhotos:r.delivery_photos||[]});});
         // Modo consulta sin internet (v1): snapshot LOCAL (localStorage) del
@@ -1364,7 +1364,7 @@ function App(props) {
         productsAPI.getAll(),
       ]);
       setReturns((freshRets||[]).map(function(r){return Object.assign({},r,{items:r.return_items||[],refundAmount:Number(r.refund_amount),itemCondition:r.item_condition,refundMethod:r.refund_method,date:r.created_at,saleId:r.sale_id||null});}));
-      setDefectives((freshDefs||[]).map(function(d){return Object.assign({},d,{price:Number(d.price||0)});}));
+      setDefectives((freshDefs||[]).map(function(d){return Object.assign({},d,{price:Number(d.price||0),date:d.created_at});}));
       setProducts((freshProds||[]).map(function(p){return Object.assign({},p,{price:Number(p.price),cost:Number(p.cost),stock:Number(p.stock)});}));
     }catch(e){
       var emR=e&&e.error?e.error:null;
@@ -1378,7 +1378,7 @@ function App(props) {
     // Ofrecer comprobante de devolución (reutiliza el modal post-venta — E2)
     setPostSale({
       sale:{id:newId,client:data.client||"Cliente",total:Number(data.refundAmount||total),method:data.refundMethod||"Efectivo",items:(data.items||[]),date:new Date().toISOString(),registradoPor:registradoPor},
-      opts:{usuario:session.name,usuarioRole:session.role,docType:"devolucion",docLabel:"Comprobante de Devolución",tipo:"devolucion"}
+      opts:{usuario:session.name,usuarioRole:session.role,docType:"devolucion",docLabel:"Comprobante de Devolución",tipo:"devolucion",verifyId:data.saleId||null}
     });
   }
 
@@ -1386,7 +1386,7 @@ function App(props) {
     try{
       await defectivesAPI.update(id,status);
       var freshDefs = await defectivesAPI.getAll();
-      setDefectives((freshDefs||[]).map(function(d){return Object.assign({},d,{price:Number(d.price||0)});}));
+      setDefectives((freshDefs||[]).map(function(d){return Object.assign({},d,{price:Number(d.price||0),date:d.created_at});}));
       if(status==="reingresado"){
         var freshProds2 = await productsAPI.getAll();
         setProducts((freshProds2||[]).map(function(p){return Object.assign({},p,{price:Number(p.price),cost:Number(p.cost),stock:Number(p.stock)});}));

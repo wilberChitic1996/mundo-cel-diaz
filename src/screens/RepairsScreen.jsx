@@ -66,8 +66,13 @@ var H1 = { fontSize: 'clamp(17px,4vw,22px)', fontWeight: 600, margin: '0 0 20px'
 
 // Genera un código correlativo REP-000001, REP-000002, ...
 function genRepCode(repairs) {
-  var n = (repairs || []).length + 1;
-  return 'REP-' + String(n).padStart(6, '0');
+  // Correlativo por MAXIMO existente (length+1 duplicaba codigos tras borrar una orden)
+  var max = 0;
+  (repairs || []).forEach(function(r) {
+    var m = String(r.repCode || r.rep_code || '').match(/REP-(\d+)/);
+    if (m) max = Math.max(max, parseInt(m[1], 10));
+  });
+  return 'REP-' + String(max + 1).padStart(6, '0');
 }
 
 // Genera un UUID v4 simplificado para IDs locales

@@ -98,7 +98,7 @@ export default function CuadresScreen({ sales, accounts, returns, products, repa
     }
     if (rango === 'quincenal') {
       var q15 = new Date(now);
-      q15.setDate(now.getDate() - 15);
+      q15.setDate(now.getDate() - 14); // 15 dias calendario INCLUYENDO hoy
       q15.setHours(0, 0, 0, 0);
       return d >= q15 && d <= now;
     }
@@ -266,7 +266,9 @@ export default function CuadresScreen({ sales, accounts, returns, products, repa
 
     var allPeriodSales    = periodSales.concat(periodSalesCredito).slice().sort(function(a, b) { return new Date(b.date) - new Date(a.date); });
     var totalTransacciones = allPeriodSales.length;
-    var totalVentasBrutas  = totalVentas + totalVentasCredito;
+    // Pie de la tabla = suma real de las filas mostradas (totales completos de cada venta),
+    // no mezclar con el credito financiado de las metricas.
+    var totalVentasBrutas  = allPeriodSales.reduce(function(s2, x) { return s2 + Number(x.total || 0); }, 0);
 
     var salesRows = allPeriodSales.map(function(s) {
       var isCredito = s.status === 'cuenta';
@@ -311,7 +313,7 @@ export default function CuadresScreen({ sales, accounts, returns, products, repa
       '<div class="section"><div class="section-title">📊 Resumen de ingresos</div>' +
       '<div class="grid4">' +
         '<div class="metric"><div class="lbl">Transacciones</div><div class="val">' + totalTransacciones + '</div></div>' +
-        '<div class="metric"><div class="lbl">Cobrado (ef/tarjeta)</div><div class="val">Q ' + totalVentas.toFixed(2) + '</div></div>' +
+        '<div class="metric"><div class="lbl">Ventas cobradas (contado)</div><div class="val">Q ' + totalVentas.toFixed(2) + '</div></div>' +
         (totalVentasCredito > 0 ? '<div class="metric" style="border-left-color:#E65100;"><div class="lbl">Crédito otorgado</div><div class="val" style="color:#E65100;">Q ' + totalVentasCredito.toFixed(2) + '</div></div>' : '') +
         '<div class="metric"><div class="lbl">Abonos cobrados</div><div class="val">Q ' + abonosPeriod.toFixed(2) + '</div></div>' +
         '<div class="metric" style="border-left-color:#2E7D32;"><div class="lbl">Ingresos netos</div><div class="val" style="color:#2E7D32;">Q ' + totalIngresosNeto.toFixed(2) + '</div></div>' +
@@ -399,7 +401,7 @@ export default function CuadresScreen({ sales, accounts, returns, products, repa
     rows.push([]);
     rows.push(['RESUMEN DEL PERÍODO', label]);
     rows.push(['Ventas cobradas', totalVentas.toFixed(2)]);
-    rows.push(['Ventas a crédito', totalVentasCredito.toFixed(2)]);
+    rows.push(['Crédito otorgado (total − abono inicial)', totalVentasCredito.toFixed(2)]);
     rows.push(['Abonos recibidos', abonosPeriod.toFixed(2)]);
     rows.push(['Reembolsos (caja)', reembolsosCaja.toFixed(2)]);
     rows.push(['Ingresos netos', totalIngresos.toFixed(2)]);
@@ -469,7 +471,7 @@ export default function CuadresScreen({ sales, accounts, returns, products, repa
       {/* Métricas principales */}
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4,1fr)', gap: 14, marginBottom: 16 }}>
         <MetricBox label="Ventas totales"              value={periodSales.length + periodSalesCredito.length} color="#378ADD" />
-        <MetricBox label="Cobrado (efectivo/tarjeta)"  value={Q(totalVentas)}        color={TEAL} />
+        <MetricBox label="Ventas cobradas (contado)"  value={Q(totalVentas)}        color={TEAL} />
         <MetricBox label="Crédito otorgado"            value={Q(totalVentasCredito)}  color="#F59E0B" />
         <MetricBox label="Abonos cobrados"             value={Q(abonosPeriod)}        color="#7F77DD" />
       </div>
@@ -598,7 +600,7 @@ export default function CuadresScreen({ sales, accounts, returns, products, repa
 
       {/* Detalle de ventas del período */}
       <div style={sCard}>
-        <p style={{ fontWeight: 600, fontSize: 14, margin: '0 0 12px' }}>📋 Ventas del período <span style={{ fontWeight: 400, color: '#999', fontSize: 12 }}>({periodSales.length})</span></p>
+        <p style={{ fontWeight: 600, fontSize: 14, margin: '0 0 12px' }}>📋 Ventas cobradas (contado) <span style={{ fontWeight: 400, color: '#999', fontSize: 12 }}>({periodSales.length}{periodSalesCredito.length > 0 ? ' · +' + periodSalesCredito.length + ' a crédito en el PDF/Excel' : ''})</span></p>
         {periodSales.length === 0
           ? <p style={{ color: '#999', fontSize: 13, padding: '20px 0', textAlign: 'center' }}>Sin ventas en el período seleccionado</p>
           : (
