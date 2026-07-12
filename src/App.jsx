@@ -1297,7 +1297,7 @@ function App(props) {
     if(payType==="completo"){
       var _createdSale=null;
       try {
-        _createdSale = await salesAPI.create({client:client,total:cartTotal,method:payMethod,items:cart,nota:nota,idempotencyKey:idempotencyKey,ivaPct:ivaPercent,secondMethod:secondMethod||null,secondAmount:secondAmount?parseFloat(secondAmount):null,repairId:cobrandoRepId||null});
+        _createdSale = await salesAPI.create({client:client,clientId:selectedClientId||null,total:cartTotal,method:payMethod,items:cart,nota:nota,idempotencyKey:idempotencyKey,ivaPct:ivaPercent,secondMethod:secondMethod||null,secondAmount:secondAmount?parseFloat(secondAmount):null,repairId:cobrandoRepId||null});
       } catch(e){
         var errMsg=e&&e.error?e.error:null;
         showFlash("⛔ "+(errMsg||"Error al registrar la venta. Verifica tu conexión."),"err");
@@ -1321,7 +1321,7 @@ function App(props) {
       var balance=cartTotal-paid;
       var _createdAcc=null;
       try{
-        _createdAcc = await salesAPI.create({client:client,total:cartTotal,method:payMethod,items:cart,payType:payType,initialPay:paid,nota:nota,idempotencyKey:idempotencyKey,ivaPct:ivaPercent,secondMethod:secondMethod||null,secondAmount:secondAmount?parseFloat(secondAmount):null,repairId:cobrandoRepId||null});
+        _createdAcc = await salesAPI.create({client:client,clientId:selectedClientId||null,total:cartTotal,method:payMethod,items:cart,payType:payType,initialPay:paid,nota:nota,idempotencyKey:idempotencyKey,ivaPct:ivaPercent,secondMethod:secondMethod||null,secondAmount:secondAmount?parseFloat(secondAmount):null,repairId:cobrandoRepId||null});
       }catch(e){
         var errMsg2=e&&e.error?e.error:null;
         showFlash("⛔ "+(errMsg2||"Error al registrar la cuenta. Verifica tu conexión."),"err");
@@ -1384,6 +1384,7 @@ function App(props) {
     try{
       await returnsAPI.create({
         client:data.client,
+        clientId:data.clientId||null,
         saleId:data.saleId||null,
         reason:data.reason,
         refundMethod:data.refundMethod,
