@@ -1271,15 +1271,18 @@ function App(props) {
       var _createdSale=null;
       try {
         _createdSale = await salesAPI.create({client:client,total:cartTotal,method:payMethod,items:cart,nota:nota,idempotencyKey:idempotencyKey,ivaPct:ivaPercent,secondMethod:secondMethod||null,secondAmount:secondAmount?parseFloat(secondAmount):null,repairId:cobrandoRepId||null});
-        var freshSales = await salesAPI.getAll();
-        var ns = (freshSales||[]).map(function(s){return Object.assign({},s,{items:s.sale_items||[],total:Number(s.total),date:s.created_at,registradoPor:s.registrado_por||null,payType:s.pay_type||'completo',status:s.status||'completado'});});
-        setSales(ns);
       } catch(e){
         var errMsg=e&&e.error?e.error:null;
         showFlash("⛔ "+(errMsg||"Error al registrar la venta. Verifica tu conexión."),"err");
         checkoutInProgress.current=false;
         return;
       }
+      // Refresco APARTE: si falla, la venta YA esta confirmada (no mostrar error de venta ni permitir re-cobro)
+      try {
+        var freshSales = await salesAPI.getAll();
+        var ns = (freshSales||[]).map(function(s){return Object.assign({},s,{items:s.sale_items||[],total:Number(s.total),date:s.created_at,registradoPor:s.registrado_por||null,payType:s.pay_type||'completo',status:s.status||'completado'});});
+        setSales(ns);
+      } catch(_re){ /* se refresca en la proxima carga */ }
       deduct();
       showFlash("✓ Venta cobrada — "+Q(cartTotal),"ok");
       if(offerReceipt){
@@ -1292,6 +1295,14 @@ function App(props) {
       var _createdAcc=null;
       try{
         _createdAcc = await salesAPI.create({client:client,total:cartTotal,method:payMethod,items:cart,payType:payType,initialPay:paid,nota:nota,idempotencyKey:idempotencyKey,ivaPct:ivaPercent,secondMethod:secondMethod||null,secondAmount:secondAmount?parseFloat(secondAmount):null,repairId:cobrandoRepId||null});
+      }catch(e){
+        var errMsg2=e&&e.error?e.error:null;
+        showFlash("⛔ "+(errMsg2||"Error al registrar la cuenta. Verifica tu conexión."),"err");
+        checkoutInProgress.current=false;
+        return;
+      }
+      // Refresco APARTE: si falla, la cuenta YA esta confirmada (no tratar como error de cobro)
+      try {
         var freshAccs = await accountsAPI.getAll();
         var na=(freshAccs||[]).map(function(a){return Object.assign({},a,{items:a.account_items||[],payments:(a.account_payments||[]).map(function(_pp){return Object.assign({},_pp,{date:_pp.date||_pp.created_at,amount:Number(_pp.amount),registradoPor:_pp.registrado_por||_pp.registradoPor||null});}),total:Number(a.total),paid:Number(a.paid),balance:Number(a.balance),clientId:a.client_id,date:a.created_at,registradoPor:a.registrado_por||null});});
         setAccounts(na);
@@ -1299,12 +1310,7 @@ function App(props) {
         var freshSales2 = await salesAPI.getAll();
         var ns2 = (freshSales2||[]).map(function(s){return Object.assign({},s,{items:s.sale_items||[],total:Number(s.total),date:s.created_at,registradoPor:s.registrado_por||null,payType:s.pay_type||'completo',status:s.status||'completado'});});
         setSales(ns2);
-      }catch(e){
-        var errMsg2=e&&e.error?e.error:null;
-        showFlash("⛔ "+(errMsg2||"Error al registrar la cuenta. Verifica tu conexión."),"err");
-        checkoutInProgress.current=false;
-        return;
-      }
+      }catch(_re){ /* se refresca en la proxima carga */ }
       deduct();
       showFlash(payType==="pendiente"?"⏳ Pendiente — "+Q(cartTotal)+" por cobrar":"💰 Abono "+Q(paid)+" — Saldo: "+Q(balance),"warn");
       if(offerReceipt){
@@ -1363,6 +1369,8 @@ function App(props) {
         defectivesAPI.getAll(),
         productsAPI.getAll(),
       ]);
+      // 'Credito en cuenta' reduce la deuda en el servidor -> refrescar Cuentas al instante
+      if (data.refundMethod === 'Crédito en cuenta') { reloadAccounts(); }
       setReturns((freshRets||[]).map(function(r){return Object.assign({},r,{items:r.return_items||[],refundAmount:Number(r.refund_amount),itemCondition:r.item_condition,refundMethod:r.refund_method,date:r.created_at,saleId:r.sale_id||null});}));
       setDefectives((freshDefs||[]).map(function(d){return Object.assign({},d,{price:Number(d.price||0),date:d.created_at});}));
       setProducts((freshProds||[]).map(function(p){return Object.assign({},p,{price:Number(p.price),cost:Number(p.cost),stock:Number(p.stock)});}));
@@ -1479,12 +1487,17 @@ function App(props) {
           name:prod.name, category:catName, category_id:catId,
           shelf:prod.shelf||"", price:prod.price,
           cost:prod.cost||0, stock:0, unit:prod.unit||"uni",
+          min_stock: prod.min_stock || prod.minStock || 5,
         });
-        // Llevar el stock al valor real y registrar el movimiento inicial
+        // Llevar el stock al valor real y registrar el movimiento inicial.
+        // Si falla, reflejar 0 en pantalla y AVISAR (antes se tragaba el error y la
+        // pantalla mostraba stock que la BD no tenia).
+        var _stockFinal = 0;
         if((prod.stock||0)>0){
-          try{ await productsAPI.adjustStock(savedImp.id,{new_stock:prod.stock,reason:"Carga inicial por importación Excel"}); }catch(se){ /* no crítico */ }
+          try{ await productsAPI.adjustStock(savedImp.id,{new_stock:prod.stock,reason:"Carga inicial por importación Excel"}); _stockFinal=prod.stock; }
+          catch(se){ importErrors.push("("+prod.name+"): guardado pero el stock inicial no se aplicó — ajustalo manualmente"); }
         }
-        setProducts(function(p){return p.concat([Object.assign({},prod,{id:savedImp.id,code:savedImp.code,category_id:catId})]);});
+        setProducts(function(p){return p.concat([Object.assign({},prod,{id:savedImp.id,code:savedImp.code,category_id:catId,stock:_stockFinal})]);});
         count++;
       }catch(e){
         console.warn("Error importando:",prod.name,e);
@@ -1505,7 +1518,7 @@ function App(props) {
       setWarranties(function(p){return [Object.assign({},w,{entityType:w.entity_type,entityId:w.entity_id,startDate:w.start_date,endDate:w.end_date})].concat(p);});
       showFlash("✅ Garantía registrada","ok");
       return w;
-    }catch(e){ showFlash("Error registrando garantía","error"); }
+    }catch(e){ showFlash("⛔ "+((e&&e.error)||"Error registrando garantía"),"err"); }
   }
 
   async function updateWarranty(id, data){
@@ -1513,7 +1526,7 @@ function App(props) {
       var w=await warrantiesAPI.update(id, data);
       setWarranties(function(p){return p.map(function(x){return x.id===id?Object.assign({},x,w,{entityType:w.entity_type||x.entityType,entityId:w.entity_id||x.entityId,startDate:w.start_date||x.startDate,endDate:w.end_date||x.endDate}):x;});});
       showFlash("✅ Garantía actualizada","ok");
-    }catch(e){ showFlash("Error actualizando garantía","error"); }
+    }catch(e){ showFlash("⛔ "+((e&&e.error)||"Error actualizando garantía"),"err"); }
   }
 
   async function saveRepair(rep){
@@ -2092,7 +2105,15 @@ function App(props) {
         </div>
         <Sidebar view={view} setView={setView} cartCount={cart.length} pendingCount={pendingAccs.length} products={products} sales={sales} session={session} onLogout={onLogout} isOnline={isOnline} theme={theme} toggleTheme={toggleTheme} sidebarOpen={sidebarOpen} setSidebarOpen={setSidebarOpen} onSearch={function(){setGsOpen(true);}} storeInfo={storeInfo}/>
         {gsOpen&&<GlobalSearch onClose={function(){setGsOpen(false);}} setView={setView} sales={sales} clients={clients} products={products} repairs={repairs} setSelectedSale={setSelSale}/>}
-        <div key={view} style={{flex:1,padding:"clamp(12px,3vw,28px)",overflowY:"auto",minWidth:0}} className="main-content screen-enter">
+        {/* Banner global de mensajes: el POS ya dibuja el suyo; en el resto de pantallas era invisible */}
+          {view!=="pos" && flash && flash.msg && (
+            <div className="flash-msg" style={{position:"fixed",top:14,left:"50%",transform:"translateX(-50%)",zIndex:3000,padding:"10px 22px",borderRadius:10,fontWeight:600,fontSize:14,boxShadow:"0 6px 22px rgba(0,0,0,0.25)",maxWidth:"90vw",
+              background: flash.type==="err"?"#FDECEA":flash.type==="warn"?"#FFF7E0":"#E1F5EE",
+              color:      flash.type==="err"?"#8A1F1F":flash.type==="warn"?"#7A5800":"#0A5C44",
+              border: "1.5px solid " + (flash.type==="err"?"#F0A9A9":flash.type==="warn"?"#EFD48A":"#9BDAC4")
+            }}>{flash.msg}</div>
+          )}
+          <div key={view} style={{flex:1,padding:"clamp(12px,3vw,28px)",overflowY:"auto",minWidth:0}} className="main-content screen-enter">
           {view==="dashboard"&&canAccess(session.role,"dashboard")&&<DashboardScreen sales={sales} todaySales={todaySales} pendingAccs={pendingAccs} totalPend={totalPend} products={products} top5={top5} setSelectedSale={setSelSale} setView={setView} navTo={navTo} accounts={accounts} returns={returns} repairs={repairs} warranties={warranties} loaded={loaded}/>}
           {view==="pos"      &&canAccess(session.role,"pos")&&<POSScreen products={products} filteredPOS={filteredPOS} cart={cart} posQ={posQ} setPosQ={setPosQ} payMethod={payMethod} setPayMethod={setPayMethod} secondMethod={secondMethod} setSecondMethod={setSecondMethod} secondAmount={secondAmount} setSecondAmount={setSecondAmount} payType={payType} setPayType={setPayType} cashIn={cashIn} setCashIn={setCashIn} initialPay={initialPay} setInitialPay={setInitialPay} clientName={clientName} setClientName={setClientName} selectedClientId={selectedClientId} setSelectedClientId={setSelectedClientId} saleNote={saleNote} setSaleNote={setSaleNote} cartTotal={cartTotal} vuelto={vuelto} initPaidVal={initPaidVal} addToCart={addToCart} changeQty={changeQty} removeFromCart={removeFromCart} applyDiscount={applyDiscount} checkout={checkout} resetPOS={resetPOS} flash={flash} clients={clients} accounts={accounts} ivaPercent={ivaPercent} ivaAmount={ivaAmount} subtotalNeto={subtotalNeto}/>}
           {view==="caja"     &&canAccess(session.role,"caja")&&<CajaScreen sales={sales} accounts={accounts} returns={returns} session={session} onBackup={function(){ backupAPI.create().catch(function(){}); }}/>}
@@ -2105,7 +2126,7 @@ function App(props) {
           {view==="history"  &&canAccess(session.role,"history")&&<HistoryScreen sales={sales} selectedSale={selSale} setSelectedSale={setSelSale} accounts={accounts} returns={returns} products={products} session={session} clients={clients} navTo={navTo}/>}
           {view==="cuadres"  &&canAccess(session.role,"cuadres")&&<CuadresScreen sales={sales} accounts={accounts} returns={returns} products={products} repairs={repairs} session={session} showFlash={showFlash}/>}
           {view==="backup"   &&canAccess(session.role,"backup")&&<BackupScreen products={products} sales={sales} accounts={accounts} returns={returns} defectives={defectives} clients={clients} repairs={repairs} warranties={warranties} onExportJSON={exportJSON} onExportExcel={exportExcel}/>}
-          {view==="migracion"&&canAccess(session.role,"migracion")&&<MigracionScreen session={session} showFlash={showFlash} onChanged={reloadAccounts} clients={clients}/>}
+          {view==="migracion"&&canAccess(session.role,"migracion")&&<MigracionScreen session={session} showFlash={showFlash} onChanged={reloadAccounts} clients={clients} accounts={accounts}/>}
           {view==="users"    &&canAccess(session.role,"users")&&<UsersScreen session={session} showFlash={showFlash}/>}
           {view==="clients"  &&canAccess(session.role,"clients")&&<ClientsScreen clients={clients} sales={sales} accounts={accounts} returns={returns} saveClient={saveClient} session={session} showFlash={showFlash} initialSearch={view==="clients"&&deepLink?deepLink.search||'':''} initialClientId={view==="clients"&&deepLink?deepLink.clientId||null:null}/>}
           {view==="repairs"    &&canAccess(session.role,"repairs")&&<RepairsScreen repairs={repairs} clients={clients} products={products} saveRepair={saveRepair} updateRepairStatus={updateRepairStatus} reloadRepairs={reloadRepairs} onCobrar={cobrarReparacion} session={session} showFlash={showFlash} warranties={warranties} saveWarranty={saveWarranty} initialSearch={view==="repairs"&&deepLink?deepLink.search||'':''} initialRepairId={view==="repairs"&&deepLink?deepLink.repairId||null:null} navTo={navTo}/>}

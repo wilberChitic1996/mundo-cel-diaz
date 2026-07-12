@@ -123,7 +123,9 @@ function printRepairTicket(rep) {
       '<div class="block"><div class="lbl">Dispositivo</div><div class="val">' + rep.brand + ' ' + rep.model + '</div>' +
         (rep.imei ? '<div class="sub">IMEI: ' + rep.imei + '</div>' : '') + '</div>' +
       '<div class="block"><div class="lbl">Técnico asignado</div><div class="val">' + (rep.techName || 'Sin asignar') + '</div></div>' +
-      '<div class="block"><div class="lbl">Costo estimado</div><div class="val" style="color:#1D9E75;">Q ' + (rep.estimatedCost ? Number(rep.estimatedCost).toFixed(2) : 'Por definir') + '</div></div>' +
+      (rep.finalCost != null && Number(rep.finalCost) > 0
+        ? '<div class="block"><div class="lbl">Costo final cobrado</div><div class="val" style="color:#1D9E75;">Q ' + Number(rep.finalCost).toFixed(2) + '</div></div>'
+        : '<div class="block"><div class="lbl">Costo estimado</div><div class="val" style="color:#1D9E75;">Q ' + (rep.estimatedCost ? Number(rep.estimatedCost).toFixed(2) : 'Por definir') + '</div></div>') +
     '</div>' +
     '<div class="section"><div class="section-title">⚠️ Problema reportado por el cliente</div><div class="section-body">' + rep.problemDesc + '</div></div>' +
     (rep.diagnosis ? '<div class="section"><div class="section-title">🔍 Diagnóstico técnico</div><div class="section-body">' + rep.diagnosis + '</div></div>' : '') +

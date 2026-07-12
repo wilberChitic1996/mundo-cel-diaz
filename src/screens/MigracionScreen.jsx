@@ -32,6 +32,12 @@ export default function MigracionScreen(props) {
   var onChanged = props.onChanged || function () {};
   var showFlash = props.showFlash || function () {};
   var clients = props.clients || [];
+  var accounts = props.accounts || [];
+  // Aviso anti doble-carga: el cliente ya tiene deuda 'del cuaderno' cargada
+  function yaTieneCuaderno(name) {
+    var k = normName(name);
+    return accounts.some(function (ac) { return ac.origin === 'migracion' && normName(ac.client) === k && Number(ac.balance) > 0; });
+  }
 
   var [staged, setStaged] = useState([]);       // filas listas para previsualizar
   var [omitidas, setOmitidas] = useState([]);   // filas del Excel que se saltaron (con motivo)
@@ -218,7 +224,7 @@ export default function MigracionScreen(props) {
                   return (
                     <tr key={i}>
                       <td style={sTD}>{r.client}</td>
-                      <td style={sTD}>{findCliente(r.client) ? <span style={mkBadge('green')}>✓ existente</span> : <span style={mkBadge('amber')}>🆕 nuevo</span>}</td>
+                      <td style={sTD}>{findCliente(r.client) ? <span style={mkBadge('green')}>✓ existente</span> : <span style={mkBadge('amber')}>🆕 nuevo</span>}{yaTieneCuaderno(r.client) && <span style={Object.assign({}, mkBadge('red'), { marginLeft: 4 })}>⚠ ya tiene deuda del cuaderno</span>}</td>
                       <td style={sTD}>{r.phone || '—'}</td>
                       <td style={sTD}>{Q(Number(r.total))}</td>
                       <td style={sTD}>{Q(Number(r.paid) || 0)}</td>
