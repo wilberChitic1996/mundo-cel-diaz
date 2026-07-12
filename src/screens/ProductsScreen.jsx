@@ -138,6 +138,26 @@ export default function ProductsScreen({ products, categories, locations, savePr
   var _sb  = useState(false); var serialBusy    = _sb[0];  var setSerialBusy    = _sb[1];
   var _se  = useState('');    var serialErr     = _se[0];  var setSerialErr     = _se[1];
 
+  // Búsqueda global de IMEI (en todo el inventario del negocio)
+  var _io = useState(false); var imeiOpen = _io[0]; var setImeiOpen = _io[1];
+  var _iq = useState('');    var imeiQ    = _iq[0]; var setImeiQ    = _iq[1];
+  var _ir = useState(null);  var imeiRes  = _ir[0]; var setImeiRes  = _ir[1];
+  var _ib = useState(false); var imeiBusy = _ib[0]; var setImeiBusy = _ib[1];
+  var _ie = useState('');    var imeiErr  = _ie[0]; var setImeiErr  = _ie[1];
+
+  async function buscarImei() {
+    var q = imeiQ.trim();
+    if (q.length < 3) { setImeiErr('Escribí al menos 3 dígitos del IMEI/serial'); return; }
+    setImeiBusy(true); setImeiErr(''); setImeiRes(null);
+    try {
+      var d = await serialsAPI.search(q);
+      setImeiRes(d || []);
+    } catch (e) {
+      setImeiErr((e && e.error) || 'Error al buscar');
+    }
+    setImeiBusy(false);
+  }
+
   // ── Abre modal de seriales ────────────────────────────────────────────────
   function abrirSeriales(p) {
     setSerialProd(p);
@@ -487,6 +507,9 @@ export default function ProductsScreen({ products, categories, locations, savePr
             <option value="price">Precio ↑</option>
           </select>
           <span style={{ fontSize: 13, color: '#666' }}>{filtrados.length} items</span>
+          <button style={Object.assign({}, mkBtn('blue'), { padding: '8px 14px' })} onClick={function() { setImeiOpen(true); setImeiQ(''); setImeiRes(null); setImeiErr(''); }}>
+            🔎 Buscar IMEI
+          </button>
         </div>
       </div>
 
@@ -817,6 +840,58 @@ export default function ProductsScreen({ products, categories, locations, savePr
                 </table>
               )}
             </div>
+          </div>
+        </div>
+      )}
+
+      {/* ── Modal: Búsqueda global de IMEI ── */}
+      {imeiOpen && (
+        <div style={{ position: 'fixed', top: 0, left: 0, width: '100%', height: '100%', background: 'rgba(0,0,0,0.5)', zIndex: 1000, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 16, boxSizing: 'border-box' }}>
+          <div style={Object.assign({}, sCard, { width: 560, maxWidth: '100%', maxHeight: '85vh', overflowY: 'auto' })}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10 }}>
+              <h3 style={{ margin: 0 }}>🔎 Buscar IMEI / Serial</h3>
+              <button style={Object.assign({}, mkBtn('gray'), { padding: '4px 10px' })} onClick={function() { setImeiOpen(false); }}>✕</button>
+            </div>
+            <div style={{ display: 'flex', gap: 8, marginBottom: 10 }}>
+              <input
+                style={Object.assign({}, sInput, { flex: 1, fontFamily: 'monospace' })}
+                placeholder="Escribí el IMEI completo o una parte (mín. 3)"
+                value={imeiQ}
+                autoFocus
+                onChange={function(e) { setImeiQ(e.target.value); }}
+                onKeyDown={function(e) { if (e.key === 'Enter') buscarImei(); }}
+              />
+              <button style={mkBtn('teal')} disabled={imeiBusy} onClick={buscarImei}>{imeiBusy ? '...' : 'Buscar'}</button>
+            </div>
+            {imeiErr && <p style={{ color: '#C0392B', fontSize: 13, margin: '4px 0' }}>{imeiErr}</p>}
+            {imeiRes && imeiRes.length === 0 && <p style={{ color: '#666', fontSize: 13 }}>No se encontró ningún IMEI con "{imeiQ}".</p>}
+            {imeiRes && imeiRes.length > 0 && (
+              <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+                <thead><tr>{['IMEI / Serial', 'Producto', 'Estado'].map(function(h) { return <th key={h} style={sTH}>{h}</th>; })}</tr></thead>
+                <tbody>
+                  {imeiRes.map(function(s) {
+                    var colorS = s.status === 'disponible' ? 'green' : s.status === 'vendido' ? 'red' : s.status === 'defectuoso' ? 'amber' : 'blue';
+                    return (
+                      <tr key={s.id}>
+                        <td style={Object.assign({}, sTD, { fontFamily: 'monospace', fontSize: 13 })}>{s.imei}</td>
+                        <td style={sTD}>
+                          {s.products ? s.products.name : '—'}
+                          {s.products && <div style={{ fontSize: 11, color: '#999', fontFamily: 'monospace' }}>{s.products.code}</div>}
+                        </td>
+                        <td style={sTD}>
+                          <span style={mkBadge(colorS)}>{s.status}</span>
+                          {s.status === 'vendido' && s.sales && (
+                            <div style={{ fontSize: 11, color: '#999', marginTop: 2 }}>
+                              Vendido a {s.sales.client || '—'}{s.sales.date ? ' · ' + fmtD(s.sales.date) : ''}
+                            </div>
+                          )}
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            )}
           </div>
         </div>
       )}

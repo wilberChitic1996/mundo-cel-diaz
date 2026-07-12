@@ -458,7 +458,7 @@ export default function CajaScreen({ sales, accounts, returns: devos, session, o
               <table style={{ width: '100%', borderCollapse: 'collapse' }}>
                 <thead>
                   <tr>
-                    {['Apertura', 'Cierre', 'Abierta por', 'Cerrada por', 'Fondo', 'Efectivo contado', 'Estado'].map(function(h) {
+                    {['Apertura', 'Cierre', 'Abierta por', 'Cerrada por', 'Fondo', 'Efectivo contado', 'Diferencia', 'Estado'].map(function(h) {
                       return <th key={h} style={sTH}>{h}</th>;
                     })}
                   </tr>
@@ -474,6 +474,9 @@ export default function CajaScreen({ sales, accounts, returns: devos, session, o
                         <td style={sTD}>{s.closed_by || '—'}</td>
                         <td style={sTD}>Q {Number(s.fondo_inicial || 0).toFixed(2)}</td>
                         <td style={sTD}>{s.efectivo_contado != null ? 'Q ' + Number(s.efectivo_contado).toFixed(2) : '—'}</td>
+                        <td style={Object.assign({}, sTD, { fontWeight: 600, color: s.diferencia == null ? '#999' : Number(s.diferencia) >= 0 ? '#1D9E75' : '#C0392B' })}>
+                          {s.diferencia != null ? (Number(s.diferencia) >= 0 ? '+' : '') + 'Q ' + Number(s.diferencia).toFixed(2) : '—'}
+                        </td>
                         <td style={sTD}><span style={mkBadge(cerrada ? 'green' : 'amber')}>{cerrada ? 'Cerrada' : 'Abierta'}</span></td>
                       </tr>
                     );

@@ -59,22 +59,23 @@ function MetricBox({ label, value, color }) {
   );
 }
 
-export default function ReturnsScreen({ returns, products, clients, sales, onProcess }) {
+export default function ReturnsScreen({ returns, products, clients, sales, onProcess, initialClient }) {
   returns  = returns  || [];
   products = products || [];
   clients  = clients  || [];
   sales    = sales    || [];
 
   // Controla si el formulario de nueva devolución está visible
-  var _sh   = useState(false); var show    = _sh[0];   var setShow    = _sh[1];
+  // (si venimos de un reclamo de garantía, abre el flujo con el cliente prellenado)
+  var _sh   = useState(!!initialClient); var show    = _sh[0];   var setShow    = _sh[1];
   // Datos del formulario en curso
   var _fo   = useState(BLANK); var form    = _fo[0];   var setForm    = _fo[1];
   // Mensaje de error de validación
   var _er   = useState('');    var err     = _er[0];   var setErr     = _er[1];
   // Texto de búsqueda del cliente
-  var _cq   = useState('');    var cliQ    = _cq[0];   var setCliQ    = _cq[1];
+  var _cq   = useState(initialClient || ''); var cliQ = _cq[0]; var setCliQ = _cq[1];
   // Controla visibilidad del dropdown de resultados
-  var _cd   = useState(false); var showDrop = _cd[0];  var setShowDrop = _cd[1];
+  var _cd   = useState(!!initialClient); var showDrop = _cd[0]; var setShowDrop = _cd[1];
   // Cliente seleccionado (objeto completo)
   var _sc   = useState(null);  var selCli  = _sc[0];   var setSelCli  = _sc[1];
   // Paso actual del flujo: "search" | "sale" | "form"

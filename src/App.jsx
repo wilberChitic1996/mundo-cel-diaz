@@ -3,7 +3,7 @@ import * as XLSX from 'xlsx';
 import html2canvas from 'html2canvas';
 import { AreaChart, Area, BarChart, Bar, PieChart, Pie, Cell, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend } from 'recharts';
 import { db } from './utils/db.js';
-import { authAPI, productsAPI, salesAPI, accountsAPI, returnsAPI, defectivesAPI, usersAPI, checkAPI, clientsAPI, repairsAPI, auditAPI, warrantiesAPI, cajaAPI, settingsAPI, suppliersAPI, adminAPI, categoriesAPI, locationsAPI, backupAPI } from './utils/api.js';
+import { authAPI, productsAPI, salesAPI, accountsAPI, returnsAPI, defectivesAPI, usersAPI, checkAPI, clientsAPI, repairsAPI, auditAPI, warrantiesAPI, cajaAPI, settingsAPI, suppliersAPI, adminAPI, categoriesAPI, locationsAPI, backupAPI, variantsAPI } from './utils/api.js';
 // Sincroniza la config de tienda con el módulo de impresión (receipt.js usa su propio estado).
 import { setStore as setReceiptStore, printVoucher as printVoucherDoc, descargarImagen as descargarBoletaImagen, buildReceiptHTML } from './utils/receipt.js';
 
@@ -1198,21 +1198,48 @@ function App(props) {
     return (p.name||"").toLowerCase().includes(q)||(p.code||"").toLowerCase().includes(q)||(p.shelf||"").toLowerCase().includes(q);
   });
 
+  // Variantes por producto (color/capacidad): se consultan UNA vez y se cachean.
+  var variantsCache = React.useRef({});
+  var _vp=useState(null); var variantPick=_vp[0]; var setVariantPick=_vp[1];
+
+  function pushCartLine(p, variant){
+    var vLabel = variant ? [variant.color, variant.capacity].filter(Boolean).join(' ') : '';
+    var name   = variant && vLabel ? p.name + ' (' + vLabel + ')' : p.name;
+    var price  = variant && variant.price != null ? Number(variant.price) : p.price;
+    var lineId = variant ? p.id + ':' + variant.id : p.id;
+    setCart(function(c){
+      var ex=c.find(function(i){return !i.serial_id && (i.lineId||i.id)===lineId;});
+      if(ex) return ex.qty>=p.stock?c:c.map(function(i){return !i.serial_id&&(i.lineId||i.id)===lineId?Object.assign({},i,{qty:i.qty+1}):i;});
+      return c.concat([{id:p.id,code:p.code,name:name,price:price,shelf:p.shelf,unit:p.unit,qty:1,maxStock:p.stock,lineId:lineId,variant_id:variant?variant.id:null}]);
+    });
+  }
+
   function addToCart(p){
     if(p.stock<=0&&p.unit!=="serv"){showFlash('⚠️ Sin stock: '+p.name,'warn');return;}
-    setCart(function(c){
-      if(p.serial_id){
+    if(p.serial_id){
+      setCart(function(c){
         if(c.find(function(i){return i.serial_id===p.serial_id;})){showFlash('⚠️ Serial ya en carrito','warn');return c;}
         return c.concat([{id:p.id,code:p.code,name:p.name,price:p.price,shelf:p.shelf,unit:p.unit,qty:1,maxStock:1,serial_id:p.serial_id,imei:p.imei}]);
-      }
-      var ex=c.find(function(i){return i.id===p.id&&!i.serial_id;});
-      if(ex) return ex.qty>=p.stock?c:c.map(function(i){return i.id===p.id&&!i.serial_id?Object.assign({},i,{qty:i.qty+1}):i;});
-      return c.concat([{id:p.id,code:p.code,name:p.name,price:p.price,shelf:p.shelf,unit:p.unit,qty:1,maxStock:p.stock}]);
-    });
+      });
+      return;
+    }
+    // ¿Tiene variantes? (cacheado; si la consulta falla se agrega normal, sin bloquear la venta)
+    var cached = variantsCache.current[p.id];
+    if (cached === undefined && p.unit !== 'serv') {
+      variantsAPI.list(p.id).then(function(vs){
+        var act=(vs||[]).filter(function(v){return v.active!==false;});
+        variantsCache.current[p.id]=act;
+        if(act.length>0) setVariantPick({product:p,variants:act});
+        else pushCartLine(p,null);
+      }).catch(function(){ variantsCache.current[p.id]=[]; pushCartLine(p,null); });
+      return;
+    }
+    if (cached && cached.length>0) { setVariantPick({product:p,variants:cached}); return; }
+    pushCartLine(p,null);
   }
   // Identidad de LÍNEA del carrito: con seriales/IMEI puede haber varias líneas
   // del mismo producto (mismo id); la clave de línea es el serial si existe.
-  function lineKey(i){ return i.serial_id||i.id; }
+  function lineKey(i){ return i.serial_id||i.lineId||i.id; }
   function changeQty(key,d){ setCart(function(c){return c.map(function(i){return lineKey(i)===key?Object.assign({},i,{qty:Math.max(1,Math.min(i.qty+d,i.maxStock))}):i;});}); }
   function removeFromCart(key){ setCart(function(c){return c.filter(function(i){return lineKey(i)!==key;});}); }
 
@@ -2113,12 +2140,37 @@ function App(props) {
               border: "1.5px solid " + (flash.type==="err"?"#F0A9A9":flash.type==="warn"?"#EFD48A":"#9BDAC4")
             }}>{flash.msg}</div>
           )}
+          {/* Selector de variante (color/capacidad) al agregar al carrito */}
+          {variantPick && (
+            <div style={{position:"fixed",top:0,left:0,width:"100%",height:"100%",background:"rgba(0,0,0,0.5)",zIndex:3000,display:"flex",alignItems:"center",justifyContent:"center",padding:16}}>
+              <div style={{background:"var(--card,#fff)",borderRadius:12,padding:20,width:380,maxWidth:"100%",maxHeight:"80vh",overflowY:"auto",boxShadow:"0 10px 40px rgba(0,0,0,0.3)"}}>
+                <p style={{fontWeight:800,fontSize:16,margin:"0 0 4px"}}>🎨 {variantPick.product.name}</p>
+                <p style={{fontSize:13,color:"#666",margin:"0 0 12px"}}>¿Cuál variante se está vendiendo?</p>
+                {variantPick.variants.map(function(v){
+                  var lbl=[v.color,v.capacity].filter(Boolean).join(' ')||v.sku||'Variante';
+                  return (
+                    <button key={v.id} style={{display:"flex",justifyContent:"space-between",alignItems:"center",width:"100%",padding:"10px 14px",marginBottom:8,borderRadius:8,border:"1.5px solid #d8d4cb",background:"transparent",cursor:"pointer",fontSize:14,fontWeight:600,color:"inherit"}}
+                      onClick={function(){pushCartLine(variantPick.product,v);setVariantPick(null);}}>
+                      <span>{lbl}</span>
+                      <span style={{color:TEAL}}>{v.price!=null?'Q '+Number(v.price).toFixed(2):'Q '+Number(variantPick.product.price).toFixed(2)}</span>
+                    </button>
+                  );
+                })}
+                <button style={{width:"100%",padding:"9px 14px",marginBottom:8,borderRadius:8,border:"1.5px dashed #bbb",background:"transparent",cursor:"pointer",fontSize:13,color:"#666"}}
+                  onClick={function(){pushCartLine(variantPick.product,null);setVariantPick(null);}}>
+                  Sin especificar variante
+                </button>
+                <button style={{width:"100%",padding:"8px",borderRadius:8,border:"none",background:"transparent",cursor:"pointer",fontSize:13,color:"#999"}}
+                  onClick={function(){setVariantPick(null);}}>Cancelar</button>
+              </div>
+            </div>
+          )}
           <div key={view} style={{flex:1,padding:"clamp(12px,3vw,28px)",overflowY:"auto",minWidth:0}} className="main-content screen-enter">
           {view==="dashboard"&&canAccess(session.role,"dashboard")&&<DashboardScreen sales={sales} todaySales={todaySales} pendingAccs={pendingAccs} totalPend={totalPend} products={products} top5={top5} setSelectedSale={setSelSale} setView={setView} navTo={navTo} accounts={accounts} returns={returns} repairs={repairs} warranties={warranties} loaded={loaded}/>}
           {view==="pos"      &&canAccess(session.role,"pos")&&<POSScreen products={products} filteredPOS={filteredPOS} cart={cart} posQ={posQ} setPosQ={setPosQ} payMethod={payMethod} setPayMethod={setPayMethod} secondMethod={secondMethod} setSecondMethod={setSecondMethod} secondAmount={secondAmount} setSecondAmount={setSecondAmount} payType={payType} setPayType={setPayType} cashIn={cashIn} setCashIn={setCashIn} initialPay={initialPay} setInitialPay={setInitialPay} clientName={clientName} setClientName={setClientName} selectedClientId={selectedClientId} setSelectedClientId={setSelectedClientId} saleNote={saleNote} setSaleNote={setSaleNote} cartTotal={cartTotal} vuelto={vuelto} initPaidVal={initPaidVal} addToCart={addToCart} changeQty={changeQty} removeFromCart={removeFromCart} applyDiscount={applyDiscount} checkout={checkout} resetPOS={resetPOS} flash={flash} clients={clients} accounts={accounts} ivaPercent={ivaPercent} ivaAmount={ivaAmount} subtotalNeto={subtotalNeto}/>}
           {view==="caja"     &&canAccess(session.role,"caja")&&<CajaScreen sales={sales} accounts={accounts} returns={returns} session={session} onBackup={function(){ backupAPI.create().catch(function(){}); }}/>}
           {view==="accounts" &&canAccess(session.role,"accounts")&&<AccountsScreen accounts={accounts} pendingAccs={pendingAccs} totalPend={totalPend} addPayment={addPayment} showFlash={showFlash} products={products} session={session} clients={clients} navTo={navTo} initialSearch={view==="accounts"&&deepLink?deepLink.search||'':''}/>}
-          {view==="returns"  &&canAccess(session.role,"returns")&&<ReturnsScreen returns={returns} products={products} onProcess={processReturn} showFlash={showFlash} clients={clients} sales={sales}/>}
+          {view==="returns"  &&canAccess(session.role,"returns")&&<ReturnsScreen returns={returns} products={products} onProcess={processReturn} showFlash={showFlash} clients={clients} sales={sales} initialClient={view==="returns"&&deepLink?deepLink.client||'':''}/>}
           {view==="defective"&&canAccess(session.role,"defective")&&<DefectiveScreen defectives={defectives} onUpdateStatus={updateDefectiveStatus} onReingress={reingresarDefective}/>}
           {view==="products" &&canAccess(session.role,"products")&&<ProductsScreen products={products} categories={categories} locations={locations} saveProduct={saveProduct} deleteProduct={deleteProduct} importProducts={importProducts} showFlash={showFlash} setProducts={setProducts} initialSearch={view==="products"&&deepLink?deepLink.search||'':''}/>}
           {view==="catalogos"&&canAccess(session.role,"catalogos")&&<CatalogosScreen categories={categories} locations={locations} products={products} reloadCatalogos={reloadCatalogos} showFlash={showFlash}/>}
