@@ -205,7 +205,7 @@ export default function BackupScreen() {
             </span>
           </div>
           <div style={{ fontSize: 13, color: '#6b7280' }}>
-            Próximo backup automático: <b>Hoy a las 2:00 AM</b> (hora Guatemala)
+            Próximo backup automático: <b>{new Date().getHours() >= 2 ? 'Mañana' : 'Hoy'} a las 2:00 AM</b> (hora Guatemala)
           </div>
           {lastSuccess && (
             <div style={{ fontSize: 12, color: '#9ca3af', marginTop: 8 }}>

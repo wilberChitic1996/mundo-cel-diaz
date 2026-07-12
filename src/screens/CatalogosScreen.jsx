@@ -41,13 +41,24 @@ export default function CatalogosScreen({ categories, locations, products, reloa
   var _busy = useState(false);        var busy   = _busy[0]; var setBusy   = _busy[1];
 
   // Cuenta cuántos productos usan una categoría (para bloquear borrado)
-  function contarPorCategoria(id) {
-    return products.filter(function(p) { return String(p.category_id) === String(id); }).length;
+  function contarPorCategoria(id, nombre) {
+    // Cuenta tambien productos legacy que solo llevan el nombre en texto (sin category_id)
+    var nm = String(nombre || '').trim().toLowerCase();
+    return products.filter(function(p) {
+      return String(p.category_id) === String(id) || (!p.category_id && nm && String(p.category || '').trim().toLowerCase() === nm);
+    }).length;
   }
 
   // Cuenta cuántos productos usan una ubicación (para bloquear borrado)
-  function contarPorUbicacion(id) {
-    return products.filter(function(p) { return String(p.location_id) === String(id); }).length;
+  function contarPorUbicacion(id, nombre) {
+    // Cuenta tambien productos legacy que solo llevan el mueble en shelf (sin location_id)
+    var nm = String(nombre || '').trim().toLowerCase();
+    return products.filter(function(p) {
+      if (String(p.location_id) === String(id)) return true;
+      if (p.location_id || !nm) return false;
+      var sh = String(p.shelf || '').trim().toLowerCase();
+      return sh === nm || sh.indexOf(nm + ' ') === 0;
+    }).length;
   }
 
   // ── Acciones de Categorías ──────────────────────────────────────────────────
@@ -73,7 +84,7 @@ export default function CatalogosScreen({ categories, locations, products, reloa
   }
 
   async function eliminarCategoria(c) {
-    if (contarPorCategoria(c.id) > 0) {
+    if (contarPorCategoria(c.id, c.name) > 0) {
       showFlash('⚠️ No se puede eliminar: hay productos en "' + c.name + '"', 'err');
       return;
     }
@@ -123,7 +134,7 @@ export default function CatalogosScreen({ categories, locations, products, reloa
   }
 
   async function eliminarUbicacion(l) {
-    if (contarPorUbicacion(l.id) > 0) {
+    if (contarPorUbicacion(l.id, l.name) > 0) {
       showFlash('⚠️ No se puede eliminar: hay productos en "' + l.name + '"', 'err');
       return;
     }
@@ -212,7 +223,7 @@ export default function CatalogosScreen({ categories, locations, products, reloa
                         <td style={Object.assign({}, sTD, { fontWeight: 600 })}>
                           {(c.icon ? c.icon + ' ' : '') + c.name}
                         </td>
-                        <td style={sTD}>{contarPorCategoria(c.id)}</td>
+                        <td style={sTD}>{contarPorCategoria(c.id, c.name)}</td>
                         <td style={Object.assign({}, sTD, { textAlign: 'right' })}>
                           <button
                             style={Object.assign({}, mkBtn('blue'), { padding: '4px 10px', fontSize: 12, marginRight: 6 })}
@@ -269,7 +280,7 @@ export default function CatalogosScreen({ categories, locations, products, reloa
                     return (
                       <tr key={l.id}>
                         <td style={Object.assign({}, sTD, { fontWeight: 600 })}>{l.name}</td>
-                        <td style={sTD}>{contarPorUbicacion(l.id)}</td>
+                        <td style={sTD}>{contarPorUbicacion(l.id, l.name)}</td>
                         <td style={Object.assign({}, sTD, { textAlign: 'right' })}>
                           <button
                             style={Object.assign({}, mkBtn('blue'), { padding: '4px 10px', fontSize: 12, marginRight: 6 })}

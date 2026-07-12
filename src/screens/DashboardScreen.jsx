@@ -21,10 +21,10 @@
 //     - Cuentas pendientes de cobro
 //
 //   Gráficas (Recharts):
-//     - Ingresos diarios (AreaChart) — 7, 14 o 30 días
+//     - Ventas diarias (AreaChart) — 7, 14 o 30 días
 //     - Métodos de pago (PieChart)
 //     - Productos más vendidos — top 5 (BarChart horizontal)
-//     - Tendencia mensual — últimos 6 meses (BarChart)
+//     - Ventas por mes — últimos 6 meses (BarChart)
 //
 //   Listas rápidas:
 //     - Pendientes de cobro (top 5 cuentas)
@@ -185,7 +185,20 @@ export default function DashboardScreen({
   var totalCobrado    = ventasCobradas.reduce(function(s, x) { return s + x.total; }, 0);
 
   // Saldo de caja = efectivo cobrado hoy − reembolsos en efectivo de hoy
-  var cajaDia     = ventasCobradas.filter(function(s) { return s.method === 'Efectivo'; }).reduce(function(s, x) { return s + x.total; }, 0);
+  // Efectivo real: reparte pago dividido y suma abonos en efectivo de hoy (igual que Caja).
+  var cajaDia = 0;
+  ventasCobradas.forEach(function(x) {
+    var seg = Number(x.second_amount) || 0;
+    if (x.second_method && seg > 0) {
+      if (x.method === 'Efectivo') cajaDia += x.total - seg;
+      if (x.second_method === 'Efectivo') cajaDia += seg;
+    } else if (x.method === 'Efectivo') { cajaDia += x.total; }
+  });
+  (accounts || []).forEach(function(acc) {
+    (acc.payments || []).forEach(function(pm) {
+      if (pm.method === 'Efectivo' && new Date(pm.date).toDateString() === hoyStr) cajaDia += Number(pm.amount) || 0;
+    });
+  });
   var reembolsos  = devos.filter(function(r) { return new Date(r.date).toDateString() === hoyStr && r.refundMethod === 'Efectivo' && r.refundAmount > 0; }).reduce(function(s, r) { return s + r.refundAmount; }, 0);
   var saldoCaja   = cajaDia - reembolsos;
 
@@ -218,8 +231,15 @@ export default function DashboardScreen({
   var metodosMap = {};
   sales.forEach(function(s) {
     if (s.status === 'anulado') return;
-    var clave = s.status === 'cuenta' ? 'Crédito' : (s.method || 'Efectivo');
-    metodosMap[clave] = (metodosMap[clave] || 0) + s.total;
+    if (s.status === 'cuenta') { metodosMap['Crédito'] = (metodosMap['Crédito'] || 0) + s.total; return; }
+    var seg = Number(s.second_amount) || 0;
+    if (s.second_method && seg > 0) {
+      metodosMap[s.method || 'Efectivo'] = (metodosMap[s.method || 'Efectivo'] || 0) + (s.total - seg);
+      metodosMap[s.second_method] = (metodosMap[s.second_method] || 0) + seg;
+    } else {
+      var clave = s.method || 'Efectivo';
+      metodosMap[clave] = (metodosMap[clave] || 0) + s.total;
+    }
   });
   var metodosPie = Object.keys(metodosMap).map(function(m) {
     return { name: m, value: Math.round(metodosMap[m] * 100) / 100, color: METODO_COLORES[m] || '#888' };
@@ -238,7 +258,7 @@ export default function DashboardScreen({
   });
 
   // ── Stock bajo mínimo / sin stock ─────────────────────────────────────────
-  var stockAlertas = products.filter(function(p) { return p.unit !== 'serv' && p.minStock > 0 && p.stock <= p.minStock; });
+  var stockAlertas = products.filter(function(p) { var _min = Number(p.min_stock != null ? p.min_stock : p.minStock) || 0; return p.unit !== 'serv' && _min > 0 && p.stock <= _min; });
   var stockCero    = products.filter(function(p) { return p.unit !== 'serv' && p.stock === 0; });
 
   // ── Cuentas vencidas (>30 días sin pago) ──────────────────────────────────
@@ -248,7 +268,7 @@ export default function DashboardScreen({
   var garantiasPorVencer = warranties.filter(function(w) {
     if (w.status === 'reclamada') return false;
     var diff = (new Date(w.endDate) - ahora) / 86400000;
-    return diff <= 7;
+    return diff >= 0 && diff <= 7;
   });
 
   var hayAlertas = repsVencidas.length > 0 || stockCero.length > 0 || cuentasVencidas.length > 0 || garantiasPorVencer.length > 0;
@@ -365,7 +385,7 @@ export default function DashboardScreen({
       {/* Gráfica principal: ingresos diarios */}
       <div style={Object.assign({}, sCard, { marginBottom: 16 })}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16, flexWrap: 'wrap', gap: 8 }}>
-          <p style={{ fontWeight: 600, fontSize: 15, margin: 0 }}>📈 Ingresos diarios</p>
+          <p style={{ fontWeight: 600, fontSize: 15, margin: 0 }}>📈 Ventas diarias</p>
           <div style={{ display: 'flex', gap: 6 }}>
             {[['7d', '7 días'], ['14d', '14 días'], ['30d', '30 días']].map(function(r) {
               return (
@@ -458,9 +478,9 @@ export default function DashboardScreen({
         </div>
       </div>
 
-      {/* Tendencia mensual — últimos 6 meses */}
+      {/* Ventas por mes — últimos 6 meses */}
       <div style={Object.assign({}, sCard, { marginBottom: 16 })}>
-        <p style={{ fontWeight: 600, fontSize: 15, margin: '0 0 12px' }}>📅 Tendencia mensual (6 meses)</p>
+        <p style={{ fontWeight: 600, fontSize: 15, margin: '0 0 12px' }}>📅 Ventas por mes (6 meses)</p>
         <ResponsiveContainer width="100%" height={160}>
           <BarChart data={ultimos6Meses} margin={{ top: 4, right: 8, left: 0, bottom: 0 }}>
             <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" vertical={false} />

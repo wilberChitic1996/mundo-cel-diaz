@@ -16,6 +16,7 @@ var STATUS_LABEL = {
   pagado:     'Cuenta cancelada',
   parcial:    'Abono parcial',
   pendiente:  'Pendiente de pago',
+  cuenta:     'Venta a crédito',
 };
 
 export default function VerifyReceipt(props) {

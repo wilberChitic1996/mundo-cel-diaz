@@ -255,7 +255,9 @@ export function printVoucher(sale, opts) {
 
   // URL de verificación pública del comprobante (el QR apunta aquí)
   var _origin    = (typeof window !== 'undefined' && window.location) ? window.location.origin : '';
-  var _verifyUrl = _origin + '/?verify=' + encodeURIComponent(sale.id);
+  // Devoluciones: el QR verifica la VENTA original (el endpoint publico no resuelve returns)
+  var _verifyId  = (opts.tipo === 'devolucion' && opts.verifyId) ? opts.verifyId : sale.id;
+  var _verifyUrl = _origin + '/?verify=' + encodeURIComponent(_verifyId);
 
   var html = '<!DOCTYPE html><html><head><meta charset="UTF-8"><title>Comprobante ' + ventaNum + '</title>' +
   '<style>' +
@@ -311,8 +313,8 @@ export function printVoucher(sale, opts) {
   '</tr></thead><tbody>' + itemsHTML + '</tbody></table>' +
   '<div class="totals"><div class="totals-box">' +
     (totalDesc > 0
-      ? '<div class="totals-row"><span>Precio lista:</span><span>Q ' + subtotal.toFixed(2) + '</span></div>' +
-        '<div class="totals-row"><span style="color:#E65100">Descuentos:</span><span style="color:#E65100">- Q ' + totalDesc.toFixed(2) + '</span></div>'
+      ? '<div class="totals-row"><span>' + (opts.tipo === 'devolucion' ? 'Valor de los artículos:' : 'Precio lista:') + '</span><span>Q ' + subtotal.toFixed(2) + '</span></div>' +
+        '<div class="totals-row"><span style="color:#E65100">' + (opts.tipo === 'devolucion' ? 'No reembolsado:' : 'Descuentos:') + '</span><span style="color:#E65100">- Q ' + totalDesc.toFixed(2) + '</span></div>'
       : '') +
     (_ivaPct > 0
       ? '<div class="totals-row"><span>Subtotal (sin IVA):</span><span>Q ' + _subtotNeto.toFixed(2) + '</span></div>' +

@@ -325,7 +325,7 @@ export default function ProductsScreen({ products, categories, locations, savePr
               price:    price,
               cost:     parseFloat(get(row, ci.cost))  || 0,
               stock:    parseInt(get(row, ci.stock))   || 0,
-              minStock: 5,
+              minStock: 5, min_stock: 5,
               unit:     unit,
             });
           }
@@ -527,7 +527,7 @@ export default function ProductsScreen({ products, categories, locations, savePr
                         : '—'}
                     </td>
                     <td style={sTD}>
-                      <span style={mkBadge(p.unit === 'serv' ? 'blue' : p.stock === 0 ? 'red' : p.stock < 5 ? 'amber' : 'green')}>
+                      <span style={mkBadge(p.unit === 'serv' ? 'blue' : p.stock === 0 ? 'red' : p.stock <= (Number(p.min_stock) > 0 ? Number(p.min_stock) : 4) ? 'amber' : 'green')}>
                         {p.unit === 'serv' ? 'Serv.' : p.stock}
                       </span>
                     </td>

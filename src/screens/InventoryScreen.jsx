@@ -54,7 +54,7 @@ export default function InventoryScreen({ products }) {
     if (!seccionesMap[sec]) seccionesMap[sec] = { count: 0, stock: 0, alertas: 0 };
     seccionesMap[sec].count++;
     seccionesMap[sec].stock  += p.stock;
-    if (p.stock < 5) seccionesMap[sec].alertas++;
+    if (p.stock <= (Number(p.min_stock) > 0 ? Number(p.min_stock) : 4)) seccionesMap[sec].alertas++;
   });
 
   // Productos filtrados para la vista Lista
@@ -240,7 +240,7 @@ export default function InventoryScreen({ products }) {
                       <td style={{ padding: '9px 14px', fontSize: 13, fontWeight: 500, color: NAVY }}>{p.name}</td>
                       <td style={{ padding: '9px 14px', fontSize: 12, color: '#666' }}>{p.category || '—'}</td>
                       <td style={{ padding: '9px 14px' }}>
-                        <span style={mkBadge(p.stock === 0 ? 'red' : p.stock < 5 ? 'amber' : 'green')}>{p.stock}</span>
+                        <span style={mkBadge(p.stock === 0 ? 'red' : p.stock <= (Number(p.min_stock) > 0 ? Number(p.min_stock) : 4) ? 'amber' : 'green')}>{p.stock}</span>
                       </td>
                       <td style={{ padding: '9px 14px', fontSize: 13, fontWeight: 600, color: NAVY }}>Q{Number(p.price).toFixed(2)}</td>
                     </tr>

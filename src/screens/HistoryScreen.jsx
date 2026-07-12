@@ -103,8 +103,12 @@ export default function HistoryScreen({ sales, selectedSale, setSelectedSale, ac
     if (s.status === 'cuenta') return;
     movs.push({
       k: 'v' + s.id, date: s.date, tipo: 'Venta', color: 'teal',
-      cliente: s.client, metodo: s.method,
-      atendio: (s.registradoPor && s.registradoPor.name) ? s.registradoPor.name : (session.name || '—'),
+      cliente: s.client,
+      // Pago dividido: mostrar ambos metodos con su porcion (antes todo al principal)
+      metodo: (s.second_method && Number(s.second_amount) > 0)
+        ? s.method + ' Q' + (Number(s.total) - Number(s.second_amount)).toFixed(2) + ' + ' + s.second_method + ' Q' + Number(s.second_amount).toFixed(2)
+        : s.method,
+      atendio: (s.registradoPor && s.registradoPor.name) ? s.registradoPor.name : '—',
       monto: Number(s.total), signo: 1, kind: 'sale', obj: s,
     });
   });
@@ -114,11 +118,11 @@ export default function HistoryScreen({ sales, selectedSale, setSelectedSale, ac
     movs.push({
       k: 'a' + a.id, date: a.date, tipo: 'Venta a credito', color: 'purple',
       cliente: a.client, metodo: 'Credito',
-      atendio: (a.registradoPor && a.registradoPor.name) ? a.registradoPor.name : (session.name || '—'),
+      atendio: (a.registradoPor && a.registradoPor.name) ? a.registradoPor.name : '—',
       monto: Number(a.total), signo: 1, kind: 'credito', obj: a,
     });
     var _ac = 0;
-    (a.payments || []).forEach(function(p) {
+    (a.payments || []).slice().sort(function(_x,_y){ return new Date(_x.date) - new Date(_y.date); }).forEach(function(p) {
       _ac += Number(p.amount);
       var _sd  = Math.max(0, Number(a.total) - _ac);
       var _fin = _sd <= 0.009;
@@ -128,7 +132,7 @@ export default function HistoryScreen({ sales, selectedSale, setSelectedSale, ac
         tipo: _fin ? 'Abono final' : 'Abono',
         color: _fin ? 'green' : 'amber',
         cliente: a.client, metodo: p.method,
-        atendio: (p.registradoPor && p.registradoPor.name) ? p.registradoPor.name : (session.name || '—'),
+        atendio: (p.registradoPor && p.registradoPor.name) ? p.registradoPor.name : '—',
         monto: Number(p.amount), signo: 1, kind: 'abono', obj: a,
         pdata: { estado: _fin ? 'pagado' : 'parcial', abonoHoy: Number(p.amount), pagado: _ac, saldo: _sd },
       });
@@ -265,9 +269,10 @@ export default function HistoryScreen({ sales, selectedSale, setSelectedSale, ac
             </tbody>
           </table>
           {(function() {
-            var ivaPct = parseFloat((getStore().iva_percent) || 0) || 0;
+            // IVA HISTORICO: usar el % y monto guardados en la venta (no el config actual).
+            var ivaPct = selectedSale.iva_percent != null ? (parseFloat(selectedSale.iva_percent) || 0) : (parseFloat((getStore().iva_percent) || 0) || 0);
             var total  = Number(selectedSale.total) || 0;
-            var ivaAmt = ivaPct > 0 ? total - total / (1 + ivaPct / 100) : 0;
+            var ivaAmt = selectedSale.iva_amount != null ? (Number(selectedSale.iva_amount) || 0) : (ivaPct > 0 ? total - total / (1 + ivaPct / 100) : 0);
             var subtot = total - ivaAmt;
             return (
               <div style={{ borderTop: '1px solid rgba(0,0,0,0.1)', marginTop: 8, paddingTop: 10, textAlign: 'right' }}>
