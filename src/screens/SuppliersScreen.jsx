@@ -292,7 +292,7 @@ export default function SuppliersScreen({ products, session, showFlash, onStockU
           )}
           {tab === 'compras' && (
             <button style={mkBtn('green')} onClick={function() {
-              var rows = purchases.map(function(p) { return [fmtD(p.date), p.supplier_name, (p.items || []).length, Q(p.total), p.notes || '']; });
+              var rows = purchases.map(function(p) { return [fmtD(p.created_at), p.supplier_name, (p.purchase_items || []).length, Q(p.total), p.notes || '']; });
               exportExcel(rows, ['Fecha', 'Proveedor', 'Artículos', 'Total', 'Notas'], 'Compras');
               showFlash('✅ Excel exportado', 'ok');
             }}>📊 Excel</button>

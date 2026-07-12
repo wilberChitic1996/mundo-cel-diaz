@@ -45,8 +45,9 @@ var saInput = { width: '100%', padding: '10px 12px', borderRadius: 8, border: '1
 // Badge de vencimiento de suscripción (verde / ámbar / rojo)
 function ExpiryBadge({ expiresAt }) {
   if (!expiresAt) return <span style={Object.assign({}, mkBadge('#aaa'), { fontSize: 10 })}>Sin fecha</span>;
-  var days = Math.ceil((new Date(expiresAt) - new Date()) / 86400000);
-  if (days < 0)   return <span style={Object.assign({}, mkBadge('#E24B4A'), { fontSize: 10 })}>Vencido</span>;
+  var ms = new Date(expiresAt) - new Date();
+  var days = Math.ceil(ms / 86400000);
+  if (ms < 0)     return <span style={Object.assign({}, mkBadge('#E24B4A'), { fontSize: 10 })}>Vencido</span>;
   if (days <= 7)  return <span style={Object.assign({}, mkBadge('#F39C12'), { fontSize: 10 })}>⚠ {days}d</span>;
   if (days <= 30) return <span style={Object.assign({}, mkBadge('#f5a623'), { fontSize: 10 })}>{days}d</span>;
   return <span style={Object.assign({}, mkBadge(TEAL), { fontSize: 10 })}>{days}d</span>;

@@ -67,6 +67,10 @@ function MetricBox({ label, value, color }) {
   );
 }
 
+
+// Comparacion de nombre tolerante (espacios/mayusculas) para registros historicos sin clientId
+function sameName(a, b) { return String(a || '').trim().toLowerCase() === String(b || '').trim().toLowerCase(); }
+
 export default function ClientsScreen({ clients, sales, accounts, returns, saveClient, session, showFlash, initialSearch, initialClientId }) {
   clients  = clients  || [];
   sales    = sales    || [];
@@ -156,9 +160,9 @@ export default function ClientsScreen({ clients, sales, accounts, returns, saveC
     var cli = clients.find(function(c) { return c.id === selCli; });
     if (!cli) { setSelCli(null); return null; }
 
-    var cliSales    = sales.filter(function(s)    { return s.clientId === cli.id || (s.client === cli.name && !s.clientId); });
-    var cliAccs     = accounts.filter(function(a) { return a.clientId === cli.id || (a.client === cli.name && !a.clientId); });
-    var cliRets     = returns.filter(function(r)  { return r.clientId === cli.id || (r.client === cli.name && !r.clientId); });
+    var cliSales    = sales.filter(function(s)    { return s.clientId === cli.id || (sameName(s.client, cli.name) && !s.clientId); });
+    var cliAccs     = accounts.filter(function(a) { return a.clientId === cli.id || (sameName(a.client, cli.name) && !a.clientId); });
+    var cliRets     = returns.filter(function(r)  { return r.clientId === cli.id || (sameName(r.client, cli.name) && !r.clientId); });
     var totalComprado  = cliSales.reduce(function(s, x) { return s + x.total; }, 0);
     var totalPendiente = cliAccs.filter(function(a) { return a.status !== 'pagado'; }).reduce(function(s, a) { return s + a.balance; }, 0);
     var esFrecuente    = cliSales.length >= 5 || totalComprado >= 1000;
@@ -292,11 +296,11 @@ export default function ClientsScreen({ clients, sales, accounts, returns, saveC
   var totalClientes = clients.length;
   var conDeuda = clients.filter(function(c) {
     return accounts.filter(function(a) {
-      return (a.clientId === c.id || (a.client === c.name && !a.clientId)) && a.status !== 'pagado';
+      return (a.clientId === c.id || (sameName(a.client, c.name) && !a.clientId)) && a.status !== 'pagado';
     }).length > 0;
   }).length;
   var frecuentes = clients.filter(function(c) {
-    var cs = sales.filter(function(s) { return s.clientId === c.id || (s.client === c.name && !s.clientId); });
+    var cs = sales.filter(function(s) { return s.clientId === c.id || (sameName(s.client, c.name) && !s.clientId); });
     return cs.length >= 5 || cs.reduce(function(s, x) { return s + x.total; }, 0) >= 1000;
   }).length;
 
@@ -389,8 +393,8 @@ export default function ClientsScreen({ clients, sales, accounts, returns, saveC
               </thead>
               <tbody>
                 {cliPag.paged.map(function(c, index) {
-                  var cliSalesArr = sales.filter(function(s) { return s.clientId === c.id || (s.client === c.name && !s.clientId); });
-                  var cliDeuda    = accounts.filter(function(a) { return (a.clientId === c.id || (a.client === c.name && !a.clientId)) && a.status !== 'pagado'; }).reduce(function(s, a) { return s + a.balance; }, 0);
+                  var cliSalesArr = sales.filter(function(s) { return s.clientId === c.id || (sameName(s.client, c.name) && !s.clientId); });
+                  var cliDeuda    = accounts.filter(function(a) { return (a.clientId === c.id || (sameName(a.client, c.name) && !a.clientId)) && a.status !== 'pagado'; }).reduce(function(s, a) { return s + a.balance; }, 0);
                   var esFrecuente = cliSalesArr.length >= 5 || cliSalesArr.reduce(function(s, x) { return s + x.total; }, 0) >= 1000;
                   return (
                     <tr key={c.id} style={{ cursor: 'pointer' }} onClick={function() { setSelCli(c.id); }}>
