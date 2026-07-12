@@ -71,8 +71,8 @@ export default function ProductForm({ product, categories, locations, onSave, on
       setErr('La categoría es obligatoria — elígela de la lista');
       return;
     }
-    if (!form.price || isNaN(parseFloat(form.price))) {
-      setErr('El precio es obligatorio');
+    if (!form.price || isNaN(parseFloat(form.price)) || parseFloat(form.price) <= 0) {
+      setErr('El precio es obligatorio y debe ser mayor que 0');
       return;
     }
 

@@ -793,7 +793,14 @@ export default function ProductsScreen({ products, categories, locations, savePr
                       return (
                         <tr key={s.id}>
                           <td style={Object.assign({}, sTD, { fontFamily: 'monospace', fontSize: 13 })}>{s.imei}</td>
-                          <td style={sTD}><span style={mkBadge(colorStatus)}>{s.status}</span></td>
+                          <td style={sTD}>
+                            <span style={mkBadge(colorStatus)}>{s.status}</span>
+                            {s.status === 'vendido' && s.sales && (
+                              <div style={{ fontSize: 11, color: '#999', marginTop: 2 }}>
+                                Vendido a {s.sales.client || '—'}{s.sales.date ? ' · ' + fmtD(s.sales.date) : ''}
+                              </div>
+                            )}
+                          </td>
                           <td style={Object.assign({}, sTD, { fontSize: 12, color: '#666' })}>{s.notes || '—'}</td>
                           <td style={sTD}>
                             {s.status !== 'vendido' && (

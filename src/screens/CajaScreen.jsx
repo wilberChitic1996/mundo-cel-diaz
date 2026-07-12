@@ -191,9 +191,9 @@ export default function CajaScreen({ sales, accounts, returns: devos, session, o
       setGastoMonto('');
       setGastoCat('general');
       setGuardando(false);
-    }).catch(function() {
+    }).catch(function(e) {
       setGuardando(false);
-      alert('Error al registrar gasto');
+      alert((e && e.error) ? e.error : 'Error al registrar gasto');
     });
   }
 
@@ -201,6 +201,8 @@ export default function CajaScreen({ sales, accounts, returns: devos, session, o
     if (!window.confirm('¿Eliminar este gasto?')) return;
     cajaAPI.eliminarGasto(id).then(function() {
       setGastos(function(prev) { return prev.filter(function(g) { return g.id !== id; }); });
+    }).catch(function(e) {
+      alert((e && e.error) ? e.error : 'No se pudo eliminar el gasto');
     });
   }
 
@@ -208,7 +210,7 @@ export default function CajaScreen({ sales, accounts, returns: devos, session, o
     if (!sesionActiva) return;
     setGuardando(true);
     cajaAPI.cerrar(sesionActiva.id, {
-      efectivo_contado: efectivoContado ? parseFloat(efectivoContado) : null,
+      efectivo_contado: efectivoContado === '' ? null : parseFloat(efectivoContado), // '0' ES un conteo (gaveta vacia), no 'sin contar'
       nota:             notaCierre,
     }).then(function(s) {
       imprimirCierreCaja(s);
@@ -306,11 +308,11 @@ export default function CajaScreen({ sales, accounts, returns: devos, session, o
         <p style={H1}>💵 Caja</p>
         <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
           {!sesionActiva ? (
-            <button style={mkBtn('teal')} onClick={function() { setShowApertura(true); }}>🔓 Abrir Caja</button>
+            session.role !== 'auditor' && <button style={mkBtn('teal')} onClick={function() { setShowApertura(true); }}>🔓 Abrir Caja</button>
           ) : (
             <>
-              <button style={mkBtn('gray')} onClick={function() { setShowGasto(true); }}>💸 Registrar Gasto</button>
-              <button style={Object.assign({}, mkBtn('red'), { background: '#E24B4A' })} onClick={function() { setShowCierre(true); }}>🔒 Cerrar Caja</button>
+              {session.role !== 'auditor' && <button style={mkBtn('gray')} onClick={function() { setShowGasto(true); }}>💸 Registrar Gasto</button>}
+              {session.role !== 'auditor' && <button style={Object.assign({}, mkBtn('red'), { background: '#E24B4A' })} onClick={function() { setShowCierre(true); }}>🔒 Cerrar Caja</button>}
             </>
           )}
         </div>
@@ -406,7 +408,7 @@ export default function CajaScreen({ sales, accounts, returns: devos, session, o
         <div style={sCard}>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 14 }}>
             <p style={{ fontWeight: 600, fontSize: 15, margin: 0 }}>Gastos de caja</p>
-            {sesionActiva && <button style={mkBtn('teal')} onClick={function() { setShowGasto(true); }}>+ Nuevo gasto</button>}
+            {sesionActiva && session.role !== 'auditor' && <button style={mkBtn('teal')} onClick={function() { setShowGasto(true); }}>+ Nuevo gasto</button>}
           </div>
           {gastos.length === 0
             ? <p style={{ textAlign: 'center', color: '#999', padding: 32 }}>Sin gastos registrados en esta sesión</p>
@@ -557,7 +559,7 @@ export default function CajaScreen({ sales, accounts, returns: devos, session, o
               onChange={function(e) { setEfectivoContado(e.target.value); }}
             />
             {/* Indicador visual de diferencia */}
-            {efectivoContado && (
+            {efectivoContado !== '' && (
               <div style={{ marginTop: 8, fontWeight: 700, fontSize: 14, color: parseFloat(efectivoContado) - saldoEsperado >= 0 ? '#2E7D32' : '#E24B4A' }}>
                 Diferencia: {parseFloat(efectivoContado) - saldoEsperado >= 0 ? '+' : ''}Q {(parseFloat(efectivoContado) - saldoEsperado).toFixed(2)}
               </div>
