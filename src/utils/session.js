@@ -69,6 +69,14 @@ export async function tryRefreshSession() {
     var data = await authAPI.refresh(rt);
     if (!data || !data.token) return null;
     if (data.refreshToken) localStorage.setItem(REFRESH_KEY, data.refreshToken);
+    // CRITICO: el interceptor de axios lee el token de 'mnpos-api-session' (api.js).
+    // Sin esta sincronizacion, el JWT renovado nunca llegaba a las peticiones y
+    // a las 8h exactas todo respondia 401 aunque la UI creyera seguir logueada.
+    try {
+      var apiSess = JSON.parse(sessionStorage.getItem('mnpos-api-session') || 'null') || {};
+      apiSess.token = data.token;
+      sessionStorage.setItem('mnpos-api-session', JSON.stringify(apiSess));
+    } catch (_e) { /* sin sesion api previa: el proximo login la crea */ }
     // Re-decode user from the existing session (user info doesn't change on refresh)
     var existing = JSON.parse(sessionStorage.getItem(SESS_KEY) || 'null');
     var user = existing ? { id: existing.userId, name: existing.name, email: existing.email, role: existing.role, tenant_id: existing.tenant_id } : null;
